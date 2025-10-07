@@ -1,5 +1,5 @@
-import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
+import { Button } from "@/frontend/components/ui/button"
+import { Badge } from "@/frontend/components/ui/badge"
 import { Calendar, ChevronLeft, ChevronRight, Sparkles, Target } from "lucide-react"
 
 export function OpportunityOfTheDay() {

@@ -1,5 +1,5 @@
 import Link from "next/link"
-import { Button } from "@/components/ui/button"
+import { Button } from "@/frontend/components/ui/button"
 import { TrendingUp } from "lucide-react"
 
 export function Header() {
@@ -9,7 +9,7 @@ export function Header() {
         <div className="flex h-16 items-center justify-between">
           <div className="flex items-center gap-2">
             <TrendingUp className="h-6 w-6 text-primary" />
-            <Link href="/" className="text-xl font-semibold">
+            <Link href="/public" className="text-xl font-semibold">
               StockScope
             </Link>
           </div>
