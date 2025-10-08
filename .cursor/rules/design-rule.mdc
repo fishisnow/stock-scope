@@ -1,7 +1,6 @@
 ---
-alwaysApply: true
+alwaysApply: false
 ---
-
 **Design Elements:**
 
 - Elegant Playfair Display serif typography for headings in royal blue

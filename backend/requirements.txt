@@ -3,3 +3,5 @@ schedule
 pandas
 flask
 requests
+supabase
+python-dotenv

@@ -1,75 +1,25 @@
 # -*- coding: utf-8 -*-
 
-import sqlite3
-import json
+import os
 from datetime import datetime
 from typing import Dict, List, Optional
-import os
+from supabase import create_client, Client
+from dotenv import load_dotenv
 
-DATABASE_PATH = 'stock_data.db'
+# 加载环境变量
+load_dotenv()
 
 class StockDatabase:
-    def __init__(self, db_path: str = DATABASE_PATH):
-        self.db_path = db_path
-        self.init_database()
-    
-    def init_database(self):
-        """初始化数据库表"""
-        with sqlite3.connect(self.db_path) as conn:
-            cursor = conn.cursor()
-            
-            # 创建股票统计记录表 - 每只股票一条记录
-            cursor.execute('''
-                CREATE TABLE IF NOT EXISTS stock_records (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    date TEXT NOT NULL,
-                    time TEXT NOT NULL,
-                    data_source TEXT NOT NULL,  -- 'futu' 或 'tonghuashun'
-                    market TEXT NOT NULL,       -- 'A' 或 'HK'
-                    data_type TEXT NOT NULL,    -- 'top_amount', 'top_change', 'top_volume_ratio', 'intersection'
-                    rank_order INTEGER NOT NULL,  -- 排名
-                    stock_code TEXT,            -- 股票代码
-                    stock_name TEXT,            -- 股票名称
-                    change_ratio REAL,          -- 涨跌幅
-                    volume REAL,                -- 成交量
-                    amount REAL,                -- 成交额
-                    pe_ratio REAL,              -- 市盈率
-                    volume_ratio REAL,          -- 量比
-                    turnover_rate REAL,         -- 换手率
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                )
-            ''')
-            
-            # 创建唯一索引防止重复插入
-            cursor.execute('''
-                CREATE UNIQUE INDEX IF NOT EXISTS idx_unique_stock_record 
-                ON stock_records (date, data_source, market, data_type, stock_code)
-            ''')
-            
-            # 创建其他索引提高查询性能
-            cursor.execute('''
-                CREATE INDEX IF NOT EXISTS idx_date_source_market 
-                ON stock_records (date, data_source, market)
-            ''')
-            
-            cursor.execute('''
-                CREATE INDEX IF NOT EXISTS idx_stock_code 
-                ON stock_records (stock_code)
-            ''')
-            
-            # 检查并添加volume_ratio字段（如果不存在）
-            cursor.execute("PRAGMA table_info(stock_records)")
-            columns = [column[1] for column in cursor.fetchall()]
-            if 'volume_ratio' not in columns:
-                cursor.execute('ALTER TABLE stock_records ADD COLUMN volume_ratio REAL DEFAULT 0')
-                print("已为数据库表添加volume_ratio字段")
-            
-            # 检查并添加turnover_rate字段（如果不存在）
-            if 'turnover_rate' not in columns:
-                cursor.execute('ALTER TABLE stock_records ADD COLUMN turnover_rate REAL DEFAULT 0')
-                print("已为数据库表添加turnover_rate字段")
-            
-            conn.commit()
+    def __init__(self):
+        """初始化Supabase客户端"""
+        self.supabase_url = os.getenv('SUPABASE_URL')
+        self.supabase_key = os.getenv('SUPABASE_KEY')
+        
+        if not self.supabase_url or not self.supabase_key:
+            raise ValueError("请在.env文件中配置SUPABASE_URL和SUPABASE_KEY")
+        
+        self.client: Client = create_client(self.supabase_url, self.supabase_key)
+        print("✅ Supabase客户端初始化成功")
     
     def save_stock_data(self, data_source: str, market: str, data: Dict[str, List[Dict]]):
         """
@@ -79,40 +29,45 @@ class StockDatabase:
         :param data: 股票数据字典
         """
         current_date = datetime.now().strftime('%Y-%m-%d')
-        current_time = datetime.now().strftime('%H:%M')
+        current_time = datetime.now().strftime('%H:%M:%S')
         
-        with sqlite3.connect(self.db_path) as conn:
-            cursor = conn.cursor()
-            
+        try:
             # 先删除当日同数据源同市场的所有数据，确保数据一致性
-            cursor.execute('''
-                DELETE FROM stock_records 
-                WHERE date = ? AND data_source = ? AND market = ?
-            ''', (current_date, data_source, market))
+            self.client.table('stock_records').delete().eq('date', current_date).eq(
+                'data_source', data_source
+            ).eq('market', market).execute()
             
-            # 然后插入新数据
+            # 准备批量插入的数据
+            records_to_insert = []
+            
             for data_type, stock_list in data.items():
                 for rank, stock in enumerate(stock_list, 1):
-                    # 安全转换数据类型，避免int64等问题
-                    cursor.execute('''
-                        INSERT INTO stock_records 
-                        (date, time, data_source, market, data_type, rank_order,
-                         stock_code, stock_name, change_ratio, volume, amount, pe_ratio, volume_ratio, turnover_rate)
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                    ''', (
-                        current_date, current_time, data_source, market, data_type, rank,
-                        str(stock.get('code', '')),
-                        str(stock.get('name', '')),
-                        float(stock.get('changeRatio', 0)) if stock.get('changeRatio') is not None else 0.0,
-                        float(stock.get('volume', 0)) if stock.get('volume') is not None else 0.0,
-                        float(stock.get('amount', 0)) if stock.get('amount') is not None else 0.0,
-                        float(stock.get('pe', 0)) if stock.get('pe') is not None else 0.0,
-                        float(stock.get('volumeRatio', 0)) if stock.get('volumeRatio') is not None else 0.0,
-                        float(stock.get('turnoverRate', 0)) if stock.get('turnoverRate') is not None else 0.0
-                    ))
+                    record = {
+                        'date': current_date,
+                        'time': current_time,
+                        'data_source': data_source,
+                        'market': market,
+                        'data_type': data_type,
+                        'rank_order': rank,
+                        'stock_code': str(stock.get('code', '')),
+                        'stock_name': str(stock.get('name', '')),
+                        'change_ratio': float(stock.get('changeRatio', 0)) if stock.get('changeRatio') is not None else 0.0,
+                        'volume': float(stock.get('volume', 0)) if stock.get('volume') is not None else 0.0,
+                        'amount': float(stock.get('amount', 0)) if stock.get('amount') is not None else 0.0,
+                        'pe_ratio': float(stock.get('pe', 0)) if stock.get('pe') is not None else 0.0,
+                        'volume_ratio': float(stock.get('volumeRatio', 0)) if stock.get('volumeRatio') is not None else 0.0,
+                        'turnover_rate': float(stock.get('turnoverRate', 0)) if stock.get('turnoverRate') is not None else 0.0
+                    }
+                    records_to_insert.append(record)
             
-            conn.commit()
-            print(f"已保存 {data_source} {market} 市场数据，共 {sum(len(stocks) for stocks in data.values())} 条记录")
+            # 批量插入数据
+            if records_to_insert:
+                self.client.table('stock_records').insert(records_to_insert).execute()
+                print(f"✅ 已保存 {data_source} {market} 市场数据，共 {len(records_to_insert)} 条记录")
+            
+        except Exception as e:
+            print(f"❌ 保存数据失败: {e}")
+            raise
     
     def get_statistics_by_date(self, date: str, data_source: Optional[str] = None) -> Dict:
         """
@@ -121,30 +76,24 @@ class StockDatabase:
         :param data_source: 数据源筛选 (可选)
         :return: 统计数据字典
         """
-        with sqlite3.connect(self.db_path) as conn:
-            cursor = conn.cursor()
-            
-            query = '''
-                SELECT data_source, market, data_type, time, rank_order,
-                       stock_code, stock_name, change_ratio, volume, amount, pe_ratio, volume_ratio, turnover_rate
-                FROM stock_records 
-                WHERE date = ?
-            '''
-            params = [date]
+        try:
+            query = self.client.table('stock_records').select('*').eq('date', date)
             
             if data_source:
-                query += ' AND data_source = ?'
-                params.append(data_source)
+                query = query.eq('data_source', data_source)
             
-            query += ' ORDER BY data_source, market, data_type, rank_order'
+            query = query.order('data_source').order('market').order('data_type').order('rank_order')
+            response = query.execute()
             
-            cursor.execute(query, params)
-            results = cursor.fetchall()
+            results = response.data
             
             # 组织数据结构
             data = {}
             for row in results:
-                source, market, data_type, time, rank, code, name, change_ratio, volume, amount, pe, volume_ratio, turnover_rate = row
+                source = row['data_source']
+                market = row['market']
+                data_type = row['data_type']
+                time = row['time']
                 
                 if source not in data:
                     data[source] = {}
@@ -156,18 +105,22 @@ class StockDatabase:
                     data[source][market][data_type] = []
                 
                 stock_info = {
-                    'code': code,
-                    'name': name,
-                    'changeRatio': change_ratio,
-                    'volume': volume,
-                    'amount': amount,
-                    'pe': pe,
-                    'volumeRatio': volume_ratio if volume_ratio is not None else 0,
-                    'turnoverRate': turnover_rate if turnover_rate is not None else 0
+                    'code': row['stock_code'],
+                    'name': row['stock_name'],
+                    'changeRatio': row['change_ratio'],
+                    'volume': row['volume'],
+                    'amount': row['amount'],
+                    'pe': row['pe_ratio'],
+                    'volumeRatio': row['volume_ratio'] if row['volume_ratio'] is not None else 0,
+                    'turnoverRate': row['turnover_rate'] if row['turnover_rate'] is not None else 0
                 }
                 data[source][market][data_type].append(stock_info)
             
             return data
+            
+        except Exception as e:
+            print(f"❌ 查询数据失败: {e}")
+            raise
     
     def get_available_dates(self, limit: int = 30) -> List[str]:
         """
@@ -175,16 +128,17 @@ class StockDatabase:
         :param limit: 返回最近多少天的数据
         :return: 日期列表
         """
-        with sqlite3.connect(self.db_path) as conn:
-            cursor = conn.cursor()
-            cursor.execute('''
-                SELECT DISTINCT date 
-                FROM stock_records 
-                ORDER BY date DESC 
-                LIMIT ?
-            ''', (limit,))
+        try:
+            response = self.client.table('stock_records').select('date').order('date', desc=True).limit(limit).execute()
             
-            return [row[0] for row in cursor.fetchall()]
+            # 去重并返回日期列表
+            dates = list(set([row['date'] for row in response.data]))
+            dates.sort(reverse=True)
+            return dates
+            
+        except Exception as e:
+            print(f"❌ 查询可用日期失败: {e}")
+            raise
     
     def get_stock_history(self, stock_code: str, days: int = 7) -> List[Dict]:
         """
@@ -193,41 +147,41 @@ class StockDatabase:
         :param days: 查询天数
         :return: 历史记录列表
         """
-        with sqlite3.connect(self.db_path) as conn:
-            cursor = conn.cursor()
-            cursor.execute('''
-                SELECT date, time, data_source, market, data_type, rank_order,
-                       stock_code, stock_name, change_ratio, volume, amount, pe_ratio, volume_ratio, turnover_rate
-                FROM stock_records 
-                WHERE stock_code = ? AND date >= date('now', '-{} days')
-                ORDER BY date DESC, time DESC
-            '''.format(days), (stock_code,))
+        try:
+            # 计算起始日期
+            from datetime import timedelta
+            start_date = (datetime.now() - timedelta(days=days)).strftime('%Y-%m-%d')
             
-            results = cursor.fetchall()
+            response = self.client.table('stock_records').select('*').eq(
+                'stock_code', stock_code
+            ).gte('date', start_date).order('date', desc=True).order('time', desc=True).execute()
+            
             history = []
-            
-            for row in results:
-                date, time, data_source, market, data_type, rank, code, name, change_ratio, volume, amount, pe, volume_ratio, turnover_rate = row
+            for row in response.data:
                 history.append({
-                    'date': date,
-                    'time': time,
-                    'data_source': data_source,
-                    'market': market,
-                    'data_type': data_type,
-                    'rank': rank,
+                    'date': row['date'],
+                    'time': row['time'],
+                    'data_source': row['data_source'],
+                    'market': row['market'],
+                    'data_type': row['data_type'],
+                    'rank': row['rank_order'],
                     'stock_info': {
-                        'code': code,
-                        'name': name,
-                        'changeRatio': change_ratio,
-                        'volume': volume,
-                        'amount': amount,
-                        'pe': pe,
-                        'volumeRatio': volume_ratio if volume_ratio is not None else 0,
-                        'turnoverRate': turnover_rate if turnover_rate is not None else 0
+                        'code': row['stock_code'],
+                        'name': row['stock_name'],
+                        'changeRatio': row['change_ratio'],
+                        'volume': row['volume'],
+                        'amount': row['amount'],
+                        'pe': row['pe_ratio'],
+                        'volumeRatio': row['volume_ratio'] if row['volume_ratio'] is not None else 0,
+                        'turnoverRate': row['turnover_rate'] if row['turnover_rate'] is not None else 0
                     }
                 })
             
             return history
+            
+        except Exception as e:
+            print(f"❌ 查询股票历史失败: {e}")
+            raise
     
     def get_statistics_summary(self, date: str) -> Dict:
         """
@@ -235,27 +189,31 @@ class StockDatabase:
         :param date: 日期字符串
         :return: 摘要信息
         """
-        with sqlite3.connect(self.db_path) as conn:
-            cursor = conn.cursor()
-            cursor.execute('''
-                SELECT data_source, market, data_type, COUNT(*) as record_count
-                FROM stock_records 
-                WHERE date = ?
-                GROUP BY data_source, market, data_type
-            ''', (date,))
+        try:
+            response = self.client.table('stock_records').select(
+                'data_source, market, data_type'
+            ).eq('date', date).execute()
             
-            results = cursor.fetchall()
+            # 手动统计分组
             summary = {}
-            
-            for row in results:
-                source, market, data_type, count = row
+            for row in response.data:
+                source = row['data_source']
+                market = row['market']
+                data_type = row['data_type']
+                
                 if source not in summary:
                     summary[source] = {}
                 if market not in summary[source]:
                     summary[source][market] = {}
-                summary[source][market][data_type] = count
+                if data_type not in summary[source][market]:
+                    summary[source][market][data_type] = 0
+                summary[source][market][data_type] += 1
             
             return summary
+            
+        except Exception as e:
+            print(f"❌ 查询统计摘要失败: {e}")
+            raise
 
 # 全局数据库实例
 db = StockDatabase()
@@ -271,14 +229,21 @@ def save_tonghuashun_data(data: Dict[str, List[Dict]]):
 
 if __name__ == '__main__':
     # 测试数据库功能
-    print("数据库初始化完成")
+    print("🔍 测试Supabase连接...")
     
-    # 获取可用日期
-    dates = db.get_available_dates()
-    print(f"可用日期: {dates}")
-    
-    if dates:
-        # 获取最新日期的数据
-        latest_date = dates[0]
-        data = db.get_statistics_by_date(latest_date)
-        print(f"最新日期 {latest_date} 的数据结构: {list(data.keys())}")
+    try:
+        # 获取可用日期
+        dates = db.get_available_dates()
+        print(f"✅ 可用日期: {dates}")
+        
+        if dates:
+            # 获取最新日期的数据
+            latest_date = dates[0]
+            data = db.get_statistics_by_date(latest_date)
+            print(f"✅ 最新日期 {latest_date} 的数据结构: {list(data.keys())}")
+            
+            # 获取统计摘要
+            summary = db.get_statistics_summary(latest_date)
+            print(f"✅ 统计摘要: {summary}")
+    except Exception as e:
+        print(f"❌ 测试失败: {e}")
