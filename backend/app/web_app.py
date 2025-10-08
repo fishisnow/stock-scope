@@ -1,17 +1,15 @@
 # -*- coding: utf-8 -*-
 
 from flask import Flask, render_template, request, jsonify
+from flask_cors import CORS
 from datetime import datetime, timedelta
 from db.database import StockDatabase
 import json
 
 app = Flask(__name__)
+CORS(app)  # 启用 CORS 支持
 db = StockDatabase()
 
-@app.route('/')
-def index():
-    """主页"""
-    return render_template('index.html')
 
 @app.route('/api/dates')
 def get_available_dates():

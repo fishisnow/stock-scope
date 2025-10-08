@@ -2,6 +2,7 @@ futu-api
 schedule
 pandas
 flask
+flask-cors
 requests
 supabase
 python-dotenv

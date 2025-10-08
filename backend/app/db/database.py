@@ -129,12 +129,14 @@ class StockDatabase:
         :return: 日期列表
         """
         try:
-            response = self.client.table('stock_records').select('date').order('date', desc=True).limit(limit).execute()
+            # 查询所有日期记录并在数据库层面排序
+            response = self.client.table('stock_records').select('date').order('date', desc=True).execute()
             
-            # 去重并返回日期列表
-            dates = list(set([row['date'] for row in response.data]))
-            dates.sort(reverse=True)
-            return dates
+            # 使用 dict.fromkeys 去重并保持顺序（已按日期倒序排列）
+            dates = list(dict.fromkeys([row['date'] for row in response.data]))
+            
+            # 返回最近 limit 天的日期
+            return dates[:limit]
             
         except Exception as e:
             print(f"❌ 查询可用日期失败: {e}")

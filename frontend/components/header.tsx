@@ -1,5 +1,5 @@
 import Link from "next/link"
-import { Button } from "@/frontend/components/ui/button"
+import { Button } from "@/components/ui/button"
 import { TrendingUp } from "lucide-react"
 
 export function Header() {
@@ -23,6 +23,9 @@ export function Header() {
             </Link>
             <Link href="#database" className="text-sm font-medium hover:text-primary transition-colors">
               Database
+            </Link>
+            <Link href="/market" className="text-sm font-medium hover:text-primary transition-colors">
+              Market
             </Link>
             <Link href="#pricing" className="text-sm font-medium hover:text-primary transition-colors">
               Pricing

@@ -1,5 +1,5 @@
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/frontend/components/ui/card"
-import { TrendChart } from "@/frontend/components/trend-chart"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { TrendChart } from "@/components/trend-chart"
 import { ArrowUp, Info } from "lucide-react"
 
 const trends = [
