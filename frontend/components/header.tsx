@@ -15,15 +15,15 @@ export function Header() {
           </div>
 
           <nav className="hidden md:flex items-center gap-8">
-            <Link href="#opportunities" className="text-sm font-medium hover:text-primary transition-colors">
-              Browse Opportunities
-            </Link>
-            <Link href="#trends" className="text-sm font-medium hover:text-primary transition-colors">
-              Trends
-            </Link>
-            <Link href="#database" className="text-sm font-medium hover:text-primary transition-colors">
-              Database
-            </Link>
+            {/*<Link href="#opportunities" className="text-sm font-medium hover:text-primary transition-colors">*/}
+            {/*  Browse Opportunities*/}
+            {/*</Link>*/}
+            {/*<Link href="#trends" className="text-sm font-medium hover:text-primary transition-colors">*/}
+            {/*  Trends*/}
+            {/*</Link>*/}
+            {/*<Link href="#database" className="text-sm font-medium hover:text-primary transition-colors">*/}
+            {/*  Database*/}
+            {/*</Link>*/}
             <Link href="/market" className="text-sm font-medium hover:text-primary transition-colors">
               Market
             </Link>

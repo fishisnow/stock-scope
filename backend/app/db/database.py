@@ -124,23 +124,21 @@ class StockDatabase:
     
     def get_available_dates(self, limit: int = 30) -> List[str]:
         """
-        获取可用的统计日期列表
+        获取可用的统计日期列表（使用 RPC 调用原生 SQL）
         :param limit: 返回最近多少天的数据
         :return: 日期列表
         """
         try:
-            # 查询所有日期记录并在数据库层面排序
-            response = self.client.table('stock_records').select('date').order('date', desc=True).execute()
-            
-            # 使用 dict.fromkeys 去重并保持顺序（已按日期倒序排列）
-            dates = list(dict.fromkeys([row['date'] for row in response.data]))
-            
-            # 返回最近 limit 天的日期
-            return dates[:limit]
+            # 使用 Supabase RPC 调用数据库函数
+            response = self.client.rpc('get_distinct_dates', {'limit_count': limit}).execute()
+            return [row['date'] for row in response.data]
             
         except Exception as e:
             print(f"❌ 查询可用日期失败: {e}")
-            raise
+            # 如果 RPC 函数不存在，使用备用方案
+            print("⚠️  使用备用查询方法")
+            response = self.client.table('stock_records').select('date').order('date', desc=True).execute()
+            return list(dict.fromkeys([row['date'] for row in response.data]))[:limit]
     
     def get_stock_history(self, stock_code: str, days: int = 7) -> List[Dict]:
         """
