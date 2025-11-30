@@ -39,11 +39,24 @@ if [ -f ".env" ]; then
     echo "✅ 加载 .env 文件"
 fi
 
+# 检测操作系统，设置网络模式
+EXTRA_ARGS=""
+if [[ "$OSTYPE" == "linux-gnu"* ]]; then
+    # Linux 系统使用 host 网络模式（最简单）
+    EXTRA_ARGS="--network host"
+    echo "✅ Linux 系统：使用 host 网络模式"
+else
+    # Windows/其他系统
+    EXTRA_ARGS="--add-host=host.docker.internal:host-gateway"
+    echo "✅ 使用 host.docker.internal"
+fi
+
 docker run -d \
     --name $CONTAINER_NAME \
     -p 3000:3000 \
     -p 5001:5001 \
     $ENV_ARGS \
+    $EXTRA_ARGS \
     --restart unless-stopped \
     $IMAGE_NAME
 

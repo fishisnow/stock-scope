@@ -2,6 +2,7 @@ from futu import *
 from datetime import date
 import pandas as pd
 from typing import Dict, List
+import os
 
 # 获取今天的日期并格式化
 formatted_date = date.today().strftime('%Y%m%d')
@@ -62,7 +63,10 @@ def get_stock_data(plate_code: str) -> Dict[str, List[Dict]]:
     """
     try:
         # 创建行情上下文
-        quote_context = OpenQuoteContext(host='127.0.0.1', port=11111)
+        # mac Docker 容器内访问宿主机使用 host.docker.internal
+        futu_host = os.getenv('FUTU_HOST', '127.0.0.1')
+        futu_port = int(os.getenv('FUTU_PORT', '11111'))
+        quote_context = OpenQuoteContext(host=futu_host, port=futu_port)
         
         # 获取涨幅前50
         change_rate_df = get_hot_top(quote_context, plate_code, 'CHANGE_RATE', 50)
