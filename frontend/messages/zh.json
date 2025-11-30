@@ -1,0 +1,59 @@
+{
+  "header": {
+    "title": "股市望远镜",
+    "market": "市场",
+    "pricing": "定价",
+    "login": "登录",
+    "signup": "注册"
+  },
+  "home": {
+    "metaTitle": "股市望远镜 - AI 驱动的投资机会",
+    "metaDescription": "发现由人工智能驱动的新兴股票投资机会"
+  },
+  "market": {
+    "pageTitle": "市场数据",
+    "pageSubtitle": "每日股市分析，提供全面的性能指标和交易洞察",
+    "realtimeIntelligence": "实时市场情报",
+    "table": {
+      "rank": "排名",
+      "stock": "股票名称",
+      "amount": "成交额(亿)",
+      "change": "涨跌幅",
+      "volume": "成交量(万手)",
+      "volumeRatio": "量比",
+      "turnover": "换手率",
+      "pe": "市盈率",
+      "performanceMetrics": "性能指标和交易活动",
+      "stocks": "只股票",
+      "showLess": "收起",
+      "showAll": "显示全部 {count} 只股票"
+    },
+    "sections": {
+      "topPerformers": "顶级表现者",
+      "highChangeVolume": "高涨幅 & 高成交量领涨股",
+      "marketLeaders": "市场领军者",
+      "topGainers": "涨幅榜",
+      "highestVolume": "成交量榜"
+    },
+    "markets": {
+      "chinaA": "中国A股市场",
+      "hongKong": "香港市场",
+      "hongKongStock": "香港股票市场"
+    },
+    "date": {
+      "lastUpdated": "最后更新",
+      "loadingDates": "加载日期中...",
+      "selectDate": "选择日期",
+      "viewingDataFor": "查看日期"
+    },
+    "loading": "加载市场数据中...",
+    "errors": {
+      "errorLoadingData": "数据加载错误",
+      "failedToLoadDates": "加载日期失败",
+      "failedToLoadData": "加载数据失败",
+      "networkError": "网络错误",
+      "noDataAvailable": "所选日期暂无数据"
+    }
+  }
+}
+

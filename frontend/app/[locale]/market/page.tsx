@@ -6,6 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Calendar, TrendingUp, TrendingDown, ChevronLeft, ChevronRight, Sparkles } from "lucide-react"
+import { useTranslations } from 'next-intl'
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5001"
 
@@ -33,7 +34,7 @@ interface FutuData {
 }
 
 // StockTable Component
-function StockTable({ title, data, dataType }: { title: string; data: Stock[]; dataType: string }) {
+function StockTable({ title, data, dataType, t }: { title: string; data: Stock[]; dataType: string; t: any }) {
   const [showAll, setShowAll] = useState(false)
   const displayData = showAll ? data : data.slice(0, 8)
   const hasMore = data.length > 8
@@ -44,10 +45,10 @@ function StockTable({ title, data, dataType }: { title: string; data: Stock[]; d
         <div className="flex items-center justify-between">
           <div>
             <CardTitle className="text-2xl font-serif text-primary mb-2">{title}</CardTitle>
-            <CardDescription>Performance metrics and trading activity</CardDescription>
+            <CardDescription>{t('table.performanceMetrics')}</CardDescription>
           </div>
           <Badge variant="secondary" className="text-sm font-mono">
-            {data.length} stocks
+            {data.length} {t('table.stocks')}
           </Badge>
         </div>
       </CardHeader>
@@ -57,30 +58,30 @@ function StockTable({ title, data, dataType }: { title: string; data: Stock[]; d
             <thead>
               <tr className="border-b-2 border-border">
                 <th className="py-3 px-2 text-left text-[10px] sm:text-xs font-bold uppercase tracking-wide text-muted-foreground whitespace-nowrap">
-                  #
+                  {t('table.rank')}
                 </th>
                 <th className="py-3 px-2 text-left text-[10px] sm:text-xs font-bold uppercase tracking-wide text-muted-foreground min-w-[80px]">
-                  Stock
+                  {t('table.stock')}
                 </th>
                 {(dataType === "top_amount" || dataType === "intersection") && (
                   <th className="py-3 px-2 text-right text-[10px] sm:text-xs font-bold uppercase tracking-wide text-muted-foreground whitespace-nowrap hidden sm:table-cell">
-                    Amt(¥B)
+                    {t('table.amount')}
                   </th>
                 )}
                 <th className="py-3 px-2 text-right text-[10px] sm:text-xs font-bold uppercase tracking-wide text-muted-foreground whitespace-nowrap">
-                  Change
+                  {t('table.change')}
                 </th>
                 <th className="py-3 px-2 text-right text-[10px] sm:text-xs font-bold uppercase tracking-wide text-muted-foreground whitespace-nowrap hidden lg:table-cell">
-                  Vol(10K)
+                  {t('table.volume')}
                 </th>
                 <th className="py-3 px-2 text-right text-[10px] sm:text-xs font-bold uppercase tracking-wide text-muted-foreground whitespace-nowrap hidden xl:table-cell">
-                  Vol Ratio
+                  {t('table.volumeRatio')}
                 </th>
                 <th className="py-3 px-2 text-right text-[10px] sm:text-xs font-bold uppercase tracking-wide text-muted-foreground whitespace-nowrap hidden md:table-cell">
-                  Turnover
+                  {t('table.turnover')}
                 </th>
                 <th className="py-3 px-2 text-right text-[10px] sm:text-xs font-bold uppercase tracking-wide text-muted-foreground whitespace-nowrap hidden lg:table-cell">
-                  P/E
+                  {t('table.pe')}
                 </th>
               </tr>
             </thead>
@@ -156,12 +157,12 @@ function StockTable({ title, data, dataType }: { title: string; data: Stock[]; d
             >
               {showAll ? (
                 <>
-                  Show Less
+                  {t('table.showLess')}
                   <ChevronLeft className="h-4 w-4 rotate-90" />
                 </>
               ) : (
                 <>
-                  Show All {data.length} Stocks
+                  {t('table.showAll', { count: data.length })}
                   <ChevronLeft className="h-4 w-4 -rotate-90" />
                 </>
               )}
@@ -174,6 +175,7 @@ function StockTable({ title, data, dataType }: { title: string; data: Stock[]; d
 }
 
 export default function MarketPage() {
+  const t = useTranslations('market')
   const [availableDates, setAvailableDates] = useState<string[]>([])
   const [selectedDate, setSelectedDate] = useState<string>("")
   const [futuData, setFutuData] = useState<FutuData | null>(null)
@@ -196,10 +198,10 @@ export default function MarketPage() {
           loadData(result.data[0])
         }
       } else {
-        setError("Failed to load dates: " + result.error)
+        setError(t('errors.failedToLoadDates') + ": " + result.error)
       }
     } catch (err) {
-      setError("Network error: " + (err as Error).message)
+      setError(t('errors.networkError') + ": " + (err as Error).message)
     }
   }
 
@@ -219,10 +221,10 @@ export default function MarketPage() {
       if (result.success) {
         setFutuData(result.data)
       } else {
-        setError("Failed to load data: " + result.error)
+        setError(t('errors.failedToLoadData') + ": " + result.error)
       }
     } catch (err) {
-      setError("Network error: " + (err as Error).message)
+      setError(t('errors.networkError') + ": " + (err as Error).message)
     } finally {
       setLoading(false)
     }
@@ -249,21 +251,6 @@ export default function MarketPage() {
   const canNavigatePrev = availableDates.indexOf(selectedDate) < availableDates.length - 1
   const canNavigateNext = availableDates.indexOf(selectedDate) > 0
 
-  const getMarketSummary = (marketData: MarketData) => {
-    const allStocks = [
-      ...(marketData.intersection || []),
-      ...(marketData.top_change || []),
-    ]
-    if (allStocks.length === 0) return null
-
-    const avgChange =
-      allStocks.reduce((sum, stock) => sum + parseFloat(String(stock.changeRatio || 0)), 0) / allStocks.length
-    const maxChange = Math.max(...allStocks.map((s) => parseFloat(String(s.changeRatio || 0))))
-    const gainers = allStocks.filter((s) => parseFloat(String(s.changeRatio || 0)) > 0).length
-
-    return { avgChange, maxChange, gainers, total: allStocks.length }
-  }
-
   const renderMarketSection = (marketKey: string, marketData: MarketData, marketTitle: string) => {
     return (
       <div className="space-y-10">
@@ -272,7 +259,7 @@ export default function MarketPage() {
           {marketData.time && (
             <div className="flex items-center justify-center gap-2 text-muted-foreground">
               <Calendar className="h-4 w-4" />
-              <span className="text-sm">Last updated: {marketData.time}</span>
+              <span className="text-sm">{t('date.lastUpdated')}: {marketData.time}</span>
             </div>
           )}
         </div>
@@ -283,10 +270,10 @@ export default function MarketPage() {
             <div className="space-y-4">
               <div className="flex items-center gap-3 mb-6">
                 <div className="h-1 w-12 bg-primary rounded-full" />
-                <h3 className="font-serif text-2xl text-primary">Top Performers</h3>
+                <h3 className="font-serif text-2xl text-primary">{t('sections.topPerformers')}</h3>
                 <div className="h-1 flex-1 bg-primary/20 rounded-full" />
               </div>
-              <StockTable title="High Change & Volume Leaders" data={marketData.intersection} dataType="intersection" />
+              <StockTable title={t('sections.highChangeVolume')} data={marketData.intersection} dataType="intersection" t={t} />
             </div>
           )}
 
@@ -296,15 +283,15 @@ export default function MarketPage() {
             <>
               <div className="flex items-center gap-3 my-10">
                 <div className="h-1 w-12 bg-primary/60 rounded-full" />
-                <h3 className="font-serif text-2xl text-primary">Market Leaders</h3>
+                <h3 className="font-serif text-2xl text-primary">{t('sections.marketLeaders')}</h3>
                 <div className="h-1 flex-1 bg-primary/20 rounded-full" />
               </div>
               <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
                 {marketData.top_change && marketData.top_change.length > 0 && (
-                  <StockTable title="Top Gainers" data={marketData.top_change} dataType="top_change" />
+                  <StockTable title={t('sections.topGainers')} data={marketData.top_change} dataType="top_change" t={t} />
                 )}
                 {marketData.top_volume_ratio && marketData.top_volume_ratio.length > 0 && (
-                  <StockTable title="Highest Volume" data={marketData.top_volume_ratio} dataType="top_volume_ratio" />
+                  <StockTable title={t('sections.highestVolume')} data={marketData.top_volume_ratio} dataType="top_volume_ratio" t={t} />
                 )}
               </div>
             </>
@@ -323,11 +310,11 @@ export default function MarketPage() {
         <div className="text-center mb-12">
           <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-secondary mb-6">
             <Sparkles className="h-4 w-4 text-primary" />
-            <span className="text-sm font-medium">Real-time Market Intelligence</span>
+            <span className="text-sm font-medium">{t('realtimeIntelligence')}</span>
           </div>
-          <h1 className="font-serif text-5xl sm:text-6xl lg:text-7xl text-primary mb-6">Market Data</h1>
+          <h1 className="font-serif text-5xl sm:text-6xl lg:text-7xl text-primary mb-6">{t('pageTitle')}</h1>
           <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-            Daily stock market analysis with comprehensive performance metrics and trading insights
+            {t('pageSubtitle')}
           </p>
         </div>
 
@@ -353,10 +340,10 @@ export default function MarketPage() {
                 className="appearance-none pl-10 pr-8 py-2.5 border border-border rounded-lg text-sm font-medium bg-background text-foreground transition-all focus:outline-none focus:ring-2 focus:ring-ring focus:border-ring disabled:opacity-50 min-w-[180px] cursor-pointer hover:bg-secondary/50"
               >
                 {availableDates.length === 0 ? (
-                  <option value="">Loading dates...</option>
+                  <option value="">{t('date.loadingDates')}</option>
                 ) : (
                   <>
-                    <option value="">Select date</option>
+                    <option value="">{t('date.selectDate')}</option>
                     {availableDates.map((date) => (
                       <option key={date} value={date}>
                         {date}
@@ -381,7 +368,7 @@ export default function MarketPage() {
 
           {selectedDate && !loading && (
             <div className="text-sm text-muted-foreground">
-              Viewing data for <span className="font-semibold text-foreground">{selectedDate}</span>
+              {t('date.viewingDataFor')} <span className="font-semibold text-foreground">{selectedDate}</span>
             </div>
           )}
         </div>
@@ -392,7 +379,7 @@ export default function MarketPage() {
             <div className="text-center py-24">
               <div className="inline-flex items-center gap-3 text-muted-foreground">
                 <div className="animate-spin h-5 w-5 border-2 border-primary border-t-transparent rounded-full" />
-                <span className="text-lg">Loading market data...</span>
+                <span className="text-lg">{t('loading')}</span>
               </div>
             </div>
           )}
@@ -401,7 +388,7 @@ export default function MarketPage() {
             <Card className="border-destructive bg-destructive/5">
               <CardContent className="py-8">
                 <div className="text-center text-destructive">
-                  <p className="font-semibold mb-2">Error Loading Data</p>
+                  <p className="font-semibold mb-2">{t('errors.errorLoadingData')}</p>
                   <p className="text-sm">{error}</p>
                 </div>
               </CardContent>
@@ -410,90 +397,17 @@ export default function MarketPage() {
 
           {!loading && !error && futuData && (
             <div className="space-y-16">
-              {/* Market Summary Cards */}
-              {(futuData.A || futuData.HK) && (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-12">
-                  {futuData.A && (() => {
-                    const summary = getMarketSummary(futuData.A)
-                    return summary ? (
-                      <Card className="border-primary/20 bg-gradient-to-br from-primary/5 to-transparent">
-                        <CardHeader>
-                          <CardTitle className="text-2xl font-serif text-primary">China A-Share Market</CardTitle>
-                          <CardDescription>Market performance overview</CardDescription>
-                        </CardHeader>
-                        <CardContent className="space-y-4">
-                          <div className="grid grid-cols-2 gap-4">
-                            <div className="space-y-1">
-                              <p className="text-xs text-muted-foreground">Avg Change</p>
-                              <p className={`text-2xl font-bold ${summary.avgChange >= 0 ? "text-red-600" : "text-green-600"}`}>
-                                {summary.avgChange >= 0 ? "+" : ""}{summary.avgChange.toFixed(2)}%
-                              </p>
-                            </div>
-                            <div className="space-y-1">
-                              <p className="text-xs text-muted-foreground">Top Gainer</p>
-                              <p className="text-2xl font-bold text-red-600">+{summary.maxChange.toFixed(2)}%</p>
-                            </div>
-                            <div className="space-y-1">
-                              <p className="text-xs text-muted-foreground">Gainers</p>
-                              <p className="text-2xl font-bold">{summary.gainers} stocks</p>
-                            </div>
-                            <div className="space-y-1">
-                              <p className="text-xs text-muted-foreground">Total Tracked</p>
-                              <p className="text-2xl font-bold">{summary.total} stocks</p>
-                            </div>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    ) : null
-                  })()}
-
-                  {futuData.HK && (() => {
-                    const summary = getMarketSummary(futuData.HK)
-                    return summary ? (
-                      <Card className="border-secondary/50">
-                        <CardHeader>
-                          <CardTitle className="text-2xl font-serif text-primary">Hong Kong Market</CardTitle>
-                          <CardDescription>Market performance overview</CardDescription>
-                        </CardHeader>
-                        <CardContent className="space-y-4">
-                          <div className="grid grid-cols-2 gap-4">
-                            <div className="space-y-1">
-                              <p className="text-xs text-muted-foreground">Avg Change</p>
-                              <p className={`text-2xl font-bold ${summary.avgChange >= 0 ? "text-red-600" : "text-green-600"}`}>
-                                {summary.avgChange >= 0 ? "+" : ""}{summary.avgChange.toFixed(2)}%
-                              </p>
-                            </div>
-                            <div className="space-y-1">
-                              <p className="text-xs text-muted-foreground">Top Gainer</p>
-                              <p className="text-2xl font-bold text-red-600">+{summary.maxChange.toFixed(2)}%</p>
-                            </div>
-                            <div className="space-y-1">
-                              <p className="text-xs text-muted-foreground">Gainers</p>
-                              <p className="text-2xl font-bold">{summary.gainers} stocks</p>
-                            </div>
-                            <div className="space-y-1">
-                              <p className="text-xs text-muted-foreground">Total Tracked</p>
-                              <p className="text-2xl font-bold">{summary.total} stocks</p>
-                            </div>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    ) : null
-                  })()}
-                </div>
-              )}
-
               {/* A Market Section */}
               {futuData.A && (
                 <section className="py-12 px-6 sm:px-8 lg:px-10 bg-secondary/30 rounded-2xl">
-                  {renderMarketSection("A", futuData.A, "China A-Share Market")}
+                  {renderMarketSection("A", futuData.A, t('markets.chinaA'))}
                 </section>
               )}
 
               {/* HK Market Section */}
               {futuData.HK && (
                 <section className="py-12 px-6 sm:px-8 lg:px-10">
-                  {renderMarketSection("HK", futuData.HK, "Hong Kong Stock Market")}
+                  {renderMarketSection("HK", futuData.HK, t('markets.hongKongStock'))}
                 </section>
               )}
             </div>
@@ -501,7 +415,7 @@ export default function MarketPage() {
 
           {!loading && !error && !futuData && selectedDate && (
             <div className="text-center py-24">
-              <p className="text-lg text-muted-foreground italic">No data available for selected date</p>
+              <p className="text-lg text-muted-foreground italic">{t('errors.noDataAvailable')}</p>
             </div>
           )}
         </div>

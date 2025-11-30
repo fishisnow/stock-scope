@@ -1,0 +1,59 @@
+{
+  "header": {
+    "title": "StockScope",
+    "market": "Market",
+    "pricing": "Pricing",
+    "login": "Login",
+    "signup": "Sign Up"
+  },
+  "home": {
+    "metaTitle": "StockScope - AI-Powered Investment Opportunities",
+    "metaDescription": "Discover emerging stock investment opportunities powered by AI"
+  },
+  "market": {
+    "pageTitle": "Market Data",
+    "pageSubtitle": "Daily stock market analysis with comprehensive performance metrics and trading insights",
+    "realtimeIntelligence": "Real-time Market Intelligence",
+    "table": {
+      "rank": "#",
+      "stock": "Stock",
+      "amount": "Amt(¥B)",
+      "change": "Change",
+      "volume": "Vol(10K)",
+      "volumeRatio": "Vol Ratio",
+      "turnover": "Turnover",
+      "pe": "P/E",
+      "performanceMetrics": "Performance metrics and trading activity",
+      "stocks": "stocks",
+      "showLess": "Show Less",
+      "showAll": "Show All {count} Stocks"
+    },
+    "sections": {
+      "topPerformers": "Top Performers",
+      "highChangeVolume": "High Change & Volume Leaders",
+      "marketLeaders": "Market Leaders",
+      "topGainers": "Top Gainers",
+      "highestVolume": "Highest Volume"
+    },
+    "markets": {
+      "chinaA": "China A-Share Market",
+      "hongKong": "Hong Kong Market",
+      "hongKongStock": "Hong Kong Stock Market"
+    },
+    "date": {
+      "lastUpdated": "Last updated",
+      "loadingDates": "Loading dates...",
+      "selectDate": "Select date",
+      "viewingDataFor": "Viewing data for"
+    },
+    "loading": "Loading market data...",
+    "errors": {
+      "errorLoadingData": "Error Loading Data",
+      "failedToLoadDates": "Failed to load dates",
+      "failedToLoadData": "Failed to load data",
+      "networkError": "Network error",
+      "noDataAvailable": "No data available for selected date"
+    }
+  }
+}
+
