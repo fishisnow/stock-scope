@@ -10,7 +10,7 @@ REGISTRY="crpi-3f383vugjtqlop7w.cn-guangzhou.personal.cr.aliyuncs.com"
 REGISTRY_VPC="crpi-3f383vugjtqlop7w-vpc.cn-guangzhou.personal.cr.aliyuncs.com"
 USERNAME="aliyun4847844216"
 NAMESPACE="fishisnow"
-REPO="hys"
+REPO="stock-scope"
 VERSION="v1.0.0"
 
 # 颜色输出
