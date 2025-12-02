@@ -1,6 +1,9 @@
 # 使用 Node.js 20 作为基础镜像（包含构建前端所需的环境）
 FROM node:20-slim AS frontend-builder
 
+# 定义构建参数
+ARG NEXT_PUBLIC_API_URL=http://invest.fishisnow.xyz:5001
+
 # 设置工作目录
 WORKDIR /app/frontend
 
@@ -12,6 +15,9 @@ RUN npm ci
 
 # 复制前端源代码
 COPY frontend/ ./
+
+# 设置环境变量（构建时使用）
+ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
 
 # 构建前端项目
 RUN npm run build
