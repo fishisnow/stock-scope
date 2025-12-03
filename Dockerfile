@@ -48,41 +48,9 @@ COPY backend/ ./backend/
 # 从构建阶段复制前端构建产物
 COPY --from=frontend-builder /app/frontend ./frontend
 
-# 创建启动脚本
-RUN echo '#!/bin/bash\n\
-set -e\n\
-echo "🚀 启动 Stock Scope 应用..."\n\
-echo "========================================"\n\
-\n\
-# 设置 Python 路径\n\
-export PYTHONPATH=/app/backend:$PYTHONPATH\n\
-\n\
-# 启动后端服务（使用 Gunicorn，在后台运行）\n\
-echo "📊 启动后端服务（Gunicorn）..."\n\
-cd /app/backend/app && gunicorn -w 4 -b 0.0.0.0:5001 web_app:app &\n\
-BACKEND_PID=$!\n\
-\n\
-# 等待后端启动\n\
-sleep 3\n\
-\n\
-# 启动前端服务\n\
-echo "🌐 启动前端服务..."\n\
-cd /app/frontend && npm start &\n\
-FRONTEND_PID=$!\n\
-\n\
-echo "========================================"\n\
-echo "✅ 应用启动成功！"\n\
-echo "前端地址: http://localhost:3000"\n\
-echo "后端地址: http://localhost:5001"\n\
-echo "========================================"\n\
-\n\
-# 等待任一进程退出\n\
-wait -n $BACKEND_PID $FRONTEND_PID\n\
-\n\
-# 如果其中一个进程退出，杀死另一个\n\
-kill $BACKEND_PID $FRONTEND_PID 2>/dev/null\n\
-exit $?\n\
-' > /app/start.sh && chmod +x /app/start.sh
+# 复制启动脚本
+COPY start.sh /app/start.sh
+RUN chmod +x /app/start.sh
 
 # 暴露端口
 EXPOSE 3000 5001
