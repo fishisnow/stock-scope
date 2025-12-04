@@ -25,9 +25,10 @@ RUN npm run build
 # 使用 Python 3.12 作为运行时镜像
 FROM python:3.12-slim
 
-# 安装 Node.js 运行时（用于运行 Next.js）
+# 安装 Node.js 运行时和时区数据（用于运行 Next.js 和设置时区）
 RUN apt-get update && apt-get install -y \
     curl \
+    tzdata \
     && curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
     && apt-get install -y nodejs \
     && apt-get clean \
@@ -58,6 +59,7 @@ EXPOSE 3000 5001
 # 设置环境变量
 ENV NODE_ENV=production
 ENV PYTHONUNBUFFERED=1
+ENV TZ=Asia/Shanghai
 
 # 启动应用
 CMD ["/app/start.sh"]
