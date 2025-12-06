@@ -2,7 +2,7 @@
 FROM node:20-slim AS frontend-builder
 
 # 定义构建参数
-ARG NEXT_PUBLIC_API_URL=http://invest.fishisnow.xyz:5001
+ARG NEXT_PUBLIC_API_URL=http://invest.fishisnow.xyz
 
 # 设置工作目录
 WORKDIR /app/frontend
