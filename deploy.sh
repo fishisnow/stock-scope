@@ -32,10 +32,34 @@ docker rm $CONTAINER_NAME 2>/dev/null || true
 IMAGE_TO_USE=""
 MODE="${1:-auto}"
 
+# 读取 .env 文件中的构建参数
+BUILD_ARGS=""
+if [ -f ".env" ]; then
+    echo "📖 读取 .env 文件中的构建参数..."
+    
+    # 定义需要在构建时传递的环境变量列表
+    BUILD_ENV_VARS=(
+        "NEXT_PUBLIC_API_URL"
+        "NEXT_PUBLIC_SUPABASE_URL"
+        "NEXT_PUBLIC_SUPABASE_ANON_KEY"
+    )
+    
+    # 遍历并读取每个环境变量
+    for VAR_NAME in "${BUILD_ENV_VARS[@]}"; do
+        if grep -q "^${VAR_NAME}=" .env; then
+            VAR_VALUE=$(grep "^${VAR_NAME}=" .env | cut -d '=' -f2- | tr -d '\r' | sed 's/^"//' | sed 's/"$//' | sed "s/^'//" | sed "s/'$//")
+            if [ -n "$VAR_VALUE" ]; then
+                BUILD_ARGS="$BUILD_ARGS --build-arg ${VAR_NAME}=${VAR_VALUE}"
+                echo "  ✓ ${VAR_NAME}=${VAR_VALUE}"
+            fi
+        fi
+    done
+fi
+
 case $MODE in
     build)
         echo "🔨 构建本地镜像..."
-        docker build -t $LOCAL_IMAGE .
+        docker build $BUILD_ARGS -t $LOCAL_IMAGE .
         IMAGE_TO_USE=$LOCAL_IMAGE
         docker image prune -f
         ;;
