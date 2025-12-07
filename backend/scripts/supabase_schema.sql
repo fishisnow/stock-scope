@@ -1,5 +1,9 @@
 -- Supabase (PostgreSQL) 数据库DDL脚本
 -- 股票数据统计系统数据库结构
+-- 
+-- 注意：本系统使用 Supabase Auth 进行用户认证
+--       不需要自定义的 users 和 refresh_tokens 表
+--       用户数据存储在 Supabase Auth 的 auth.users 表中
 
 -- ============================================
 -- 股票统计记录表

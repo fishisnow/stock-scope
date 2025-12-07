@@ -9,6 +9,7 @@ import { NextIntlClientProvider } from 'next-intl';
 import { getMessages } from 'next-intl/server';
 import { routing } from '@/i18n/routing';
 import { notFound } from 'next/navigation';
+import { AuthProvider } from '@/lib/auth-context';
 import "../globals.css"
 
 const playfair = Playfair_Display({
@@ -49,8 +50,10 @@ export default async function LocaleLayout({
     <html lang={locale}>
       <body className={`font-sans ${GeistSans.variable} ${GeistMono.variable} ${playfair.variable}`} suppressHydrationWarning>
         <NextIntlClientProvider messages={messages}>
-          <Suspense fallback={null}>{children}</Suspense>
-          <Analytics />
+          <AuthProvider>
+            <Suspense fallback={null}>{children}</Suspense>
+            <Analytics />
+          </AuthProvider>
         </NextIntlClientProvider>
       </body>
     </html>
