@@ -1,14 +1,10 @@
 #!/bin/bash
 
 # Stock Scope 一键部署脚本
-# 使用方法：
-#   ./deploy.sh          - 使用本地镜像或从阿里云拉取
-#   ./deploy.sh build    - 重新构建镜像
-#   ./deploy.sh pull     - 从阿里云拉取最新镜像
+# 使用方法：./deploy.sh
 
 set -e
 
-LOCAL_IMAGE="stock-scope:latest"
 ALIYUN_IMAGE="crpi-3f383vugjtqlop7w.cn-guangzhou.personal.cr.aliyuncs.com/fishisnow/stock-scope:latest"
 CONTAINER_NAME="stock-scope"
 
@@ -28,61 +24,9 @@ echo "📦 清理旧容器..."
 docker stop $CONTAINER_NAME 2>/dev/null || true
 docker rm $CONTAINER_NAME 2>/dev/null || true
 
-# 根据参数决定使用哪个镜像
-IMAGE_TO_USE=""
-MODE="${1:-auto}"
-
-# 读取 .env 文件中的构建参数
-BUILD_ARGS=""
-if [ -f ".env" ]; then
-    echo "📖 读取 .env 文件中的构建参数..."
-    
-    # 定义需要在构建时传递的环境变量列表
-    BUILD_ENV_VARS=(
-        "NEXT_PUBLIC_API_URL"
-        "NEXT_PUBLIC_SUPABASE_URL"
-        "NEXT_PUBLIC_SUPABASE_ANON_KEY"
-    )
-    
-    # 遍历并读取每个环境变量
-    for VAR_NAME in "${BUILD_ENV_VARS[@]}"; do
-        if grep -q "^${VAR_NAME}=" .env; then
-            VAR_VALUE=$(grep "^${VAR_NAME}=" .env | cut -d '=' -f2- | tr -d '\r' | sed 's/^"//' | sed 's/"$//' | sed "s/^'//" | sed "s/'$//")
-            if [ -n "$VAR_VALUE" ]; then
-                BUILD_ARGS="$BUILD_ARGS --build-arg ${VAR_NAME}=${VAR_VALUE}"
-                echo "  ✓ ${VAR_NAME}=${VAR_VALUE}"
-            fi
-        fi
-    done
-fi
-
-case $MODE in
-    build)
-        echo "🔨 构建本地镜像..."
-        docker build $BUILD_ARGS -t $LOCAL_IMAGE .
-        IMAGE_TO_USE=$LOCAL_IMAGE
-        docker image prune -f
-        ;;
-    pull)
-        echo "📥 从阿里云拉取镜像..."
-        docker pull $ALIYUN_IMAGE
-        IMAGE_TO_USE=$ALIYUN_IMAGE
-        ;;
-    auto|*)
-        # 自动模式：优先使用本地镜像，没有则从阿里云拉取
-        if docker image inspect $LOCAL_IMAGE >/dev/null 2>&1; then
-            echo "✅ 使用本地镜像: $LOCAL_IMAGE"
-            IMAGE_TO_USE=$LOCAL_IMAGE
-        elif docker image inspect $ALIYUN_IMAGE >/dev/null 2>&1; then
-            echo "✅ 使用阿里云镜像: $ALIYUN_IMAGE"
-            IMAGE_TO_USE=$ALIYUN_IMAGE
-        else
-            echo "📥 本地无镜像，从阿里云拉取..."
-            docker pull $ALIYUN_IMAGE
-            IMAGE_TO_USE=$ALIYUN_IMAGE
-        fi
-        ;;
-esac
+# 从阿里云拉取镜像
+echo "📥 从阿里云拉取最新镜像..."
+docker pull $ALIYUN_IMAGE
 
 # 检查 .env 文件
 echo ""
@@ -120,7 +64,7 @@ docker run -d \
     $ENV_ARGS \
     $EXTRA_ARGS \
     --restart unless-stopped \
-    $IMAGE_TO_USE
+    $ALIYUN_IMAGE
 
 # 等待启动
 sleep 3
@@ -131,7 +75,7 @@ if docker ps | grep -q $CONTAINER_NAME; then
     echo "=========================================="
     echo "✅ 部署完成！"
     echo "=========================================="
-    echo "使用镜像: $IMAGE_TO_USE"
+    echo "使用镜像: $ALIYUN_IMAGE"
     echo ""
     echo "📱 前端地址: http://localhost:3000"
     echo "🔌 后端地址: http://localhost:5001"
@@ -140,11 +84,6 @@ if docker ps | grep -q $CONTAINER_NAME; then
     echo "  查看日志: docker logs -f $CONTAINER_NAME"
     echo "  停止服务: docker stop $CONTAINER_NAME"
     echo "  重启服务: docker restart $CONTAINER_NAME"
-    echo ""
-    echo "部署选项："
-    echo "  使用本地镜像: ./deploy.sh"
-    echo "  重新构建镜像: ./deploy.sh build"
-    echo "  从阿里云拉取: ./deploy.sh pull"
     echo "=========================================="
 else
     echo "❌ 容器启动失败，查看日志："
