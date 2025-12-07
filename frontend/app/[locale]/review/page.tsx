@@ -35,16 +35,21 @@ import {
   BarChart3,
   Wallet,
   Target,
-  Clock
+  Clock,
+  Calendar
 } from "lucide-react"
 import { useTranslations } from 'next-intl'
 import { useAuth } from '@/lib/auth-context'
+import { ProfitBarChart } from "@/components/profit-bar-chart"
+import { Label } from "@/components/ui/label"
+import { Input } from "@/components/ui/input"
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5001"
 
 interface StockSummary {
   stock_code: string
   stock_name: string
+  currency: string
   total_bought: number
   total_sold: number
   total_buy_amount: number
@@ -75,6 +80,7 @@ interface TradeRecord {
   direction: string
   stock_code: string
   stock_name: string
+  currency: string
   order_price: number
   order_quantity: number
   order_amount: number
@@ -109,6 +115,10 @@ export default function ReviewPage() {
   const [stockTrades, setStockTrades] = useState<TradeRecord[]>([])
   const [loadingTrades, setLoadingTrades] = useState(false)
   
+  // 时间过滤
+  const [startDate, setStartDate] = useState("")
+  const [endDate, setEndDate] = useState("")
+  
   // 修复 hydration 错误
   useEffect(() => {
     setMounted(true)
@@ -118,7 +128,7 @@ export default function ReviewPage() {
     if (mounted && user && session) {
       loadSummary()
     }
-  }, [mounted, user, session])
+  }, [mounted, user, session, startDate, endDate])
   
   const getAuthHeaders = () => {
     return {
@@ -133,7 +143,21 @@ export default function ReviewPage() {
     setError(null)
     
     try {
-      const response = await fetch(`${API_URL}/api/trading/summary`, {
+      let url = `${API_URL}/api/trading/summary`
+      const params = new URLSearchParams()
+      
+      if (startDate) {
+        params.append('start_date', startDate)
+      }
+      if (endDate) {
+        params.append('end_date', endDate)
+      }
+      
+      if (params.toString()) {
+        url += `?${params.toString()}`
+      }
+      
+      const response = await fetch(url, {
         headers: getAuthHeaders()
       })
       const result = await response.json()
@@ -251,13 +275,18 @@ export default function ReviewPage() {
     }
   }
   
-  const formatCurrency = (value: number) => {
+  const formatCurrency = (value: number, currency: string = 'USD') => {
     return new Intl.NumberFormat('zh-CN', {
       style: 'currency',
-      currency: 'USD',
+      currency: currency,
       minimumFractionDigits: 2,
       maximumFractionDigits: 2
     }).format(value)
+  }
+  
+  const formatPrice = (value: number, currency: string = 'USD') => {
+    const symbol = currency === 'HKD' ? 'HK$' : 'US$'
+    return `${symbol}${value.toFixed(4)}`
   }
   
   const formatDate = (dateStr: string | null) => {
@@ -318,78 +347,127 @@ export default function ReviewPage() {
           </p>
         </div>
         
-        {/* 数据导入区域 */}
-        <Card className="mb-8">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Upload className="h-5 w-5" />
-              {t('importData')}
-            </CardTitle>
-            <CardDescription>{t('importDesc')}</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div
-              className={`border-2 border-dashed rounded-lg p-8 text-center transition-all ${
-                isDragging 
-                  ? 'border-primary bg-primary/5' 
-                  : 'border-border hover:border-primary/50'
-              }`}
-              onDrop={handleDrop}
-              onDragOver={handleDragOver}
-              onDragLeave={handleDragLeave}
-            >
-              <FileSpreadsheet className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-              <p className="text-lg font-medium mb-2">{t('dragAndDrop')}</p>
-              <p className="text-sm text-muted-foreground mb-4">{t('supportedFormats')}</p>
-              
-              <label htmlFor="file-upload">
-                <Button asChild disabled={uploading}>
-                  <span className="cursor-pointer">
-                    {uploading ? (
-                      <>
-                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                        {t('uploading')}
-                      </>
+        {/* 数据导入和时间筛选区域 */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+          {/* 数据导入区域 - 缩小版 */}
+          <Card className="lg:col-span-2">
+            <CardHeader className="pb-3">
+              <CardTitle className="flex items-center gap-2 text-base">
+                <Upload className="h-4 w-4" />
+                {t('importData')}
+              </CardTitle>
+              <CardDescription className="text-xs">{t('importDesc')}</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div
+                className={`border-2 border-dashed rounded-lg p-4 text-center transition-all ${
+                  isDragging 
+                    ? 'border-primary bg-primary/5' 
+                    : 'border-border hover:border-primary/50'
+                }`}
+                onDrop={handleDrop}
+                onDragOver={handleDragOver}
+                onDragLeave={handleDragLeave}
+              >
+                <FileSpreadsheet className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
+                <p className="text-sm font-medium mb-1">{t('dragAndDrop')}</p>
+                <p className="text-xs text-muted-foreground mb-3">{t('supportedFormats')}</p>
+                
+                <label htmlFor="file-upload">
+                  <Button size="sm" asChild disabled={uploading}>
+                    <span className="cursor-pointer">
+                      {uploading ? (
+                        <>
+                          <Loader2 className="h-3 w-3 mr-2 animate-spin" />
+                          {t('uploading')}
+                        </>
+                      ) : (
+                        <>
+                          <Upload className="h-3 w-3 mr-2" />
+                          {t('selectFile')}
+                        </>
+                      )}
+                    </span>
+                  </Button>
+                </label>
+                <input
+                  id="file-upload"
+                  type="file"
+                  accept=".xlsx,.xls,.csv"
+                  className="hidden"
+                  onChange={handleFileSelect}
+                  disabled={uploading}
+                />
+                
+                {uploading && (
+                  <div className="mt-3 max-w-xs mx-auto">
+                    <Progress value={uploadProgress} className="h-1.5" />
+                    <p className="text-xs text-muted-foreground mt-1">{uploadProgress}%</p>
+                  </div>
+                )}
+                
+                {uploadResult && (
+                  <div className={`mt-3 flex items-center justify-center gap-2 ${
+                    uploadResult.success ? 'text-green-600' : 'text-destructive'
+                  }`}>
+                    {uploadResult.success ? (
+                      <CheckCircle2 className="h-3 w-3" />
                     ) : (
-                      <>
-                        <Upload className="h-4 w-4 mr-2" />
-                        {t('selectFile')}
-                      </>
+                      <AlertCircle className="h-3 w-3" />
                     )}
-                  </span>
+                    <span className="text-xs">{uploadResult.message}</span>
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+          
+          {/* 时间筛选区域 */}
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="flex items-center gap-2 text-base">
+                <Calendar className="h-4 w-4" />
+                {t('timeFilter')}
+              </CardTitle>
+              <CardDescription className="text-xs">{t('timeFilterDesc')}</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div className="space-y-1.5">
+                <Label htmlFor="start-date" className="text-xs">{t('startDate')}</Label>
+                <Input
+                  id="start-date"
+                  type="date"
+                  value={startDate}
+                  onChange={(e) => setStartDate(e.target.value)}
+                  className="h-8 text-sm"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="end-date" className="text-xs">{t('endDate')}</Label>
+                <Input
+                  id="end-date"
+                  type="date"
+                  value={endDate}
+                  onChange={(e) => setEndDate(e.target.value)}
+                  className="h-8 text-sm"
+                />
+              </div>
+              {(startDate || endDate) && (
+                <Button 
+                  size="sm" 
+                  variant="outline" 
+                  onClick={() => {
+                    setStartDate("")
+                    setEndDate("")
+                  }}
+                  className="w-full h-8 text-xs"
+                >
+                  {t('clearFilter')}
                 </Button>
-              </label>
-              <input
-                id="file-upload"
-                type="file"
-                accept=".xlsx,.xls,.csv"
-                className="hidden"
-                onChange={handleFileSelect}
-                disabled={uploading}
-              />
-              
-              {uploading && (
-                <div className="mt-4 max-w-xs mx-auto">
-                  <Progress value={uploadProgress} className="h-2" />
-                  <p className="text-xs text-muted-foreground mt-1">{uploadProgress}%</p>
-                </div>
               )}
-              
-              {uploadResult && (
-                <div className={`mt-4 flex items-center justify-center gap-2 ${
-                  uploadResult.success ? 'text-green-600' : 'text-destructive'
-                }`}>
-                  {uploadResult.success ? (
-                    <CheckCircle2 className="h-4 w-4" />
-                  ) : (
-                    <AlertCircle className="h-4 w-4" />
-                  )}
-                  <span className="text-sm">{uploadResult.message}</span>
-                </div>
-              )}
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        </div>
         
         {/* 统计概览 */}
         {totalStats && totalStats.total_stocks > 0 && (
@@ -476,91 +554,125 @@ export default function ReviewPage() {
                 <p className="text-sm text-muted-foreground">{t('noDataDesc')}</p>
               </div>
             ) : (
-              <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="w-12">#</TableHead>
-                      <TableHead>{t('table.stock')}</TableHead>
-                      <TableHead className="text-right">{t('table.buyAmount')}</TableHead>
-                      <TableHead className="text-right">{t('table.sellAmount')}</TableHead>
-                      <TableHead className="text-right">{t('table.profit')}</TableHead>
-                      <TableHead className="text-right">{t('table.profitRate')}</TableHead>
-                      <TableHead className="text-right">{t('table.holding')}</TableHead>
-                      <TableHead className="text-right">{t('table.trades')}</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {stockSummary.map((stock, index) => (
-                      <TableRow 
-                        key={stock.stock_code}
-                        className="cursor-pointer hover:bg-secondary/50"
-                        onClick={() => loadStockTrades(stock)}
-                      >
-                        <TableCell className="font-medium">
-                          {index < 3 ? (
-                            <Badge variant={index === 0 ? "default" : "secondary"} className="w-6 h-6 p-0 flex items-center justify-center">
-                              {index + 1}
-                            </Badge>
-                          ) : (
-                            <span className="text-muted-foreground">{index + 1}</span>
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          <div>
-                            <p className="font-semibold">{stock.stock_name}</p>
-                            <p className="text-xs text-muted-foreground">{stock.stock_code}</p>
-                          </div>
-                        </TableCell>
-                        <TableCell className="text-right font-mono">
-                          {formatCurrency(stock.total_buy_amount)}
-                        </TableCell>
-                        <TableCell className="text-right font-mono">
-                          {formatCurrency(stock.total_sell_amount)}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <div className="flex items-center justify-end gap-1">
-                            {stock.realized_profit > 0 ? (
-                              <TrendingUp className="h-4 w-4 text-green-600" />
-                            ) : stock.realized_profit < 0 ? (
-                              <TrendingDown className="h-4 w-4 text-red-600" />
-                            ) : null}
+              <div className="space-y-6">
+                {/* 盈亏柱状图 - 分成盈利和亏损两部分，上下两行显示 */}
+                <div className="space-y-4">
+                  {/* 盈利柱状图 - 第一行 */}
+                  <div className="bg-secondary/30 rounded-lg p-4">
+                    <h3 className="text-sm font-semibold mb-3 flex items-center gap-2 text-green-600">
+                      <TrendingUp className="h-4 w-4" />
+                      {t('profitStocks')} ({stockSummary.filter(s => s.realized_profit > 0).length})
+                      <span className="text-xs text-muted-foreground font-normal ml-2">
+                        ({t('topStocks', { count: Math.min(30, stockSummary.filter(s => s.realized_profit > 0).length) })})
+                      </span>
+                    </h3>
+                    <div className="h-64">
+                      <ProfitBarChart data={stockSummary} type="profit" />
+                    </div>
+                  </div>
+                  
+                  {/* 亏损柱状图 - 第二行 */}
+                  <div className="bg-secondary/30 rounded-lg p-4">
+                    <h3 className="text-sm font-semibold mb-3 flex items-center gap-2 text-red-600">
+                      <TrendingDown className="h-4 w-4" />
+                      {t('lossStocks')} ({stockSummary.filter(s => s.realized_profit < 0).length})
+                      <span className="text-xs text-muted-foreground font-normal ml-2">
+                        ({t('topStocks', { count: Math.min(30, stockSummary.filter(s => s.realized_profit < 0).length) })})
+                      </span>
+                    </h3>
+                    <div className="h-64">
+                      <ProfitBarChart data={stockSummary} type="loss" />
+                    </div>
+                  </div>
+                </div>
+                
+                {/* 详细表格 */}
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="w-12">#</TableHead>
+                        <TableHead>{t('table.stock')}</TableHead>
+                        <TableHead className="text-right">{t('table.buyAmount')}</TableHead>
+                        <TableHead className="text-right">{t('table.sellAmount')}</TableHead>
+                        <TableHead className="text-right">{t('table.profit')}</TableHead>
+                        <TableHead className="text-right">{t('table.profitRate')}</TableHead>
+                        <TableHead className="text-right">{t('table.holding')}</TableHead>
+                        <TableHead className="text-right">{t('table.trades')}</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {stockSummary.map((stock, index) => (
+                        <TableRow 
+                          key={stock.stock_code}
+                          className="cursor-pointer hover:bg-secondary/50"
+                          onClick={() => loadStockTrades(stock)}
+                        >
+                          <TableCell className="font-medium">
+                            {index < 3 ? (
+                              <Badge variant={index === 0 ? "default" : "secondary"} className="w-6 h-6 p-0 flex items-center justify-center">
+                                {index + 1}
+                              </Badge>
+                            ) : (
+                              <span className="text-muted-foreground">{index + 1}</span>
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            <div>
+                              <p className="font-semibold">{stock.stock_name}</p>
+                              <p className="text-xs text-muted-foreground">{stock.stock_code}</p>
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-right font-mono">
+                            {formatCurrency(stock.total_buy_amount, stock.currency)}
+                          </TableCell>
+                          <TableCell className="text-right font-mono">
+                            {formatCurrency(stock.total_sell_amount, stock.currency)}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <div className="flex items-center justify-end gap-1">
+                              {stock.realized_profit > 0 ? (
+                                <TrendingUp className="h-4 w-4 text-green-600" />
+                              ) : stock.realized_profit < 0 ? (
+                                <TrendingDown className="h-4 w-4 text-red-600" />
+                              ) : null}
+                              <span className={`font-mono font-semibold ${
+                                stock.realized_profit > 0 
+                                  ? 'text-green-600' 
+                                  : stock.realized_profit < 0 
+                                    ? 'text-red-600' 
+                                    : ''
+                              }`}>
+                                {stock.realized_profit >= 0 ? '+' : ''}{formatCurrency(stock.realized_profit, 'USD')}
+                              </span>
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-right">
                             <span className={`font-mono font-semibold ${
-                              stock.realized_profit > 0 
+                              stock.profit_rate > 0 
                                 ? 'text-green-600' 
-                                : stock.realized_profit < 0 
+                                : stock.profit_rate < 0 
                                   ? 'text-red-600' 
                                   : ''
                             }`}>
-                              {stock.realized_profit >= 0 ? '+' : ''}{formatCurrency(stock.realized_profit)}
+                              {stock.profit_rate >= 0 ? '+' : ''}{stock.profit_rate.toFixed(2)}%
                             </span>
-                          </div>
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <span className={`font-mono font-semibold ${
-                            stock.profit_rate > 0 
-                              ? 'text-green-600' 
-                              : stock.profit_rate < 0 
-                                ? 'text-red-600' 
-                                : ''
-                          }`}>
-                            {stock.profit_rate >= 0 ? '+' : ''}{stock.profit_rate.toFixed(2)}%
-                          </span>
-                        </TableCell>
-                        <TableCell className="text-right font-mono">
-                          {stock.current_holding > 0 ? (
-                            <Badge variant="outline">{stock.current_holding}</Badge>
-                          ) : (
-                            <span className="text-muted-foreground">0</span>
-                          )}
-                        </TableCell>
-                        <TableCell className="text-right font-mono">
-                          {stock.trade_count}
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
+                          </TableCell>
+                          <TableCell className="text-right font-mono">
+                            {stock.current_holding > 0 ? (
+                              <Badge variant="outline">{stock.current_holding}</Badge>
+                            ) : (
+                              <span className="text-muted-foreground">0</span>
+                            )}
+                          </TableCell>
+                          <TableCell className="text-right font-mono">
+                            {stock.trade_count}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
               </div>
             )}
           </CardContent>
@@ -585,22 +697,22 @@ export default function ReviewPage() {
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3 p-4 bg-secondary/30 rounded-lg">
                   <div>
                     <p className="text-xs text-muted-foreground">{t('avgBuyPrice')}</p>
-                    <p className="font-mono font-semibold">${selectedStock.avg_buy_price.toFixed(4)}</p>
+                    <p className="font-mono font-semibold">{formatPrice(selectedStock.avg_buy_price, selectedStock.currency)}</p>
                   </div>
                   <div>
                     <p className="text-xs text-muted-foreground">{t('avgSellPrice')}</p>
-                    <p className="font-mono font-semibold">${selectedStock.avg_sell_price.toFixed(4)}</p>
+                    <p className="font-mono font-semibold">{formatPrice(selectedStock.avg_sell_price, selectedStock.currency)}</p>
                   </div>
                   <div>
                     <p className="text-xs text-muted-foreground">{t('totalFees')}</p>
-                    <p className="font-mono font-semibold">${selectedStock.total_fees.toFixed(2)}</p>
+                    <p className="font-mono font-semibold">{formatCurrency(selectedStock.total_fees, selectedStock.currency)}</p>
                   </div>
                   <div>
                     <p className="text-xs text-muted-foreground">{t('realizedProfit')}</p>
                     <p className={`font-mono font-semibold ${
                       selectedStock.realized_profit >= 0 ? 'text-green-600' : 'text-red-600'
                     }`}>
-                      {selectedStock.realized_profit >= 0 ? '+' : ''}${selectedStock.realized_profit.toFixed(2)}
+                      {selectedStock.realized_profit >= 0 ? '+' : ''}{formatCurrency(selectedStock.realized_profit, 'USD')}
                     </p>
                   </div>
                 </div>
@@ -636,13 +748,13 @@ export default function ReviewPage() {
                               {trade.filled_quantity}
                             </TableCell>
                             <TableCell className="text-right font-mono">
-                              ${trade.filled_price?.toFixed(4) || '-'}
+                              {trade.filled_price ? formatPrice(trade.filled_price, trade.currency) : '-'}
                             </TableCell>
                             <TableCell className="text-right font-mono">
-                              ${trade.filled_amount?.toFixed(2) || '-'}
+                              {trade.filled_amount ? formatCurrency(trade.filled_amount, trade.currency) : '-'}
                             </TableCell>
                             <TableCell className="text-right font-mono text-muted-foreground">
-                              ${trade.total_fee?.toFixed(2) || '0.00'}
+                              {formatCurrency(trade.total_fee || 0, trade.currency)}
                             </TableCell>
                             <TableCell className="text-sm">
                               {formatDate(trade.filled_time)}

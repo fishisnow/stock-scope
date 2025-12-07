@@ -20,7 +20,8 @@ CREATE TABLE IF NOT EXISTS futu_trading_records (
     order_time TIMESTAMP WITH TIME ZONE,               -- 下单时间
     filled_time TIMESTAMP WITH TIME ZONE,              -- 成交时间
     total_fee DECIMAL(10, 4) DEFAULT 0,                -- 合计费用
-    remarks TEXT,                                      -- 备注
+    remarks TEXT,                                      -- 备注,
+    currency VARCHAR(10),                              -- 币种
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(), -- 创建时间
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()  -- 更新时间
 );
