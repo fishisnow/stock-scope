@@ -7,7 +7,7 @@ Supabase Auth 中间件
 
 from flask import request, jsonify
 from functools import wraps
-from db.database import db as stock_db
+from app.db.database import db as stock_db
 import os
 
 

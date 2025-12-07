@@ -5,13 +5,19 @@ from flask_cors import CORS
 from datetime import datetime, timedelta
 from db.database import StockDatabase
 from api.auth_middleware import token_required, optional_token
+from api.trading_api import trading_bp
 import json
 
 app = Flask(__name__)
 # 配置 Flask JSON 输出中文字符不转义
 app.config['JSON_AS_ASCII'] = False
+# 配置上传文件大小限制（16MB）
+app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024
 CORS(app)  # 启用 CORS 支持
 db = StockDatabase()
+
+# 注册交易API蓝图
+app.register_blueprint(trading_bp)
 
 # 注意：现在使用 Supabase Auth
 # 认证由前端 Supabase 客户端直接处理

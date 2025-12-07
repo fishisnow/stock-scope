@@ -2,7 +2,7 @@
 
 import React, { createContext, useContext, useState, useEffect } from 'react'
 import { supabase } from './supabase'
-import type { User as SupabaseUser, AuthError } from '@supabase/supabase-js'
+import type { User as SupabaseUser, AuthError, Session } from '@supabase/supabase-js'
 
 export interface User {
   id: string
@@ -15,6 +15,7 @@ export interface User {
 
 interface AuthContextType {
   user: User | null
+  session: Session | null
   isLoading: boolean
   login: (email: string, password: string) => Promise<void>
   signup: (email: string, password: string) => Promise<void>
@@ -25,6 +26,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
+  const [session, setSession] = useState<Session | null>(null)
   const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
@@ -32,6 +34,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const initAuth = async () => {
       try {
         const { data: { session } } = await supabase.auth.getSession()
+        setSession(session)
         setUser(session?.user ? mapSupabaseUser(session.user) : null)
       } catch (error) {
         console.error('Failed to get session:', error)
@@ -44,6 +47,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     // 监听认证状态变化
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session)
       setUser(session?.user ? mapSupabaseUser(session.user) : null)
     })
 
@@ -102,7 +106,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <AuthContext.Provider value={{ user, isLoading, login, signup, logout }}>
+    <AuthContext.Provider value={{ user, session, isLoading, login, signup, logout }}>
       {children}
     </AuthContext.Provider>
   )

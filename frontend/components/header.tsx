@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Link } from "@/i18n/routing"
 import { Button } from "@/components/ui/button"
 import { TrendingUp, LogOut, User } from "lucide-react"
@@ -24,6 +24,12 @@ export function Header() {
   const { user, logout } = useAuth()
   const [showLoginDialog, setShowLoginDialog] = useState(false)
   const [showSignupDialog, setShowSignupDialog] = useState(false)
+  const [mounted, setMounted] = useState(false)
+  
+  // 修复 Hydration 错误：等待客户端挂载
+  useEffect(() => {
+    setMounted(true)
+  }, [])
   
   // 获取邮箱的首字母作为头像
   const getInitials = (email: string) => {
@@ -46,6 +52,9 @@ export function Header() {
               <Link href="/market" className="text-sm font-medium hover:text-primary transition-colors">
                 {t('market')}
               </Link>
+              <Link href="/review" className="text-sm font-medium hover:text-primary transition-colors">
+                {t('review')}
+              </Link>
               <Link href="#pricing" className="text-sm font-medium hover:text-primary transition-colors">
                 {t('pricing')}
               </Link>
@@ -53,7 +62,7 @@ export function Header() {
 
             <div className="flex items-center gap-2">
               <LanguageSwitcher />
-              {user ? (
+              {mounted && user ? (
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button variant="ghost" size="sm" className="gap-2">
@@ -84,7 +93,7 @@ export function Header() {
                     </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
-              ) : (
+              ) : mounted ? (
                 <>
                   <Button 
                     variant="ghost" 
@@ -101,6 +110,16 @@ export function Header() {
                     {t('signup')}
                   </Button>
                 </>
+              ) : (
+                // 服务端渲染和加载中显示占位符，避免 hydration 错误
+                <div className="flex items-center gap-2">
+                  <Button variant="ghost" size="sm" disabled>
+                    {t('login')}
+                  </Button>
+                  <Button size="sm" disabled>
+                    {t('signup')}
+                  </Button>
+                </div>
               )}
             </div>
           </div>

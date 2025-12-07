@@ -1,6 +1,8 @@
 futu-api
 schedule
 pandas
+openpyxl
+xlrd
 flask
 flask-cors
 gunicorn
