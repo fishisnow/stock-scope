@@ -7,6 +7,7 @@ import schedule
 
 from app.db.database import save_futu_data
 from app.utils import futu_data
+from app.utils.wx_push import send_md_message
 
 
 def futu_job():
@@ -85,6 +86,9 @@ def futu_job():
             turnover_rate = stock.get('turnoverRate', 0)
             message_parts.append(f"| {i} | {stock['name']} | {float(stock['amount'])/100000000:.1f} | {float(stock['changeRatio']):.1f} | {float(stock['volume'])/10000:.1f} | {float(volume_ratio):.1f} | {float(turnover_rate):.1f} | {float(stock['pe']):.1f} |")
 
+            # 发送消息
+        message = "\n".join(message_parts)
+        send_md_message(message)
     except Exception as e:
         print(f"富途任务执行出错: {e}")
 
