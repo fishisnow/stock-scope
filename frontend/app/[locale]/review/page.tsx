@@ -22,6 +22,7 @@ import {
 } from "@/components/ui/table"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Progress } from "@/components/ui/progress"
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import { 
   TrendingUp, 
   TrendingDown, 
@@ -118,6 +119,9 @@ export default function ReviewPage() {
   // 时间过滤
   const [startDate, setStartDate] = useState("")
   const [endDate, setEndDate] = useState("")
+  
+  // Tab 切换状态
+  const [activeTab, setActiveTab] = useState<"profit" | "loss">("profit")
   
   // 修复 hydration 错误
   useEffect(() => {
@@ -408,7 +412,7 @@ export default function ReviewPage() {
                 
                 {uploadResult && (
                   <div className={`mt-3 flex items-center justify-center gap-2 ${
-                    uploadResult.success ? 'text-green-600' : 'text-destructive'
+                    uploadResult.success ? 'text-blue-600' : 'text-destructive'
                   }`}>
                     {uploadResult.success ? (
                       <CheckCircle2 className="h-3 w-3" />
@@ -489,7 +493,7 @@ export default function ReviewPage() {
                   <span className="text-sm text-muted-foreground">{t('totalProfit')}</span>
                 </div>
                 <p className={`text-2xl font-bold ${
-                  totalStats.total_profit >= 0 ? 'text-green-600' : 'text-red-600'
+                  totalStats.total_profit >= 0 ? 'text-red-600' : 'text-green-600'
                 }`}>
                   {totalStats.total_profit >= 0 ? '+' : ''}{formatCurrency(totalStats.total_profit)}
                 </p>
@@ -518,9 +522,9 @@ export default function ReviewPage() {
                 </div>
                 <p className="text-2xl font-bold">{totalStats.total_stocks}</p>
                 <p className="text-xs text-muted-foreground">
-                  <span className="text-green-600">{totalStats.winning_stocks} {t('profit')}</span>
+                  <span className="text-red-600">{totalStats.winning_stocks} {t('profit')}</span>
                   {' / '}
-                  <span className="text-red-600">{totalStats.losing_stocks} {t('loss')}</span>
+                  <span className="text-green-600">{totalStats.losing_stocks} {t('loss')}</span>
                 </p>
               </CardContent>
             </Card>
@@ -559,7 +563,7 @@ export default function ReviewPage() {
                 <div className="space-y-4">
                   {/* 盈利柱状图 - 第一行 */}
                   <div className="bg-secondary/30 rounded-lg p-4">
-                    <h3 className="text-sm font-semibold mb-3 flex items-center gap-2 text-green-600">
+                    <h3 className="text-sm font-semibold mb-3 flex items-center gap-2 text-red-600">
                       <TrendingUp className="h-4 w-4" />
                       {t('profitStocks')} ({stockSummary.filter(s => s.realized_profit > 0).length})
                       <span className="text-xs text-muted-foreground font-normal ml-2">
@@ -573,7 +577,7 @@ export default function ReviewPage() {
                   
                   {/* 亏损柱状图 - 第二行 */}
                   <div className="bg-secondary/30 rounded-lg p-4">
-                    <h3 className="text-sm font-semibold mb-3 flex items-center gap-2 text-red-600">
+                    <h3 className="text-sm font-semibold mb-3 flex items-center gap-2 text-green-600">
                       <TrendingDown className="h-4 w-4" />
                       {t('lossStocks')} ({stockSummary.filter(s => s.realized_profit < 0).length})
                       <span className="text-xs text-muted-foreground font-normal ml-2">
@@ -586,7 +590,108 @@ export default function ReviewPage() {
                   </div>
                 </div>
                 
-                {/* 详细表格 */}
+                {/* 详细表格 - 使用 Tab 切换 */}
+                <Tabs defaultValue="profit" className="w-full">
+                  <TabsList className="w-full max-w-md mx-auto mb-4">
+                    <TabsTrigger 
+                      value="profit" 
+                      active={activeTab === "profit"}
+                      onClick={() => setActiveTab("profit")}
+                      className="flex-1 text-red-600 data-[active=true]:text-red-600"
+                    >
+                      <TrendingUp className="h-4 w-4 mr-2" />
+                      {t('profitStocks')} ({stockSummary.filter(s => s.realized_profit > 0).length})
+                    </TabsTrigger>
+                    <TabsTrigger 
+                      value="loss" 
+                      active={activeTab === "loss"}
+                      onClick={() => setActiveTab("loss")}
+                      className="flex-1 text-green-600 data-[active=true]:text-green-600"
+                    >
+                      <TrendingDown className="h-4 w-4 mr-2" />
+                      {t('lossStocks')} ({stockSummary.filter(s => s.realized_profit < 0).length})
+                    </TabsTrigger>
+                  </TabsList>
+                  
+                  {/* 盈利列表 */}
+                  <TabsContent value="profit" className={activeTab === "profit" ? "block" : "hidden"}>
+                    <div className="overflow-x-auto">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead className="w-12">#</TableHead>
+                            <TableHead>{t('table.stock')}</TableHead>
+                            <TableHead className="text-right">{t('table.buyAmount')}</TableHead>
+                            <TableHead className="text-right">{t('table.sellAmount')}</TableHead>
+                            <TableHead className="text-right">{t('table.profit')}</TableHead>
+                            <TableHead className="text-right">{t('table.profitRate')}</TableHead>
+                            <TableHead className="text-right">{t('table.holding')}</TableHead>
+                            <TableHead className="text-right">{t('table.trades')}</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {stockSummary
+                            .filter(s => s.realized_profit > 0)
+                            .sort((a, b) => b.realized_profit - a.realized_profit)
+                            .map((stock, index) => (
+                            <TableRow 
+                              key={stock.stock_code}
+                              className="cursor-pointer hover:bg-secondary/50"
+                              onClick={() => loadStockTrades(stock)}
+                            >
+                              <TableCell className="font-medium">
+                                {index < 3 ? (
+                                  <Badge variant={index === 0 ? "default" : "secondary"} className="w-6 h-6 p-0 flex items-center justify-center">
+                                    {index + 1}
+                                  </Badge>
+                                ) : (
+                                  <span className="text-muted-foreground">{index + 1}</span>
+                                )}
+                              </TableCell>
+                              <TableCell>
+                                <div>
+                                  <p className="font-semibold">{stock.stock_name}</p>
+                                  <p className="text-xs text-muted-foreground">{stock.stock_code}</p>
+                                </div>
+                              </TableCell>
+                              <TableCell className="text-right font-mono">
+                                {formatCurrency(stock.total_buy_amount, stock.currency)}
+                              </TableCell>
+                              <TableCell className="text-right font-mono">
+                                {formatCurrency(stock.total_sell_amount, stock.currency)}
+                              </TableCell>
+                              <TableCell className="text-right">
+                                <div className="flex items-center justify-end gap-1">
+                                  <TrendingUp className="h-4 w-4 text-red-600" />
+                                  <span className="font-mono font-semibold text-red-600">
+                                    +{formatCurrency(stock.realized_profit, 'USD')}
+                                  </span>
+                                </div>
+                              </TableCell>
+                              <TableCell className="text-right">
+                                <span className="font-mono font-semibold text-red-600">
+                                  +{stock.profit_rate.toFixed(2)}%
+                                </span>
+                              </TableCell>
+                              <TableCell className="text-right font-mono">
+                                {stock.current_holding > 0 ? (
+                                  <Badge variant="outline">{stock.current_holding}</Badge>
+                                ) : (
+                                  <span className="text-muted-foreground">0</span>
+                                )}
+                              </TableCell>
+                              <TableCell className="text-right font-mono">
+                                {stock.trade_count}
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  </TabsContent>
+                  
+                  {/* 亏损列表 */}
+                  <TabsContent value="loss" className={activeTab === "loss" ? "block" : "hidden"}>
                 <div className="overflow-x-auto">
                   <Table>
                     <TableHeader>
@@ -602,7 +707,10 @@ export default function ReviewPage() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {stockSummary.map((stock, index) => (
+                          {stockSummary
+                            .filter(s => s.realized_profit < 0)
+                            .sort((a, b) => a.realized_profit - b.realized_profit)
+                            .map((stock, index) => (
                         <TableRow 
                           key={stock.stock_code}
                           className="cursor-pointer hover:bg-secondary/50"
@@ -631,31 +739,15 @@ export default function ReviewPage() {
                           </TableCell>
                           <TableCell className="text-right">
                             <div className="flex items-center justify-end gap-1">
-                              {stock.realized_profit > 0 ? (
-                                <TrendingUp className="h-4 w-4 text-green-600" />
-                              ) : stock.realized_profit < 0 ? (
-                                <TrendingDown className="h-4 w-4 text-red-600" />
-                              ) : null}
-                              <span className={`font-mono font-semibold ${
-                                stock.realized_profit > 0 
-                                  ? 'text-green-600' 
-                                  : stock.realized_profit < 0 
-                                    ? 'text-red-600' 
-                                    : ''
-                              }`}>
-                                {stock.realized_profit >= 0 ? '+' : ''}{formatCurrency(stock.realized_profit, 'USD')}
+                                  <TrendingDown className="h-4 w-4 text-green-600" />
+                                  <span className="font-mono font-semibold text-green-600">
+                                    {formatCurrency(stock.realized_profit, 'USD')}
                               </span>
                             </div>
                           </TableCell>
                           <TableCell className="text-right">
-                            <span className={`font-mono font-semibold ${
-                              stock.profit_rate > 0 
-                                ? 'text-green-600' 
-                                : stock.profit_rate < 0 
-                                  ? 'text-red-600' 
-                                  : ''
-                            }`}>
-                              {stock.profit_rate >= 0 ? '+' : ''}{stock.profit_rate.toFixed(2)}%
+                                <span className="font-mono font-semibold text-green-600">
+                                  {stock.profit_rate.toFixed(2)}%
                             </span>
                           </TableCell>
                           <TableCell className="text-right font-mono">
@@ -673,6 +765,8 @@ export default function ReviewPage() {
                     </TableBody>
                   </Table>
                 </div>
+                  </TabsContent>
+                </Tabs>
               </div>
             )}
           </CardContent>
@@ -710,7 +804,7 @@ export default function ReviewPage() {
                   <div>
                     <p className="text-xs text-muted-foreground">{t('realizedProfit')}</p>
                     <p className={`font-mono font-semibold ${
-                      selectedStock.realized_profit >= 0 ? 'text-green-600' : 'text-red-600'
+                      selectedStock.realized_profit >= 0 ? 'text-red-600' : 'text-green-600'
                     }`}>
                       {selectedStock.realized_profit >= 0 ? '+' : ''}{formatCurrency(selectedStock.realized_profit, 'USD')}
                     </p>

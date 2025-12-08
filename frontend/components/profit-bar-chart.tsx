@@ -38,7 +38,7 @@ export function ProfitBarChart({ data, type }: ProfitBarChartProps) {
           <p className="font-semibold">{data.fullName}</p>
           <p className="text-sm text-muted-foreground">{data.code}</p>
           <p className={`font-mono font-semibold ${
-            data.profit >= 0 ? 'text-green-600' : 'text-red-600'
+            data.profit >= 0 ? 'text-red-600' : 'text-green-600'
           }`}>
             {data.profit >= 0 ? '+' : ''}US${data.profit.toFixed(2)}
           </p>
@@ -87,7 +87,7 @@ export function ProfitBarChart({ data, type }: ProfitBarChartProps) {
           {chartData.map((entry, index) => (
             <Cell 
               key={`cell-${index}`} 
-              fill={type === 'profit' ? 'hsl(142 76% 36%)' : 'hsl(0 84% 60%)'}
+              fill={type === 'profit' ? 'hsl(0 84% 60%)' : 'hsl(142 76% 36%)'}
             />
           ))}
         </Bar>
