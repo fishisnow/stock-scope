@@ -58,10 +58,10 @@
     },
     "sections": {
       "topPerformers": "顶级表现者",
-      "highChangeVolume": "高涨幅 & 高成交量领涨股",
+      "highChangeVolume": "高涨幅 & 高成交额领涨股",
       "marketLeaders": "市场领军者",
       "topGainers": "涨幅榜",
-      "highestVolume": "成交量榜"
+      "highestVolume": "成交额榜"
     },
     "markets": {
       "chinaA": "中国A股市场",

@@ -14,7 +14,7 @@ CREATE TABLE IF NOT EXISTS stock_records (
     time TIME NOT NULL,                                  -- 时间
     data_source VARCHAR(50) NOT NULL,                    -- 数据源: 'futu' 或 'tonghuashun'
     market VARCHAR(10) NOT NULL,                         -- 市场: 'A' 或 'HK'
-    data_type VARCHAR(50) NOT NULL,                      -- 数据类型: 'top_amount', 'top_change', 'top_volume_ratio', 'intersection'
+    data_type VARCHAR(50) NOT NULL,                      -- 数据类型: 'top_turnover', 'top_change', 'intersection'
     rank_order INTEGER NOT NULL,                         -- 排名
     stock_code VARCHAR(20),                              -- 股票代码
     stock_name VARCHAR(100),                             -- 股票名称
@@ -55,7 +55,7 @@ COMMENT ON COLUMN stock_records.date IS '统计日期';
 COMMENT ON COLUMN stock_records.time IS '统计时间';
 COMMENT ON COLUMN stock_records.data_source IS '数据源：futu-富途，tonghuashun-同花顺';
 COMMENT ON COLUMN stock_records.market IS '市场：A-A股市场，HK-港股市场';
-COMMENT ON COLUMN stock_records.data_type IS '数据类型：top_amount-成交额榜，top_change-涨跌幅榜，top_volume_ratio-量比榜，intersection-交集';
+COMMENT ON COLUMN stock_records.data_type IS '数据类型：top_turnover-成交额榜（前50），top_change-涨跌幅榜，intersection-交集';
 COMMENT ON COLUMN stock_records.rank_order IS '在该榜单中的排名';
 COMMENT ON COLUMN stock_records.stock_code IS '股票代码';
 COMMENT ON COLUMN stock_records.stock_name IS '股票名称';

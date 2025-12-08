@@ -48,7 +48,7 @@ def futu_job():
         message_parts.append("\n#### 成交额前50")
         message_parts.append("| 排名 | 股票名称 | 成交额(亿) | 涨跌幅(%) | 成交量(万手) | 量比 | 换手率(%) | 市盈率 |")
         message_parts.append("|------|----------|------------|-----------|-------------|------|---------|--------|")
-        for i, stock in enumerate(data['A']['top_volume_ratio'], 1):
+        for i, stock in enumerate(data['A']['top_turnover'], 1):
             volume_ratio = stock.get('volumeRatio', 0)
             turnover_rate = stock.get('turnoverRate', 0)
             message_parts.append(f"| {i} | {stock['name']} | {float(stock['amount'])/100000000:.1f} | {float(stock['changeRatio']):.1f} | {float(stock['volume'])/10000:.1f} | {float(volume_ratio):.1f} | {float(turnover_rate):.1f} | {float(stock['pe']):.1f} |")
@@ -80,7 +80,7 @@ def futu_job():
         message_parts.append("\n#### 成交额前50")
         message_parts.append("| 排名 | 股票名称 | 成交额(亿) | 涨跌幅(%) | 成交量(万手) | 量比 | 换手率(%) | 市盈率 |")
         message_parts.append("|------|----------|------------|-----------|-------------|------|---------|--------|")
-        for i, stock in enumerate(data['HK']['top_volume_ratio'], 1):
+        for i, stock in enumerate(data['HK']['top_turnover'], 1):
             volume_ratio = stock.get('volumeRatio', 0)
             turnover_rate = stock.get('turnoverRate', 0)
             message_parts.append(f"| {i} | {stock['name']} | {float(stock['amount'])/100000000:.1f} | {float(stock['changeRatio']):.1f} | {float(stock['volume'])/10000:.1f} | {float(volume_ratio):.1f} | {float(turnover_rate):.1f} | {float(stock['pe']):.1f} |")

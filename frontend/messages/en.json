@@ -58,10 +58,10 @@
     },
     "sections": {
       "topPerformers": "Top Performers",
-      "highChangeVolume": "High Change & Volume Leaders",
+      "highChangeVolume": "High Change & Turnover Leaders",
       "marketLeaders": "Market Leaders",
       "topGainers": "Top Gainers",
-      "highestVolume": "Highest Volume"
+      "highestVolume": "Highest Turnover"
     },
     "markets": {
       "chinaA": "China A-Share Market",

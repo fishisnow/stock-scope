@@ -24,8 +24,7 @@ interface MarketData {
   time?: string
   intersection?: Stock[]
   top_change?: Stock[]
-  top_volume_ratio?: Stock[]
-  top_amount?: Stock[]
+  top_turnover?: Stock[]
 }
 
 interface FutuData {
@@ -63,7 +62,7 @@ function StockTable({ title, data, dataType, t }: { title: string; data: Stock[]
                 <th className="py-3 px-2 text-left text-[10px] sm:text-xs font-bold uppercase tracking-wide text-muted-foreground min-w-[80px]">
                   {t('table.stock')}
                 </th>
-                {(dataType === "top_amount" || dataType === "intersection") && (
+                {(dataType === "top_turnover" || dataType === "intersection") && (
                   <th className="py-3 px-2 text-right text-[10px] sm:text-xs font-bold uppercase tracking-wide text-muted-foreground whitespace-nowrap hidden sm:table-cell">
                     {t('table.amount')}
                   </th>
@@ -107,7 +106,7 @@ function StockTable({ title, data, dataType, t }: { title: string; data: Stock[]
                     <td className="py-3 px-2">
                       <span className="text-xs sm:text-sm font-semibold truncate block max-w-[120px]">{stock.name || "-"}</span>
                     </td>
-                    {(dataType === "top_amount" || dataType === "intersection") && (
+                    {(dataType === "top_turnover" || dataType === "intersection") && (
                       <td className="py-3 px-2 text-right hidden sm:table-cell">
                         <span className="text-xs sm:text-sm font-mono font-medium">
                           {(parseFloat(String(stock.amount || 0)) / 100000000).toFixed(1)}
@@ -279,7 +278,7 @@ export default function MarketPage() {
 
           {/* Top Gainers and Highest Volume side by side */}
           {((marketData.top_change && marketData.top_change.length > 0) ||
-            (marketData.top_volume_ratio && marketData.top_volume_ratio.length > 0)) && (
+            (marketData.top_turnover && marketData.top_turnover.length > 0)) && (
             <>
               <div className="flex items-center gap-3 my-10">
                 <div className="h-1 w-12 bg-primary/60 rounded-full" />
@@ -290,8 +289,8 @@ export default function MarketPage() {
                 {marketData.top_change && marketData.top_change.length > 0 && (
                   <StockTable title={t('sections.topGainers')} data={marketData.top_change} dataType="top_change" t={t} />
                 )}
-                {marketData.top_volume_ratio && marketData.top_volume_ratio.length > 0 && (
-                  <StockTable title={t('sections.highestVolume')} data={marketData.top_volume_ratio} dataType="top_volume_ratio" t={t} />
+                {marketData.top_turnover && marketData.top_turnover.length > 0 && (
+                  <StockTable title={t('sections.highestVolume')} data={marketData.top_turnover} dataType="top_turnover" t={t} />
                 )}
               </div>
             </>

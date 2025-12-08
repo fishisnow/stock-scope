@@ -72,14 +72,11 @@ def get_stock_data(plate_code: str) -> Dict[str, List[Dict]]:
         change_rate_df = get_hot_top(quote_context, plate_code, 'CHANGE_RATE', 50)
         # 获取成交额前50
         turnover_top50_df = get_hot_top(quote_context, plate_code, 'TURNOVER', 50)
-        # 获取成交额前10
-        turnover_df = get_hot_top(quote_context, plate_code, 'TURNOVER', 10)
         
         # 收集所有需要获取详细数据的股票代码
         all_codes = set()
         all_codes.update(change_rate_df['code'].tolist())
         all_codes.update(turnover_top50_df['code'].tolist())
-        all_codes.update(turnover_df['code'].tolist())
         all_codes = list(all_codes)
         
         # 一次性获取所有股票的详细数据
@@ -171,8 +168,7 @@ def get_stock_data(plate_code: str) -> Dict[str, List[Dict]]:
         
         return {
             'top_change': process_df(change_rate_df),
-            'top_volume_ratio': process_df(turnover_top50_df),
-            'top_amount': process_df(turnover_df),
+            'top_turnover': process_df(turnover_top50_df),
             'intersection': intersection_data
         }
         
@@ -180,8 +176,7 @@ def get_stock_data(plate_code: str) -> Dict[str, List[Dict]]:
         print(f"获取数据时发生错误: {str(e)}")
         return {
             'top_change': [],
-            'top_volume_ratio': [],
-            'top_amount': [],
+            'top_turnover': [],
             'intersection': []
         }
 
