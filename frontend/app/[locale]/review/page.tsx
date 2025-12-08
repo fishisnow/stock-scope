@@ -120,9 +120,6 @@ export default function ReviewPage() {
   const [startDate, setStartDate] = useState("")
   const [endDate, setEndDate] = useState("")
   
-  // Tab 切换状态
-  const [activeTab, setActiveTab] = useState<"profit" | "loss">("profit")
-  
   // 修复 hydration 错误
   useEffect(() => {
     setMounted(true)
@@ -595,18 +592,14 @@ export default function ReviewPage() {
                   <TabsList className="w-full max-w-md mx-auto mb-4">
                     <TabsTrigger 
                       value="profit" 
-                      active={activeTab === "profit"}
-                      onClick={() => setActiveTab("profit")}
-                      className="flex-1 text-red-600 data-[active=true]:text-red-600"
+                      className="flex-1"
                     >
                       <TrendingUp className="h-4 w-4 mr-2" />
                       {t('profitStocks')} ({stockSummary.filter(s => s.realized_profit > 0).length})
                     </TabsTrigger>
                     <TabsTrigger 
                       value="loss" 
-                      active={activeTab === "loss"}
-                      onClick={() => setActiveTab("loss")}
-                      className="flex-1 text-green-600 data-[active=true]:text-green-600"
+                      className="flex-1"
                     >
                       <TrendingDown className="h-4 w-4 mr-2" />
                       {t('lossStocks')} ({stockSummary.filter(s => s.realized_profit < 0).length})
@@ -614,7 +607,7 @@ export default function ReviewPage() {
                   </TabsList>
                   
                   {/* 盈利列表 */}
-                  <TabsContent value="profit" className={activeTab === "profit" ? "block" : "hidden"}>
+                  <TabsContent value="profit">
                     <div className="overflow-x-auto">
                       <Table>
                         <TableHeader>
@@ -691,7 +684,7 @@ export default function ReviewPage() {
                   </TabsContent>
                   
                   {/* 亏损列表 */}
-                  <TabsContent value="loss" className={activeTab === "loss" ? "block" : "hidden"}>
+                  <TabsContent value="loss">
                 <div className="overflow-x-auto">
                   <Table>
                     <TableHeader>
