@@ -23,6 +23,7 @@ import {
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Progress } from "@/components/ui/progress"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { 
   TrendingUp, 
   TrendingDown, 
@@ -37,7 +38,8 @@ import {
   Wallet,
   Target,
   Clock,
-  Calendar
+  Calendar,
+  RefreshCw
 } from "lucide-react"
 import { useTranslations } from 'next-intl'
 import { useAuth } from '@/lib/auth-context'
@@ -125,11 +127,12 @@ export default function ReviewPage() {
     setMounted(true)
   }, [])
   
+  // 只在初始化时加载数据，不再自动响应时间筛选的变化
   useEffect(() => {
     if (mounted && user && session) {
       loadSummary()
     }
-  }, [mounted, user, session, startDate, endDate])
+  }, [mounted, user, session])
   
   const getAuthHeaders = () => {
     return {
@@ -276,6 +279,101 @@ export default function ReviewPage() {
     }
   }
   
+  // 快捷时间选项 - 立即应用
+  const setQuickTimeRange = (type: string) => {
+    const now = new Date()
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+    let start = new Date()
+    
+    switch (type) {
+      case '1m':
+        start = new Date(today)
+        start.setMonth(start.getMonth() - 1)
+        break
+      case '3m':
+        start = new Date(today)
+        start.setMonth(start.getMonth() - 3)
+        break
+      case '6m':
+        start = new Date(today)
+        start.setMonth(start.getMonth() - 6)
+        break
+      case '1y':
+        start = new Date(today)
+        start.setFullYear(start.getFullYear() - 1)
+        break
+      case 'ytd':
+        start = new Date(now.getFullYear(), 0, 1)
+        break
+      default:
+        return
+    }
+    
+    const startDateStr = start.toISOString().split('T')[0]
+    const endDateStr = today.toISOString().split('T')[0]
+    
+    setStartDate(startDateStr)
+    setEndDate(endDateStr)
+    
+    // 立即应用筛选
+    loadSummaryWithDates(startDateStr, endDateStr)
+  }
+  
+  // 应用筛选（用于自定义日期）
+  const applyFilter = () => {
+    loadSummary()
+  }
+  
+  // 清除筛选
+  const clearFilter = () => {
+    setStartDate("")
+    setEndDate("")
+    loadSummary()
+  }
+  
+  // 带日期参数的加载函数
+  const loadSummaryWithDates = async (start?: string, end?: string) => {
+    if (!session?.access_token) return
+    
+    setLoading(true)
+    setError(null)
+    
+    try {
+      let url = `${API_URL}/api/trading/summary`
+      const params = new URLSearchParams()
+      
+      const startParam = start !== undefined ? start : startDate
+      const endParam = end !== undefined ? end : endDate
+      
+      if (startParam) {
+        params.append('start_date', startParam)
+      }
+      if (endParam) {
+        params.append('end_date', endParam)
+      }
+      
+      if (params.toString()) {
+        url += `?${params.toString()}`
+      }
+      
+      const response = await fetch(url, {
+        headers: getAuthHeaders()
+      })
+      const result = await response.json()
+      
+      if (result.success) {
+        setStockSummary(result.data)
+        setTotalStats(result.total_stats)
+      } else {
+        setError(result.error)
+      }
+    } catch (err) {
+      setError((err as Error).message)
+    } finally {
+      setLoading(false)
+    }
+  }
+  
   const formatCurrency = (value: number, currency: string = 'USD') => {
     return new Intl.NumberFormat('zh-CN', {
       style: 'currency',
@@ -348,127 +446,213 @@ export default function ReviewPage() {
           </p>
         </div>
         
-        {/* 数据导入和时间筛选区域 */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
-          {/* 数据导入区域 - 缩小版 */}
-          <Card className="lg:col-span-2">
-            <CardHeader className="pb-3">
-              <CardTitle className="flex items-center gap-2 text-base">
-                <Upload className="h-4 w-4" />
-                {t('importData')}
-              </CardTitle>
-              <CardDescription className="text-xs">{t('importDesc')}</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div
-                className={`border-2 border-dashed rounded-lg p-4 text-center transition-all ${
-                  isDragging 
-                    ? 'border-primary bg-primary/5' 
-                    : 'border-border hover:border-primary/50'
-                }`}
-                onDrop={handleDrop}
-                onDragOver={handleDragOver}
-                onDragLeave={handleDragLeave}
-              >
-                <FileSpreadsheet className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
-                <p className="text-sm font-medium mb-1">{t('dragAndDrop')}</p>
-                <p className="text-xs text-muted-foreground mb-3">{t('supportedFormats')}</p>
-                
-                <label htmlFor="file-upload">
-                  <Button size="sm" asChild disabled={uploading}>
-                    <span className="cursor-pointer">
-                      {uploading ? (
-                        <>
-                          <Loader2 className="h-3 w-3 mr-2 animate-spin" />
-                          {t('uploading')}
-                        </>
-                      ) : (
-                        <>
-                          <Upload className="h-3 w-3 mr-2" />
-                          {t('selectFile')}
-                        </>
-                      )}
-                    </span>
-                  </Button>
-                </label>
-                <input
-                  id="file-upload"
-                  type="file"
-                  accept=".xlsx,.xls,.csv"
-                  className="hidden"
-                  onChange={handleFileSelect}
-                  disabled={uploading}
-                />
-                
-                {uploading && (
-                  <div className="mt-3 max-w-xs mx-auto">
-                    <Progress value={uploadProgress} className="h-1.5" />
-                    <p className="text-xs text-muted-foreground mt-1">{uploadProgress}%</p>
-                  </div>
-                )}
-                
+        {/* 操作工具栏 - 紧凑设计 */}
+        <Card className="mb-8">
+          <CardContent className="pt-6">
+            <div className="flex flex-col lg:flex-row gap-4 lg:gap-6 lg:items-start">
+              {/* 左侧：数据导入 */}
+              <div className="flex-shrink-0 lg:w-80">
+                <div className="flex items-center gap-2 mb-2">
+                  <Upload className="h-4 w-4 text-muted-foreground" />
+                  <Label className="text-sm font-medium">{t('importData')}</Label>
+                </div>
+                <div className="flex gap-2">
+                  <label htmlFor="file-upload" className="flex-1">
+                    <Button size="sm" variant="outline" className="w-full h-9" asChild disabled={uploading}>
+                      <span className="cursor-pointer">
+                        {uploading ? (
+                          <>
+                            <Loader2 className="h-3.5 w-3.5 mr-2 animate-spin" />
+                            {uploadProgress}%
+                          </>
+                        ) : (
+                          <>
+                            <FileSpreadsheet className="h-3.5 w-3.5 mr-2" />
+                            {t('selectFile')}
+                          </>
+                        )}
+                      </span>
+                    </Button>
+                  </label>
+                  <input
+                    id="file-upload"
+                    type="file"
+                    accept=".xlsx,.xls,.csv"
+                    className="hidden"
+                    onChange={handleFileSelect}
+                    disabled={uploading}
+                  />
+                </div>
                 {uploadResult && (
-                  <div className={`mt-3 flex items-center justify-center gap-2 ${
+                  <p className={`text-xs mt-2 flex items-center gap-1.5 ${
                     uploadResult.success ? 'text-blue-600' : 'text-destructive'
                   }`}>
                     {uploadResult.success ? (
-                      <CheckCircle2 className="h-3 w-3" />
+                      <CheckCircle2 className="h-3.5 w-3.5" />
                     ) : (
-                      <AlertCircle className="h-3 w-3" />
+                      <AlertCircle className="h-3.5 w-3.5" />
                     )}
-                    <span className="text-xs">{uploadResult.message}</span>
+                    <span>{uploadResult.message}</span>
+                  </p>
+                )}
+                {uploading && (
+                  <div className="mt-2">
+                    <Progress value={uploadProgress} className="h-1" />
                   </div>
                 )}
               </div>
-            </CardContent>
-          </Card>
-          
-          {/* 时间筛选区域 */}
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="flex items-center gap-2 text-base">
-                <Calendar className="h-4 w-4" />
-                {t('timeFilter')}
-              </CardTitle>
-              <CardDescription className="text-xs">{t('timeFilterDesc')}</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <div className="space-y-1.5">
-                <Label htmlFor="start-date" className="text-xs">{t('startDate')}</Label>
-                <Input
-                  id="start-date"
-                  type="date"
-                  value={startDate}
-                  onChange={(e) => setStartDate(e.target.value)}
-                  className="h-8 text-sm"
-                />
+              
+              {/* 分隔线 */}
+              <div className="hidden lg:block w-px bg-border self-stretch min-h-[60px]"></div>
+              
+              {/* 右侧：时间筛选 */}
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 mb-2 flex-wrap">
+                  <Calendar className="h-4 w-4 text-muted-foreground" />
+                  <Label className="text-sm font-medium">{t('timeFilter')}</Label>
+                  
+                  {/* 当前选择的时间范围 Badge */}
+                  {(startDate || endDate) && (
+                    <>
+                      <Badge variant="secondary" className="text-xs font-normal">
+                        <Clock className="h-3 w-3 mr-1" />
+                        {startDate || t('start')} ~ {endDate || t('end')}
+                      </Badge>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={clearFilter}
+                        className="h-5 w-5 p-0 hover:bg-destructive/10"
+                      >
+                        <X className="h-3 w-3" />
+                      </Button>
+                    </>
+                  )}
+                </div>
+                
+                <div className="flex flex-wrap items-center gap-2">
+                  {/* 快捷时间按钮 - 点击立即生效 */}
+                  <Button 
+                    size="sm" 
+                    variant="outline" 
+                    onClick={() => setQuickTimeRange('1m')} 
+                    disabled={loading}
+                    className="h-9 text-xs px-3"
+                  >
+                    {t('past1Month')}
+                  </Button>
+                  <Button 
+                    size="sm" 
+                    variant="outline" 
+                    onClick={() => setQuickTimeRange('3m')} 
+                    disabled={loading}
+                    className="h-9 text-xs px-3"
+                  >
+                    {t('past3Months')}
+                  </Button>
+                  <Button 
+                    size="sm" 
+                    variant="outline" 
+                    onClick={() => setQuickTimeRange('6m')} 
+                    disabled={loading}
+                    className="h-9 text-xs px-3"
+                  >
+                    {t('past6Months')}
+                  </Button>
+                  <Button 
+                    size="sm" 
+                    variant="outline" 
+                    onClick={() => setQuickTimeRange('1y')} 
+                    disabled={loading}
+                    className="h-9 text-xs px-3"
+                  >
+                    {t('past1Year')}
+                  </Button>
+                  <Button 
+                    size="sm" 
+                    variant="outline" 
+                    onClick={() => setQuickTimeRange('ytd')} 
+                    disabled={loading}
+                    className="h-9 text-xs px-3"
+                  >
+                    {t('yearToDate')}
+                  </Button>
+                  
+                  {/* 自定义日期 Popover */}
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button 
+                        size="sm" 
+                        variant="outline" 
+                        className="h-9 text-xs px-3"
+                        disabled={loading}
+                      >
+                        <Calendar className="h-3.5 w-3.5 mr-1.5" />
+                        {t('customRange')}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-4" align="end">
+                      <div className="space-y-3">
+                        <div className="space-y-1.5">
+                          <Label htmlFor="start-date" className="text-xs">{t('startDate')}</Label>
+                          <Input
+                            id="start-date"
+                            type="date"
+                            value={startDate}
+                            onChange={(e) => setStartDate(e.target.value)}
+                            className="h-8 text-sm"
+                          />
+                        </div>
+                        <div className="space-y-1.5">
+                          <Label htmlFor="end-date" className="text-xs">{t('endDate')}</Label>
+                          <Input
+                            id="end-date"
+                            type="date"
+                            value={endDate}
+                            onChange={(e) => setEndDate(e.target.value)}
+                            className="h-8 text-sm"
+                          />
+                        </div>
+                        <div className="flex gap-2">
+                          <Button 
+                            size="sm" 
+                            onClick={applyFilter}
+                            disabled={loading}
+                            className="flex-1"
+                          >
+                            {loading ? (
+                              <>
+                                <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                                {t('loading')}
+                              </>
+                            ) : (
+                              <>
+                                <RefreshCw className="h-3 w-3 mr-1" />
+                                {t('applyFilter')}
+                              </>
+                            )}
+                          </Button>
+                          {(startDate || endDate) && (
+                            <Button 
+                              size="sm" 
+                              variant="outline" 
+                              onClick={() => {
+                                setStartDate("")
+                                setEndDate("")
+                              }}
+                            >
+                              <X className="h-3 w-3" />
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                    </PopoverContent>
+                  </Popover>
+                </div>
               </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="end-date" className="text-xs">{t('endDate')}</Label>
-                <Input
-                  id="end-date"
-                  type="date"
-                  value={endDate}
-                  onChange={(e) => setEndDate(e.target.value)}
-                  className="h-8 text-sm"
-                />
-              </div>
-              {(startDate || endDate) && (
-                <Button 
-                  size="sm" 
-                  variant="outline" 
-                  onClick={() => {
-                    setStartDate("")
-                    setEndDate("")
-                  }}
-                  className="w-full h-8 text-xs"
-                >
-                  {t('clearFilter')}
-                </Button>
-              )}
-            </CardContent>
-          </Card>
-        </div>
+            </div>
+          </CardContent>
+        </Card>
         
         {/* 统计概览 */}
         {totalStats && totalStats.total_stocks > 0 && (
