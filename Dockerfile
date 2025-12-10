@@ -30,13 +30,22 @@ RUN npm run build
 FROM python:3.12-slim
 
 # 安装 Node.js 运行时和时区数据（用于运行 Next.js 和设置时区）
-RUN apt-get update && apt-get install -y \
+# 注意：在生产环境中，建议使用官方 Node.js 二进制文件而不是通过脚本安装
+RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     tzdata \
+    ca-certificates \
     && curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
-    && apt-get install -y nodejs \
+    && apt-get install -y --no-install-recommends nodejs \
     && apt-get clean \
-    && rm -rf /var/lib/apt/lists/*
+    && rm -rf /var/lib/apt/lists/* \
+    && rm -rf /tmp/* \
+    && rm -rf /var/tmp/*
+
+# 创建非 root 用户（安全最佳实践）
+RUN groupadd -r appuser && useradd -r -g appuser -u 1000 appuser \
+    && mkdir -p /app /home/appuser \
+    && chown -R appuser:appuser /app /home/appuser
 
 # 设置工作目录
 WORKDIR /app
@@ -57,6 +66,9 @@ COPY --from=frontend-builder /app/frontend ./frontend
 COPY start.sh /app/start.sh
 RUN chmod +x /app/start.sh
 
+# 设置文件权限（确保非 root 用户可以访问）
+RUN chown -R appuser:appuser /app
+
 # 暴露端口
 EXPOSE 3000 5001
 
@@ -64,6 +76,10 @@ EXPOSE 3000 5001
 ENV NODE_ENV=production
 ENV PYTHONUNBUFFERED=1
 ENV TZ=Asia/Shanghai
+ENV HOME=/home/appuser
+
+# 切换到非 root 用户（安全最佳实践）
+USER appuser
 
 # 启动应用
 CMD ["/app/start.sh"]

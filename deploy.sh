@@ -28,6 +28,17 @@ docker rm $CONTAINER_NAME 2>/dev/null || true
 echo "📥 从阿里云拉取最新镜像..."
 docker pull $ALIYUN_IMAGE
 
+# 检查镜像是否支持非 root 用户（可选，如果失败会自动回退）
+echo "🔍 检查镜像安全配置..."
+if docker run --rm --user 1000:1000 $ALIYUN_IMAGE id > /dev/null 2>&1; then
+    echo "✅ 镜像支持非 root 用户运行"
+    USE_NON_ROOT=true
+else
+    echo "⚠️  警告: 镜像可能不支持非 root 用户，将尝试使用 root 用户"
+    echo "   建议重新构建镜像以启用安全加固功能"
+    USE_NON_ROOT=false
+fi
+
 # 检查 .env 文件
 echo ""
 if [ ! -f ".env" ]; then
@@ -49,6 +60,8 @@ fi
 EXTRA_ARGS=""
 if [[ "$OSTYPE" == "linux-gnu"* ]]; then
     # Linux 系统使用 host 网络模式（最简单）
+    # 注意：host 网络模式会降低隔离性，但为了兼容性保留
+    # 如果可能，建议使用桥接网络模式以提高安全性
     EXTRA_ARGS="--network host"
     echo "✅ Linux 系统：使用 host 网络模式"
 else
@@ -57,12 +70,35 @@ else
     echo "✅ 使用 host.docker.internal"
 fi
 
+# 安全加固配置
+SECURITY_ARGS=""
+SECURITY_ARGS="$SECURITY_ARGS --security-opt no-new-privileges:true"  # 禁止获取新权限
+SECURITY_ARGS="$SECURITY_ARGS --cap-drop ALL"  # 移除所有能力
+SECURITY_ARGS="$SECURITY_ARGS --cap-add NET_BIND_SERVICE"  # 仅允许绑定端口（<1024需要）
+SECURITY_ARGS="$SECURITY_ARGS --memory=2g"  # 限制内存使用
+SECURITY_ARGS="$SECURITY_ARGS --memory-swap=2g"  # 禁用交换分区
+SECURITY_ARGS="$SECURITY_ARGS --cpus=2"  # 限制 CPU 使用
+SECURITY_ARGS="$SECURITY_ARGS --pids-limit=100"  # 限制进程数
+SECURITY_ARGS="$SECURITY_ARGS --ulimit nofile=1024:2048"  # 限制文件描述符
+SECURITY_ARGS="$SECURITY_ARGS --ulimit nproc=50"  # 限制进程数（ulimit方式）
+
+# 使用非 root 用户运行（如果镜像支持）
+if [ "$USE_NON_ROOT" = true ]; then
+    SECURITY_ARGS="$SECURITY_ARGS --user 1000:1000"  # 使用非 root 用户
+    echo "✅ 启用非 root 用户运行"
+else
+    echo "⚠️  使用 root 用户运行（安全性较低，建议更新镜像）"
+fi
+
+echo "🔒 应用安全加固配置..."
+
 docker run -d \
     --name $CONTAINER_NAME \
     -p 3000:3000 \
     -p 5001:5001 \
     $ENV_ARGS \
     $EXTRA_ARGS \
+    $SECURITY_ARGS \
     --restart unless-stopped \
     $ALIYUN_IMAGE
 
