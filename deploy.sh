@@ -80,7 +80,7 @@ SECURITY_ARGS="$SECURITY_ARGS --memory-swap=2g"  # 禁用交换分区
 SECURITY_ARGS="$SECURITY_ARGS --cpus=2"  # 限制 CPU 使用
 SECURITY_ARGS="$SECURITY_ARGS --pids-limit=100"  # 限制进程数
 SECURITY_ARGS="$SECURITY_ARGS --ulimit nofile=1024:2048"  # 限制文件描述符
-SECURITY_ARGS="$SECURITY_ARGS --ulimit nproc=50"  # 限制进程数（ulimit方式）
+SECURITY_ARGS="$SECURITY_ARGS --ulimit nproc=1024"  # 限制进程数（ulimit方式）
 
 # 使用非 root 用户运行（如果镜像支持）
 if [ "$USE_NON_ROOT" = true ]; then
