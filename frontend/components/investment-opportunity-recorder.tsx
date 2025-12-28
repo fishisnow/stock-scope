@@ -16,12 +16,21 @@ import { X } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { useTranslations } from 'next-intl'
 
-interface StockInfo {
+interface StockSearchResult {
   code: string
   name: string
   market: string
   current_price?: number
   change_ratio?: number
+}
+
+interface StockInfo {
+  stock_name: string
+  stock_code: string
+  current_price: number | null
+  market: string
+  latest_price?: number | null
+  price_change_ratio?: number | null
 }
 
 interface InvestmentOpportunity {
@@ -30,10 +39,7 @@ interface InvestmentOpportunity {
   source_url: string
   summary: string
   trigger_words: string[]
-  stock_name: string
-  stock_code: string
-  current_price: number | null
-  market: string
+  stocks: StockInfo[]
   recorded_at: string
   created_at?: string
   updated_at?: string
@@ -67,15 +73,13 @@ export function InvestmentOpportunityRecorder({
     source_url: "",
     summary: "",
     trigger_words: [],
-    stock_name: "",
-    stock_code: "",
-    current_price: null,
-    market: "A"
+    stocks: []
   })
   const [stockSearchQuery, setStockSearchQuery] = useState("")
-  const [stockSearchResults, setStockSearchResults] = useState<StockInfo[]>([])
+  const [stockSearchResults, setStockSearchResults] = useState<StockSearchResult[]>([])
   const [isSearchingStock, setIsSearchingStock] = useState(false)
   const [currentTriggerWord, setCurrentTriggerWord] = useState("")
+  const [selectedMarket, setSelectedMarket] = useState("A")
   const { toast } = useToast()
 
   // 获取认证头
@@ -117,24 +121,28 @@ export function InvestmentOpportunityRecorder({
   }
 
   // 选择股票
-  const selectStock = async (stock: StockInfo) => {
-    setFormData(prev => ({
-      ...prev,
-      stock_name: stock.name,
-      stock_code: stock.code,
-      market: stock.market
-    }))
+  const selectStock = async (stock: StockSearchResult) => {
+    // 检查是否已经添加过该股票
+    const existingStocks = formData.stocks || []
+    if (existingStocks.some(s => s.stock_code === stock.code && s.market === stock.market)) {
+      toast({
+        title: "已添加",
+        description: "该股票已经添加过了",
+        variant: "default"
+      })
+      setStockSearchQuery("")
+      setStockSearchResults([])
+      return
+    }
 
     // 获取当前股价
+    let currentPrice: number | null = null
     try {
       const response = await fetch(`${API_URL}/api/stock-analysis/get-stock-price?code=${stock.code}&market=${stock.market}`)
       if (response.ok) {
         const result = await response.json()
         if (result.success) {
-          setFormData(prev => ({
-            ...prev,
-            current_price: result.data.current_price
-          }))
+          currentPrice = result.data.current_price
         }
       }
     } catch (error) {
@@ -142,8 +150,29 @@ export function InvestmentOpportunityRecorder({
       // 不显示错误提示，因为这是可选功能
     }
 
+    // 添加股票到列表
+    const newStock: StockInfo = {
+      stock_name: stock.name,
+      stock_code: stock.code,
+      market: stock.market,
+      current_price: currentPrice
+    }
+
+    setFormData(prev => ({
+      ...prev,
+      stocks: [...(prev.stocks || []), newStock]
+    }))
+
     setStockSearchQuery("")
     setStockSearchResults([])
+  }
+
+  // 删除股票
+  const removeStock = (index: number) => {
+    setFormData(prev => ({
+      ...prev,
+      stocks: prev.stocks?.filter((_, i) => i !== index) || []
+    }))
   }
 
   // 添加触发词
@@ -242,15 +271,13 @@ export function InvestmentOpportunityRecorder({
       source_url: "",
       summary: "",
       trigger_words: [],
-      stock_name: "",
-      stock_code: "",
-      current_price: null,
-      market: "A"
+      stocks: []
     })
     setEditingOpportunity(null)
     setCurrentTriggerWord("")
     setStockSearchQuery("")
     setStockSearchResults([])
+    setSelectedMarket("A")
   }
 
   // 编辑投资机会
@@ -261,10 +288,7 @@ export function InvestmentOpportunityRecorder({
       source_url: opportunity.source_url,
       summary: opportunity.summary,
       trigger_words: [...opportunity.trigger_words],
-      stock_name: opportunity.stock_name,
-      stock_code: opportunity.stock_code,
-      current_price: opportunity.current_price,
-      market: opportunity.market
+      stocks: opportunity.stocks ? [...opportunity.stocks] : []
     })
     setIsDialogOpen(true)
   }
@@ -275,16 +299,36 @@ export function InvestmentOpportunityRecorder({
       if (initialEditingOpportunity) {
         // 编辑模式：使用传入的数据
         setEditingOpportunity(initialEditingOpportunity)
+        
+        // 确保 stocks 数组正确初始化（处理各种可能的数据格式）
+        let stocks: StockInfo[] = []
+        if (initialEditingOpportunity.stocks) {
+          if (Array.isArray(initialEditingOpportunity.stocks)) {
+            stocks = initialEditingOpportunity.stocks.map(stock => ({
+              stock_name: stock.stock_name || "",
+              stock_code: stock.stock_code || "",
+              current_price: stock.current_price ?? null,
+              market: stock.market || "A"
+            }))
+          }
+        }
+        
         setFormData({
-          core_idea: initialEditingOpportunity.core_idea,
-          source_url: initialEditingOpportunity.source_url,
-          summary: initialEditingOpportunity.summary,
-          trigger_words: [...initialEditingOpportunity.trigger_words],
-          stock_name: initialEditingOpportunity.stock_name,
-          stock_code: initialEditingOpportunity.stock_code,
-          current_price: initialEditingOpportunity.current_price,
-          market: initialEditingOpportunity.market
+          core_idea: initialEditingOpportunity.core_idea || "",
+          source_url: initialEditingOpportunity.source_url || "",
+          summary: initialEditingOpportunity.summary || "",
+          trigger_words: Array.isArray(initialEditingOpportunity.trigger_words) 
+            ? [...initialEditingOpportunity.trigger_words] 
+            : [],
+          stocks: stocks
         })
+        
+        // 如果有股票，设置市场选择为第一个股票的市场
+        if (stocks.length > 0) {
+          setSelectedMarket(stocks[0].market || "A")
+        } else {
+          setSelectedMarket("A")
+        }
       } else {
         // 新增模式：重置表单和编辑状态
         setEditingOpportunity(null)
@@ -293,14 +337,12 @@ export function InvestmentOpportunityRecorder({
           source_url: "",
           summary: "",
           trigger_words: [],
-          stock_name: "",
-          stock_code: "",
-          current_price: null,
-          market: "A"
+          stocks: []
         })
         setCurrentTriggerWord("")
         setStockSearchQuery("")
         setStockSearchResults([])
+        setSelectedMarket("A")
       }
     }
   }, [dialogOpen, initialEditingOpportunity])
@@ -406,8 +448,8 @@ export function InvestmentOpportunityRecorder({
                   <div className="space-y-2">
                     <Label>{t('marketLabel')}</Label>
                     <Select
-                      value={formData.market || "A"}
-                      onValueChange={(value) => setFormData(prev => ({ ...prev, market: value }))}
+                      value={selectedMarket}
+                      onValueChange={(value) => setSelectedMarket(value)}
                     >
                       <SelectTrigger>
                         <SelectValue />
@@ -428,7 +470,7 @@ export function InvestmentOpportunityRecorder({
                         value={stockSearchQuery}
                         onChange={(e) => {
                           setStockSearchQuery(e.target.value)
-                          searchStocks(e.target.value, formData.market)
+                          searchStocks(e.target.value, selectedMarket)
                         }}
                       />
                       {isSearchingStock && (
@@ -462,29 +504,44 @@ export function InvestmentOpportunityRecorder({
                     )}
                   </div>
 
-                  {/* 已选择的股票信息 */}
-                  {formData.stock_name && (
-                    <div className="p-4 bg-muted rounded-md space-y-2">
-                      <div className="font-medium">{t('selectedStock')}</div>
-                      <div className="grid grid-cols-2 gap-4 text-sm">
-                        <div>
-                          <span className="text-muted-foreground">{t('stockName')}：</span>
-                          {formData.stock_name}
-                        </div>
-                        <div>
-                          <span className="text-muted-foreground">{t('stockCode')}：</span>
-                          {formData.stock_code}
-                        </div>
-                        {formData.current_price && (
-                          <div>
-                            <span className="text-muted-foreground">{t('currentPrice')}：</span>
-                            ¥{formData.current_price.toFixed(2)}
+                  {/* 已选择的股票列表 */}
+                  {formData.stocks && formData.stocks.length > 0 && (
+                    <div className="space-y-2">
+                      <Label>{t('selectedStocks') || '已选择的股票'}</Label>
+                      <div className="space-y-2">
+                        {formData.stocks.map((stock, index) => (
+                          <div key={index} className="p-3 bg-muted rounded-md flex items-start justify-between">
+                            <div className="flex-1 grid grid-cols-2 gap-2 text-sm">
+                              <div>
+                                <span className="text-muted-foreground">{t('stockName')}：</span>
+                                {stock.stock_name}
+                              </div>
+                              <div>
+                                <span className="text-muted-foreground">{t('stockCode')}：</span>
+                                {stock.stock_code}
+                              </div>
+                              {stock.current_price !== null && stock.current_price !== undefined && (
+                                <div>
+                                  <span className="text-muted-foreground">{t('currentPrice')}：</span>
+                                  ¥{stock.current_price.toFixed(2)}
+                                </div>
+                              )}
+                              <div>
+                                <span className="text-muted-foreground">{t('market')}：</span>
+                                {stock.market === 'A' ? t('marketA') : t('marketHK')}
+                              </div>
+                            </div>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => removeStock(index)}
+                              className="ml-2"
+                            >
+                              <X className="h-4 w-4" />
+                            </Button>
                           </div>
-                        )}
-                        <div>
-                          <span className="text-muted-foreground">{t('market')}：</span>
-                          {formData.market === 'A' ? t('marketA') : t('marketHK')}
-                        </div>
+                        ))}
                       </div>
                     </div>
                   )}

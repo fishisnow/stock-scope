@@ -402,6 +402,42 @@ def get_stock_price():
 
 investment_opportunities_bp = Blueprint('investment_opportunities', __name__, url_prefix='/api/investment-opportunities')
 
+def enrich_stock_with_price_change(stock: dict) -> dict:
+    """
+    为股票数据添加最新价格和涨幅信息
+    
+    :param stock: 股票数据字典，包含 stock_code, market, current_price
+    :return: 添加了 latest_price 和 price_change_ratio 的股票数据
+    """
+    recorded_price = stock.get('current_price')
+    if recorded_price is not None and recorded_price > 0:
+        try:
+            # 获取当前最新股价
+            current_price_info = get_stock_current_price(
+                code=stock['stock_code'],
+                market=stock['market']
+            )
+            current_price = current_price_info.get('current_price')
+            
+            if current_price is not None and current_price > 0:
+                # 计算距今涨幅 = (当前股价 - 录入时股价) / 录入时股价 * 100
+                price_change_ratio = ((current_price - recorded_price) / recorded_price) * 100
+                stock['latest_price'] = current_price
+                stock['price_change_ratio'] = round(price_change_ratio, 2)
+            else:
+                stock['latest_price'] = None
+                stock['price_change_ratio'] = None
+        except Exception as e:
+            # 如果获取失败，不影响其他股票
+            print(f"获取股票 {stock['stock_code']} 最新价格失败: {str(e)}")
+            stock['latest_price'] = None
+            stock['price_change_ratio'] = None
+    else:
+        stock['latest_price'] = None
+        stock['price_change_ratio'] = None
+    
+    return stock
+
 @investment_opportunities_bp.route('', methods=['POST'])
 @token_required
 def create_investment_opportunity():
@@ -411,19 +447,23 @@ def create_investment_opportunity():
     请求体:
     {
         "core_idea": "AI代理将颠覆客服行业",
-        "source": "《AI未来》P45、与张总的对话",
+        "source_url": "https://example.com",
         "summary": "详细的描述...",
         "trigger_words": ["AI代理", "客服自动化", "人力替代"],
-        "stock_name": "平安银行",
-        "stock_code": "000001",
-        "current_price": 10.5,
-        "market": "A"
+        "stocks": [
+            {
+                "stock_name": "平安银行",
+                "stock_code": "000001",
+                "current_price": 10.5,
+                "market": "A"
+            }
+        ]
     }
 
     响应:
     {
         "success": true,
-        "data": { ... 记录详情 ... }
+        "data": { ... 记录详情（包含stocks数组）... }
     }
     """
     try:
@@ -439,16 +479,12 @@ def create_investment_opportunity():
                     "error": f"缺少必需字段: {field}"
                 }), 400
 
-        # 准备插入数据
+        # 准备插入投资机会数据
         record = {
             'core_idea': data['core_idea'].strip(),
             'source_url': data.get('source_url', '').strip(),
             'summary': data.get('summary', '').strip(),
             'trigger_words': data.get('trigger_words', []) if isinstance(data.get('trigger_words'), list) else [],
-            'stock_name': data.get('stock_name', '').strip(),
-            'stock_code': data.get('stock_code', '').strip(),
-            'current_price': float(data['current_price']) if data.get('current_price') is not None else None,
-            'market': data.get('market', '').upper(),
             'recorded_at': datetime.now().isoformat(),
             'user_id': user_id
         }
@@ -461,11 +497,48 @@ def create_investment_opportunity():
                 "error": "数据库连接失败"
             }), 500
 
+        # 插入投资机会记录
         response = user_supabase.table('investment_opportunities').insert(record).execute()
+        
+        if not response.data:
+            return jsonify({
+                "success": False,
+                "error": "创建投资机会失败"
+            }), 500
+
+        opportunity_id = response.data[0]['id']
+        stocks = data.get('stocks', [])
+        
+        # 插入关联的股票
+        if stocks and isinstance(stocks, list):
+            stock_records = []
+            for stock in stocks:
+                if stock.get('stock_code') and stock.get('stock_name'):
+                    stock_records.append({
+                        'opportunity_id': opportunity_id,
+                        'stock_code': stock['stock_code'].strip(),
+                        'stock_name': stock['stock_name'].strip(),
+                        'market': stock.get('market', 'A').upper(),
+                        'current_price': float(stock['current_price']) if stock.get('current_price') is not None else None
+                    })
+            
+            if stock_records:
+                user_supabase.table('investment_opportunity_stocks').insert(stock_records).execute()
+
+        # 查询完整的记录（包含关联的股票）
+        opportunity = response.data[0]
+        stocks_response = user_supabase.table('investment_opportunity_stocks').select('*').eq('opportunity_id', opportunity_id).execute()
+        stocks = stocks_response.data if stocks_response.data else []
+        
+        # 为每个股票计算涨幅
+        for stock in stocks:
+            enrich_stock_with_price_change(stock)
+        
+        opportunity['stocks'] = stocks
 
         return jsonify({
             "success": True,
-            "data": response.data[0] if response.data else record
+            "data": opportunity
         })
 
     except ValueError as e:
@@ -492,7 +565,7 @@ def get_investment_opportunities():
     响应:
     {
         "success": true,
-        "data": [ ... 记录列表 ... ],
+        "data": [ ... 记录列表（每个记录包含stocks数组）... ],
         "pagination": {
             "page": 1,
             "limit": 10,
@@ -520,9 +593,34 @@ def get_investment_opportunities():
         query = user_supabase.table('investment_opportunities').select('*', count='exact').eq('user_id', user_id)
         response = query.order('created_at', desc=True).range(offset, offset + limit - 1).execute()
 
+        # 为每个投资机会查询关联的股票
+        opportunities = response.data
+        opportunity_ids = [opp['id'] for opp in opportunities]
+        
+        if opportunity_ids:
+            stocks_response = user_supabase.table('investment_opportunity_stocks').select('*').in_('opportunity_id', opportunity_ids).execute()
+            stocks_by_opportunity = {}
+            for stock in stocks_response.data:
+                opp_id = stock['opportunity_id']
+                if opp_id not in stocks_by_opportunity:
+                    stocks_by_opportunity[opp_id] = []
+                stocks_by_opportunity[opp_id].append(stock)
+            
+            # 将股票数据添加到对应的投资机会中，并计算距今涨幅
+            for opp in opportunities:
+                stocks = stocks_by_opportunity.get(opp['id'], [])
+                # 为每个股票获取最新股价并计算涨幅
+                for stock in stocks:
+                    enrich_stock_with_price_change(stock)
+                
+                opp['stocks'] = stocks
+        else:
+            for opp in opportunities:
+                opp['stocks'] = []
+
         return jsonify({
             "success": True,
-            "data": response.data,
+            "data": opportunities,
             "pagination": {
                 "page": page,
                 "limit": limit,
@@ -542,7 +640,21 @@ def update_investment_opportunity(opportunity_id):
     """
     更新投资机会记录
 
-    请求体: 同创建接口
+    请求体:
+    {
+        "core_idea": "AI代理将颠覆客服行业",
+        "source_url": "https://example.com",
+        "summary": "详细的描述...",
+        "trigger_words": ["AI代理", "客服自动化", "人力替代"],
+        "stocks": [
+            {
+                "stock_name": "平安银行",
+                "stock_code": "000001",
+                "current_price": 10.5,
+                "market": "A"
+            }
+        ]
+    }
     """
     try:
         data = request.get_json()
@@ -566,7 +678,7 @@ def update_investment_opportunity(opportunity_id):
                 "error": "记录不存在或无权限访问"
             }), 404
 
-        # 更新数据
+        # 更新投资机会数据
         update_data = {
             'updated_at': datetime.now().isoformat()
         }
@@ -579,20 +691,45 @@ def update_investment_opportunity(opportunity_id):
             update_data['summary'] = data['summary'].strip()
         if 'trigger_words' in data:
             update_data['trigger_words'] = data['trigger_words'] if isinstance(data['trigger_words'], list) else []
-        if 'stock_name' in data:
-            update_data['stock_name'] = data['stock_name'].strip()
-        if 'stock_code' in data:
-            update_data['stock_code'] = data['stock_code'].strip()
-        if 'current_price' in data:
-            update_data['current_price'] = float(data['current_price']) if data['current_price'] is not None else None
-        if 'market' in data:
-            update_data['market'] = data['market'].upper()
 
         response = user_supabase.table('investment_opportunities').update(update_data).eq('id', opportunity_id).execute()
 
+        # 更新关联的股票：先删除旧的，再插入新的
+        if 'stocks' in data:
+            # 删除旧的股票关联
+            user_supabase.table('investment_opportunity_stocks').delete().eq('opportunity_id', opportunity_id).execute()
+            
+            # 插入新的股票关联
+            stocks = data['stocks'] if isinstance(data['stocks'], list) else []
+            if stocks:
+                stock_records = []
+                for stock in stocks:
+                    if stock.get('stock_code') and stock.get('stock_name'):
+                        stock_records.append({
+                            'opportunity_id': opportunity_id,
+                            'stock_code': stock['stock_code'].strip(),
+                            'stock_name': stock['stock_name'].strip(),
+                            'market': stock.get('market', 'A').upper(),
+                            'current_price': float(stock['current_price']) if stock.get('current_price') is not None else None
+                        })
+                
+                if stock_records:
+                    user_supabase.table('investment_opportunity_stocks').insert(stock_records).execute()
+
+        # 查询完整的记录（包含关联的股票）
+        opportunity = response.data[0] if response.data else update_data
+        stocks_response = user_supabase.table('investment_opportunity_stocks').select('*').eq('opportunity_id', opportunity_id).execute()
+        stocks = stocks_response.data if stocks_response.data else []
+        
+        # 为每个股票计算涨幅
+        for stock in stocks:
+            enrich_stock_with_price_change(stock)
+        
+        opportunity['stocks'] = stocks
+
         return jsonify({
             "success": True,
-            "data": response.data[0] if response.data else update_data
+            "data": opportunity
         })
 
     except ValueError as e:

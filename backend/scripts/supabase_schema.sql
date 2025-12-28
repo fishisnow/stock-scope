@@ -97,14 +97,23 @@ CREATE TABLE IF NOT EXISTS investment_opportunities (
     source_url TEXT,                                       -- 来源URL：灵感来源链接
     summary TEXT,                                         -- 概要：详细描述
     trigger_words TEXT[],                                 -- 触发词：3-5个关键词数组
-    stock_name VARCHAR(100),                              -- 股票名称
-    stock_code VARCHAR(20),                               -- 股票代码
-    current_price DOUBLE PRECISION,                       -- 当前股价
-    market VARCHAR(10),                                   -- 市场：'A' 或 'HK'
     recorded_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),   -- 记录时间
     user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE, -- 用户ID
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),    -- 创建时间
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()     -- 更新时间
+);
+
+-- ============================================
+-- 投资机会关联股票表
+-- ============================================
+CREATE TABLE IF NOT EXISTS investment_opportunity_stocks (
+    id BIGSERIAL PRIMARY KEY,
+    opportunity_id BIGINT NOT NULL REFERENCES investment_opportunities(id) ON DELETE CASCADE, -- 投资机会ID
+    stock_code VARCHAR(20) NOT NULL,                       -- 股票代码
+    stock_name VARCHAR(100) NOT NULL,                     -- 股票名称
+    market VARCHAR(10) NOT NULL,                          -- 市场：'A' 或 'HK'
+    current_price DOUBLE PRECISION,                        -- 记录时的当前股价
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()     -- 创建时间
 );
 
 -- ============================================
@@ -116,8 +125,14 @@ ON investment_opportunities (user_id);
 CREATE INDEX IF NOT EXISTS idx_investment_opportunities_created_at
 ON investment_opportunities (created_at DESC);
 
-CREATE INDEX IF NOT EXISTS idx_investment_opportunities_stock_code
-ON investment_opportunities (stock_code);
+-- ============================================
+-- 投资机会关联股票表的索引
+-- ============================================
+CREATE INDEX IF NOT EXISTS idx_investment_opportunity_stocks_opportunity_id
+ON investment_opportunity_stocks (opportunity_id);
+
+CREATE INDEX IF NOT EXISTS idx_investment_opportunity_stocks_stock_code
+ON investment_opportunity_stocks (stock_code);
 
 -- ============================================
 -- 注释
@@ -127,12 +142,15 @@ COMMENT ON COLUMN investment_opportunities.core_idea IS '核心观点：一句�
 COMMENT ON COLUMN investment_opportunities.source_url IS '来源URL：灵感来源链接地址';
 COMMENT ON COLUMN investment_opportunities.summary IS '概要：投资机会的详细描述';
 COMMENT ON COLUMN investment_opportunities.trigger_words IS '触发词：3-5个关键词数组';
-COMMENT ON COLUMN investment_opportunities.stock_name IS '股票名称';
-COMMENT ON COLUMN investment_opportunities.stock_code IS '股票代码';
-COMMENT ON COLUMN investment_opportunities.current_price IS '记录时的当前股价';
-COMMENT ON COLUMN investment_opportunities.market IS '市场：A-A股市场，HK-港股市场';
 COMMENT ON COLUMN investment_opportunities.recorded_at IS '记录时间';
 COMMENT ON COLUMN investment_opportunities.user_id IS '用户ID，关联Supabase Auth用户';
+
+COMMENT ON TABLE investment_opportunity_stocks IS '投资机会关联股票表，一个投资机会可以关联多个股票';
+COMMENT ON COLUMN investment_opportunity_stocks.opportunity_id IS '投资机会ID，关联investment_opportunities表';
+COMMENT ON COLUMN investment_opportunity_stocks.stock_code IS '股票代码';
+COMMENT ON COLUMN investment_opportunity_stocks.stock_name IS '股票名称';
+COMMENT ON COLUMN investment_opportunity_stocks.market IS '市场：A-A股市场，HK-港股市场';
+COMMENT ON COLUMN investment_opportunity_stocks.current_price IS '记录时的当前股价';
 
 -- ============================================
 -- RLS (行级安全策略)
@@ -154,6 +172,51 @@ CREATE POLICY "Users can update own investment opportunities" ON investment_oppo
 -- 用户只能删除自己的投资机会记录
 CREATE POLICY "Users can delete own investment opportunities" ON investment_opportunities
     FOR DELETE USING (auth.uid() = user_id);
+
+-- ============================================
+-- 投资机会关联股票表的RLS (行级安全策略)
+-- ============================================
+ALTER TABLE investment_opportunity_stocks ENABLE ROW LEVEL SECURITY;
+
+-- 用户只能查看自己投资机会关联的股票
+CREATE POLICY "Users can view own opportunity stocks" ON investment_opportunity_stocks
+    FOR SELECT USING (
+        EXISTS (
+            SELECT 1 FROM investment_opportunities
+            WHERE investment_opportunities.id = investment_opportunity_stocks.opportunity_id
+            AND investment_opportunities.user_id = auth.uid()
+        )
+    );
+
+-- 用户只能插入自己投资机会关联的股票
+CREATE POLICY "Users can insert own opportunity stocks" ON investment_opportunity_stocks
+    FOR INSERT WITH CHECK (
+        EXISTS (
+            SELECT 1 FROM investment_opportunities
+            WHERE investment_opportunities.id = investment_opportunity_stocks.opportunity_id
+            AND investment_opportunities.user_id = auth.uid()
+        )
+    );
+
+-- 用户只能更新自己投资机会关联的股票
+CREATE POLICY "Users can update own opportunity stocks" ON investment_opportunity_stocks
+    FOR UPDATE USING (
+        EXISTS (
+            SELECT 1 FROM investment_opportunities
+            WHERE investment_opportunities.id = investment_opportunity_stocks.opportunity_id
+            AND investment_opportunities.user_id = auth.uid()
+        )
+    );
+
+-- 用户只能删除自己投资机会关联的股票
+CREATE POLICY "Users can delete own opportunity stocks" ON investment_opportunity_stocks
+    FOR DELETE USING (
+        EXISTS (
+            SELECT 1 FROM investment_opportunities
+            WHERE investment_opportunities.id = investment_opportunity_stocks.opportunity_id
+            AND investment_opportunities.user_id = auth.uid()
+        )
+    );
 
 -- ============================================
 -- 股票基础信息表

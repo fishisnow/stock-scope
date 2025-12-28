@@ -163,7 +163,7 @@
     "triggerWords": "Trigger Words",
     "stockName": "Stock Name",
     "stockCode": "Stock Code",
-    "currentPrice": "Recorded Price",
+    "currentPrice": "Current Price",
     "market": "Market",
     "marketA": "A-Share",
     "marketHK": "Hong Kong",
@@ -174,6 +174,11 @@
     "deleteFailed": "Failed to delete",
     "noOpportunities": "No recorded investment opportunities",
     "noOpportunitiesDesc": "Start recording investment opportunities and business inspiration you discover in daily life",
+    "relatedStocks": "Related Stocks",
+    "recordedPrice": "Recorded Price",
+    "latestPrice": "Latest Price",
+    "priceChangeSinceRecorded": "Price Change Since Recorded",
+    "relatedStocksDesc": "Related stocks that may benefit from this investment opportunity",
     "recorder": {
       "title": "Investment Opportunity Recorder",
       "subtitle": "Capture investment opportunities and business inspiration seen in daily life",
@@ -210,7 +215,8 @@
       "createFailed": "Failed to record",
       "updateFailed": "Failed to update",
       "loginRequired": "Please login first",
-      "coreIdeaRequired": "Please enter core idea"
+      "coreIdeaRequired": "Please enter core idea",
+      "selectedStocks": "Selected Stocks"
     }
   }
 }

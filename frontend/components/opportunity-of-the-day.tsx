@@ -3,11 +3,20 @@
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Calendar, ExternalLink, Lightbulb } from "lucide-react"
+import { Calendar, ExternalLink, Lightbulb, TrendingUp, ChevronRight } from "lucide-react"
 import { useAuth } from '@/lib/auth-context'
 import { useTranslations } from 'next-intl'
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5001"
+
+interface StockInfo {
+  stock_name: string
+  stock_code: string
+  current_price: number | null
+  market: string
+  latest_price?: number | null
+  price_change_ratio?: number | null
+}
 
 interface InvestmentOpportunity {
   id?: number
@@ -15,10 +24,7 @@ interface InvestmentOpportunity {
   source_url: string
   summary: string
   trigger_words: string[]
-  stock_name: string
-  stock_code: string
-  current_price: number | null
-  market: string
+  stocks: StockInfo[]
   recorded_at: string
   created_at?: string
   updated_at?: string
@@ -174,21 +180,98 @@ export function OpportunityOfTheDay({ selectedOpportunity, onOpportunityChange }
             </div>
           )}
 
-          {opportunity.stock_name && (
-            <div className="pt-6 border-t space-y-2">
-              <div className="flex items-center justify-between">
-                <div>
-                  <div className="font-semibold text-lg">{opportunity.stock_name}</div>
-                  <div className="text-sm text-muted-foreground">
-                    {opportunity.stock_code} • {opportunity.market === 'A' ? t('marketA') : t('marketHK')}
-                  </div>
+          {opportunity.stocks && opportunity.stocks.length > 0 && (
+            <div className="pt-6 border-t">
+              <div className="mb-4">
+                <div className="flex items-center gap-2 mb-1">
+                  <TrendingUp className="h-5 w-5 text-primary" />
+                  <div className="font-semibold text-lg">{t('relatedStocks') || '关联股票'}</div>
                 </div>
-                {opportunity.current_price && (
-                  <div className="text-right">
-                    <div className="text-2xl font-bold">¥{opportunity.current_price.toFixed(2)}</div>
-                    <div className="text-xs text-muted-foreground">{t('currentPrice')}</div>
-                  </div>
-                )}
+                <p className="text-sm text-muted-foreground ml-7">
+                  {t('relatedStocksDesc') || '该投资机会可能受益的相关标的'}
+                </p>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                {[...opportunity.stocks]
+                  .sort((a, b) => {
+                    // 按涨幅降序排序，涨幅大的在前
+                    const ratioA = a.price_change_ratio ?? -Infinity
+                    const ratioB = b.price_change_ratio ?? -Infinity
+                    return ratioB - ratioA
+                  })
+                  .map((stock, index) => {
+                    const priceChangeRatio = stock.price_change_ratio ?? 0
+                    const isPositive = priceChangeRatio > 0
+                    const isNegative = priceChangeRatio < 0
+                    const isNeutral = priceChangeRatio === 0
+                    const isHighGain = priceChangeRatio > 10
+                    const recordedPrice = stock.current_price
+                    const latestPrice = stock.latest_price
+                    const pricesEqual = recordedPrice !== null && latestPrice !== null && 
+                                       Math.abs(recordedPrice - latestPrice) < 0.01
+
+                    return (
+                      <div
+                        key={index}
+                        className={`p-4 bg-card border rounded-lg transition-all cursor-pointer group ${
+                          isHighGain ? 'border-primary/30 bg-primary/5' : 'hover:shadow-lg hover:border-primary/20'
+                        }`}
+                        onClick={() => {
+                          // 可以跳转到市场页面或股票详情
+                          window.location.href = `/market?code=${stock.stock_code}&market=${stock.market}`
+                        }}
+                      >
+                        <div className="space-y-3">
+                          {/* 主视觉：股票名称 + 涨幅 */}
+                          <div className="flex items-start justify-between">
+                            <div className="flex-1">
+                              <div className="font-bold text-lg mb-1">{stock.stock_name}</div>
+                              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                <span>{stock.stock_code}</span>
+                                <span>•</span>
+                                <span>{stock.market === 'A' ? t('marketA') : t('marketHK')}</span>
+                              </div>
+                            </div>
+                            {priceChangeRatio !== null && priceChangeRatio !== undefined && (
+                              <div className={`text-2xl font-bold ${
+                                isPositive ? 'text-red-600' : 
+                                isNegative ? 'text-green-600' : 
+                                'text-muted-foreground'
+                              }`}>
+                                {isNeutral ? '' : isPositive ? '+' : ''}{priceChangeRatio.toFixed(2)}%
+                              </div>
+                            )}
+                            <ChevronRight className="h-5 w-5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0" />
+                          </div>
+                          
+                          {/* 价格信息：智能显示 */}
+                          {(recordedPrice !== null && recordedPrice !== undefined) && (
+                            <div className="pt-2">
+                              {pricesEqual ? (
+                                <div className="flex justify-between items-center text-sm">
+                                  <span className="text-muted-foreground">{t('recordedPrice') || '记录价'}</span>
+                                  <span className="font-medium">¥{recordedPrice.toFixed(2)}</span>
+                                </div>
+                              ) : (
+                                <div className="space-y-1 text-sm">
+                                  <div className="flex justify-between items-center">
+                                    <span className="text-muted-foreground">{t('recordedPrice') || '记录价'}</span>
+                                    <span className="font-medium">¥{recordedPrice.toFixed(2)}</span>
+                                  </div>
+                                  {latestPrice !== null && latestPrice !== undefined && (
+                                    <div className="flex justify-between items-center">
+                                      <span className="text-muted-foreground">{t('latestPrice') || '最新价'}</span>
+                                      <span className="font-medium">¥{latestPrice.toFixed(2)}</span>
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )
+                  })}
               </div>
             </div>
           )}

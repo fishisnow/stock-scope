@@ -4,7 +4,7 @@ import { useState, useEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Edit, Trash2, ExternalLink, Plus } from "lucide-react"
+import { Edit, Trash2, ExternalLink, Plus, TrendingUp } from "lucide-react"
 import { InvestmentOpportunityRecorder } from "./investment-opportunity-recorder"
 import { useAuth } from '@/lib/auth-context'
 import { useToast } from "@/hooks/use-toast"
@@ -12,16 +12,22 @@ import { useTranslations } from 'next-intl'
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5001"
 
+interface StockInfo {
+  stock_name: string
+  stock_code: string
+  current_price: number | null
+  market: string
+  latest_price?: number | null
+  price_change_ratio?: number | null
+}
+
 interface InvestmentOpportunity {
   id?: number
   core_idea: string
   source_url: string
   summary: string
   trigger_words: string[]
-  stock_name: string
-  stock_code: string
-  current_price: number | null
-  market: string
+  stocks: StockInfo[]
   recorded_at: string
   created_at?: string
   updated_at?: string
@@ -257,19 +263,35 @@ export function OpportunitiesDatabase({ onSelectOpportunity, selectedOpportunity
                     </div>
                   )}
 
-                  {opportunity.stock_name && (
-                    <div className="text-sm pt-2 border-t">
-                      <div className="flex justify-between items-center">
-                        <span className="font-medium">{opportunity.stock_name}</span>
-                        <Badge variant="outline" className="text-xs">
-                          {opportunity.stock_code}
-                        </Badge>
+                  {opportunity.stocks && opportunity.stocks.length > 0 && (
+                    <div className="text-sm pt-2 border-t space-y-2">
+                      <div className="flex items-center gap-2 font-medium mb-2">
+                        <TrendingUp className="h-4 w-4 text-primary" />
+                        <span>{t('relatedStocks') || '关联股票'}</span>
                       </div>
-                      {opportunity.current_price && (
-                        <div className="text-muted-foreground mt-1">
-                          {t('currentPrice')}: ¥{opportunity.current_price.toFixed(2)}
+                      {opportunity.stocks.map((stock, index) => (
+                        <div key={index} className="flex justify-between items-center">
+                          <div className="flex items-center gap-2">
+                            <span className="font-medium">{stock.stock_name}</span>
+                            <Badge variant="outline" className="text-xs">
+                              {stock.stock_code}
+                            </Badge>
+                            <span className="text-xs text-muted-foreground">
+                              {stock.market === 'A' ? t('marketA') : t('marketHK')}
+                            </span>
+                          </div>
+                          {stock.price_change_ratio !== null && stock.price_change_ratio !== undefined && (
+                            <div className={`text-sm font-semibold ${
+                              stock.price_change_ratio > 0 ? 'text-red-600' : 
+                              stock.price_change_ratio < 0 ? 'text-green-600' : 
+                              'text-muted-foreground'
+                            }`}>
+                              {stock.price_change_ratio === 0 ? '' : stock.price_change_ratio > 0 ? '+' : ''}
+                              {stock.price_change_ratio.toFixed(2)}%
+                            </div>
+                          )}
                         </div>
-                      )}
+                      ))}
                     </div>
                   )}
                 </CardContent>

@@ -7,16 +7,22 @@ import { OpportunityOfTheDay } from "@/components/opportunity-of-the-day"
 import { OpportunitiesDatabase } from "@/components/opportunities-database"
 import { InvestmentOpportunityRecorder } from "@/components/investment-opportunity-recorder"
 
+interface StockInfo {
+  stock_name: string
+  stock_code: string
+  current_price: number | null
+  market: string
+  latest_price?: number | null
+  price_change_ratio?: number | null
+}
+
 interface InvestmentOpportunity {
   id?: number
   core_idea: string
   source_url: string
   summary: string
   trigger_words: string[]
-  stock_name: string
-  stock_code: string
-  current_price: number | null
-  market: string
+  stocks: StockInfo[]
   recorded_at: string
   created_at?: string
   updated_at?: string
