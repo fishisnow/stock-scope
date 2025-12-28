@@ -8,6 +8,7 @@ Supabase Auth 中间件
 from flask import request, jsonify
 from functools import wraps
 from app.db.database import db as stock_db
+from supabase import create_client
 import os
 
 
@@ -100,8 +101,41 @@ def optional_token(f):
                         }
                 except Exception:
                     pass  # 忽略错误，继续执行
-        
+
         return f(*args, **kwargs)
-    
+
     return decorated
+
+
+def get_user_supabase_client():
+    """
+    创建带有用户认证信息的 Supabase 客户端
+    从请求头中获取用户的 JWT token，传递给 Supabase
+    这样 Supabase 就知道是哪个用户在操作，RLS 策略能正常工作
+
+    返回:
+        supabase.Client: 配置了用户认证的Supabase客户端
+    """
+    # Supabase 配置
+    supabase_url = os.environ.get('SUPABASE_URL')
+    supabase_key = os.environ.get('SUPABASE_KEY')  # 使用 anon key，配合用户 token
+
+    if not supabase_url or not supabase_key:
+        return None
+
+    # 从请求头获取用户的 JWT token
+    auth_header = request.headers.get('Authorization', '')
+    user_token = auth_header.replace('Bearer ', '') if auth_header else None
+
+    if not user_token:
+        # 如果没有 token，返回普通客户端
+        return create_client(supabase_url, supabase_key)
+
+    # 创建带有用户 token 的客户端
+    # 这样 Supabase 就能识别用户，auth.uid() 会返回正确的用户 ID
+    client = create_client(supabase_url, supabase_key)
+    # 设置用户 session
+    client.auth.set_session(user_token, user_token)
+
+    return client
 

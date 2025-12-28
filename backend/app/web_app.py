@@ -6,6 +6,7 @@ from datetime import datetime, timedelta
 from db.database import StockDatabase
 from api.auth_middleware import token_required, optional_token
 from api.trading_api import trading_bp
+from api.stock_analysis_api import register_stock_analysis_api, register_investment_opportunities_api
 import json
 
 app = Flask(__name__)
@@ -18,6 +19,12 @@ db = StockDatabase()
 
 # 注册交易API蓝图
 app.register_blueprint(trading_bp)
+
+# 注册股票分析API
+register_stock_analysis_api(app)
+
+# 注册投资机会记录API
+register_investment_opportunities_api(app)
 
 # 注意：现在使用 Supabase Auth
 # 认证由前端 Supabase 客户端直接处理

@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { Link } from "@/i18n/routing"
 import { Button } from "@/components/ui/button"
-import { TrendingUp, LogOut, User } from "lucide-react"
+import { TrendingUp, LogOut, User, Plus } from "lucide-react"
 import { LanguageSwitcher } from "./language-switcher"
 import { LoginDialog } from "./login-dialog"
 import { SignupDialog } from "./signup-dialog"
@@ -19,8 +19,13 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 
-export function Header() {
+interface HeaderProps {
+  onRecordOpportunity?: () => void
+}
+
+export function Header({ onRecordOpportunity }: HeaderProps = {}) {
   const t = useTranslations('header')
+  const tOpp = useTranslations('opportunity.recorder')
   const { user, logout } = useAuth()
   const [showLoginDialog, setShowLoginDialog] = useState(false)
   const [showSignupDialog, setShowSignupDialog] = useState(false)
@@ -61,6 +66,17 @@ export function Header() {
             </nav>
 
             <div className="flex items-center gap-2">
+              {mounted && user && onRecordOpportunity && (
+                <Button 
+                  size="sm" 
+                  className="gap-2 bg-primary hover:bg-primary/90"
+                  onClick={onRecordOpportunity}
+                >
+                  <Plus className="h-4 w-4" />
+                  <span className="hidden sm:inline">{tOpp('recordNew')}</span>
+                  <span className="sm:hidden"><Plus className="h-4 w-4" /></span>
+                </Button>
+              )}
               <LanguageSwitcher />
               {mounted && user ? (
                 <DropdownMenu>

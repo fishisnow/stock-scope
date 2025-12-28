@@ -2,6 +2,12 @@
 
 import threading
 import time
+import os
+import sys
+
+# Add the backend directory to Python path for imports
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 import core.schedule_stocks as schedule_stocks
 import web_app
 

@@ -5,21 +5,16 @@
 """
 
 from flask import Blueprint, request, jsonify
-from app.api.auth_middleware import token_required
+from app.api.auth_middleware import token_required, get_user_supabase_client
 from decimal import Decimal
 import pandas as pd
 from io import BytesIO
 from datetime import datetime
 import re
 import os
-from supabase import create_client
 
 # 创建蓝图
 trading_bp = Blueprint('trading', __name__)
-
-# Supabase 配置
-supabase_url = os.environ.get('SUPABASE_URL')
-supabase_key = os.environ.get('SUPABASE_KEY')  # 使用 anon key，配合用户 token
 
 
 def parse_number(value):
@@ -70,32 +65,6 @@ def parse_datetime(value):
             continue
     
     return None
-
-
-def get_user_supabase_client():
-    """
-    创建带有用户认证信息的 Supabase 客户端
-    从请求头中获取用户的 JWT token，传递给 Supabase
-    这样 Supabase 就知道是哪个用户在操作，RLS 策略能正常工作
-    """
-    if not supabase_url or not supabase_key:
-        return None
-    
-    # 从请求头获取用户的 JWT token
-    auth_header = request.headers.get('Authorization', '')
-    user_token = auth_header.replace('Bearer ', '') if auth_header else None
-    
-    if not user_token:
-        # 如果没有 token，返回普通客户端
-        return create_client(supabase_url, supabase_key)
-    
-    # 创建带有用户 token 的客户端
-    # 这样 Supabase 就能识别用户，auth.uid() 会返回正确的用户 ID
-    client = create_client(supabase_url, supabase_key)
-    # 设置用户 session
-    client.auth.set_session(user_token, user_token)
-    
-    return client
 
 
 def parse_filled_info(filled_str):

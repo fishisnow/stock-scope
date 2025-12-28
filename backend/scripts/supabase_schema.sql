@@ -86,3 +86,71 @@ COMMENT ON COLUMN stock_records.turnover_rate IS '换手率（%）';
 
 -- CREATE POLICY "Allow authenticated delete" ON stock_records
 --     FOR DELETE USING (auth.role() = 'authenticated');
+
+
+-- ============================================
+-- 投资机会记录表（如果不存在则创建）
+-- ============================================
+CREATE TABLE IF NOT EXISTS investment_opportunities (
+    id BIGSERIAL PRIMARY KEY,
+    core_idea TEXT NOT NULL,                              -- 核心观点：一句话概括机会
+    source_url TEXT,                                       -- 来源URL：灵感来源链接
+    summary TEXT,                                         -- 概要：详细描述
+    trigger_words TEXT[],                                 -- 触发词：3-5个关键词数组
+    stock_name VARCHAR(100),                              -- 股票名称
+    stock_code VARCHAR(20),                               -- 股票代码
+    current_price DOUBLE PRECISION,                       -- 当前股价
+    market VARCHAR(10),                                   -- 市场：'A' 或 'HK'
+    recorded_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),   -- 记录时间
+    user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE, -- 用户ID
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),    -- 创建时间
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()     -- 更新时间
+);
+
+-- ============================================
+-- 投资机会记录表的索引
+-- ============================================
+CREATE INDEX IF NOT EXISTS idx_investment_opportunities_user_id
+ON investment_opportunities (user_id);
+
+CREATE INDEX IF NOT EXISTS idx_investment_opportunities_created_at
+ON investment_opportunities (created_at DESC);
+
+CREATE INDEX IF NOT EXISTS idx_investment_opportunities_stock_code
+ON investment_opportunities (stock_code);
+
+-- ============================================
+-- 注释
+-- ============================================
+COMMENT ON TABLE investment_opportunities IS '投资机会记录表，存储用户记录的投资机会和灵感';
+COMMENT ON COLUMN investment_opportunities.core_idea IS '核心观点：一句话概括投资机会';
+COMMENT ON COLUMN investment_opportunities.source_url IS '来源URL：灵感来源链接地址';
+COMMENT ON COLUMN investment_opportunities.summary IS '概要：投资机会的详细描述';
+COMMENT ON COLUMN investment_opportunities.trigger_words IS '触发词：3-5个关键词数组';
+COMMENT ON COLUMN investment_opportunities.stock_name IS '股票名称';
+COMMENT ON COLUMN investment_opportunities.stock_code IS '股票代码';
+COMMENT ON COLUMN investment_opportunities.current_price IS '记录时的当前股价';
+COMMENT ON COLUMN investment_opportunities.market IS '市场：A-A股市场，HK-港股市场';
+COMMENT ON COLUMN investment_opportunities.recorded_at IS '记录时间';
+COMMENT ON COLUMN investment_opportunities.user_id IS '用户ID，关联Supabase Auth用户';
+
+-- ============================================
+-- RLS (行级安全策略)
+-- ============================================
+ALTER TABLE investment_opportunities ENABLE ROW LEVEL SECURITY;
+
+-- 用户只能查看自己的投资机会记录
+CREATE POLICY "Users can view own investment opportunities" ON investment_opportunities
+    FOR SELECT USING (auth.uid() = user_id);
+
+-- 用户只能插入自己的投资机会记录
+CREATE POLICY "Users can insert own investment opportunities" ON investment_opportunities
+    FOR INSERT WITH CHECK (auth.uid() = user_id);
+
+-- 用户只能更新自己的投资机会记录
+CREATE POLICY "Users can update own investment opportunities" ON investment_opportunities
+    FOR UPDATE USING (auth.uid() = user_id);
+
+-- 用户只能删除自己的投资机会记录
+CREATE POLICY "Users can delete own investment opportunities" ON investment_opportunities
+    FOR DELETE USING (auth.uid() = user_id);

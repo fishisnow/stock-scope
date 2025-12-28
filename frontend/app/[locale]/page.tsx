@@ -1,18 +1,80 @@
+"use client"
+
+import { useState } from "react"
 import { Header } from "@/components/header"
 import { OpportunityOfTheDay } from "@/components/opportunity-of-the-day"
-import { TrendsSection } from "@/components/trends-section"
+// import { TrendsSection } from "@/components/trends-section"
 import { OpportunitiesDatabase } from "@/components/opportunities-database"
+import { InvestmentOpportunityRecorder } from "@/components/investment-opportunity-recorder"
+
+interface InvestmentOpportunity {
+  id?: number
+  core_idea: string
+  source_url: string
+  summary: string
+  trigger_words: string[]
+  stock_name: string
+  stock_code: string
+  current_price: number | null
+  market: string
+  recorded_at: string
+  created_at?: string
+  updated_at?: string
+}
 
 export default function Home() {
+  const [selectedOpportunity, setSelectedOpportunity] = useState<InvestmentOpportunity | null>(null)
+  const [opportunityChangeTrigger, setOpportunityChangeTrigger] = useState(0)
+  const [recorderOpen, setRecorderOpen] = useState(false)
+  const [editingOpportunity, setEditingOpportunity] = useState<InvestmentOpportunity | null>(null)
+
+  const handleSelectOpportunity = (opportunity: InvestmentOpportunity) => {
+    setSelectedOpportunity(opportunity)
+  }
+
+  const handleOpportunityChange = () => {
+    setOpportunityChangeTrigger(prev => prev + 1)
+    setSelectedOpportunity(null) // 重置选中，显示最新的
+  }
+
+  const handleOpenRecorder = () => {
+    setEditingOpportunity(null)
+    setRecorderOpen(true)
+  }
+
+  const handleEditOpportunity = (opportunity: InvestmentOpportunity) => {
+    setEditingOpportunity(opportunity)
+    setRecorderOpen(true)
+  }
+
+  const handleEditComplete = () => {
+    setEditingOpportunity(null)
+  }
+
   return (
     <div className="min-h-screen bg-background">
-      <Header />
+      <Header onRecordOpportunity={handleOpenRecorder} />
       <main>
-        <OpportunityOfTheDay />
-        <TrendsSection />
-        <OpportunitiesDatabase />
+        <OpportunityOfTheDay 
+          selectedOpportunity={selectedOpportunity}
+          onOpportunityChange={opportunityChangeTrigger}
+        />
+        {/* <TrendsSection /> */}
+        <OpportunitiesDatabase 
+          onSelectOpportunity={handleSelectOpportunity}
+          selectedOpportunityId={selectedOpportunity?.id}
+          onOpportunityChange={handleOpportunityChange}
+          onOpenRecorder={handleOpenRecorder}
+          onEditOpportunity={handleEditOpportunity}
+        />
+        <InvestmentOpportunityRecorder 
+          onOpportunityChange={handleOpportunityChange}
+          initialEditingOpportunity={editingOpportunity}
+          onEditComplete={handleEditComplete}
+          open={recorderOpen}
+          onOpenChange={setRecorderOpen}
+        />
       </main>
     </div>
   )
 }
-

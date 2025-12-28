@@ -10,6 +10,7 @@ import { getMessages } from 'next-intl/server';
 import { routing } from '@/i18n/routing';
 import { notFound } from 'next/navigation';
 import { AuthProvider } from '@/lib/auth-context';
+import { Toaster } from '@/components/ui/toaster';
 import "../globals.css"
 
 const playfair = Playfair_Display({
@@ -52,6 +53,7 @@ export default async function LocaleLayout({
         <NextIntlClientProvider messages={messages}>
           <AuthProvider>
             <Suspense fallback={null}>{children}</Suspense>
+            <Toaster />
             <Analytics />
           </AuthProvider>
         </NextIntlClientProvider>
