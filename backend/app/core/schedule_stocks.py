@@ -5,7 +5,7 @@ from datetime import datetime
 
 import schedule
 
-from app.db.database import save_futu_data
+from app.db.database import save_futu_data, save_stock_basic_info
 from app.utils import futu_data
 from app.utils.wx_push import send_md_message
 
@@ -93,16 +93,65 @@ def futu_job():
         print(f"富途任务执行出错: {e}")
 
 
+# 记录上次同步股票基础信息的月份，避免同一个月重复执行
+_last_sync_month = None
+
+def sync_stock_basic_info_job(manual: bool = False):
+    """
+    同步股票基础信息任务（每月月初执行）
+    """
+    global _last_sync_month
+    
+    try:
+        now = datetime.now()
+        current_date = now.date()
+        current_day = now.day
+        current_month = now.strftime('%Y-%m')  # 格式：2024-01
+        
+        # 只在每月1号执行
+        if current_day != 1 and not manual:
+            return
+        
+        # 检查是否已经执行过（避免同一个月重复执行）
+        if _last_sync_month == current_month:
+            return
+        
+        print(f"开始同步股票基础信息: {now.strftime('%Y-%m-%d %H:%M')}")
+        
+        # 获取所有股票基础信息
+        stocks_data = futu_data.get_all_stocks_basic_info()
+        
+        # 保存到数据库
+        save_stock_basic_info(stocks_data)
+        
+        # 更新最后同步月份
+        _last_sync_month = current_month
+        
+        print(f"股票基础信息同步完成: {now.strftime('%Y-%m-%d %H:%M')}")
+        
+    except Exception as e:
+        print(f"同步股票基础信息失败: {e}")
+
+
 def main():
     schedule.every().hour.at(":55").do(futu_job)
+    
+    # 每天凌晨2点检查是否需要同步股票基础信息（每月1号执行）
+    # 函数内部会检查是否是1号，避免非1号时执行
+    schedule.every().day.at("02:00").do(sync_stock_basic_info_job)
 
     while True:
         current_time = datetime.now().time()
         current_weekday = datetime.now().weekday()  # 0-6，0是周一，6是周日
 
-        # 只在周一到周五（0-4）的9:00-16:00之间运行
+        # 只在周一到周五（0-4）的9:00-16:00之间运行富途数据任务
+        # 股票基础信息同步任务由 schedule 自动管理，会在每天2点检查并执行（如果是1号）
         if 0 <= current_weekday <= 4 and 9 <= current_time.hour <= 16:
             schedule.run_pending()
+        else:
+            # 非交易时间也运行 schedule，以便执行股票基础信息同步任务
+            schedule.run_pending()
+        
         time.sleep(60)
 
 

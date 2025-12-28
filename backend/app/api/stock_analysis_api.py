@@ -21,6 +21,7 @@ from app.search_engine import (
     DeepSeekAnalyzer,
     StockAnalysisWorkflow
 )
+from app.utils.futu_data import get_stock_current_price
 
 # 加载环境变量
 load_dotenv()
@@ -265,8 +266,7 @@ def search_stocks():
                 "code": "000001",
                 "name": "平安银行",
                 "market": "A",
-                "current_price": 10.5,
-                "change_ratio": 2.5
+                "exchange": "SZ"
             }
         ]
     }
@@ -281,59 +281,63 @@ def search_stocks():
                 "error": "缺少搜索关键词参数: query"
             }), 400
 
-        # 从数据库中搜索匹配的股票
-        # 这里我们从最近的股票记录中搜索
-        search_query = db.client.table('stock_records').select(
-            'stock_code, stock_name, market, change_ratio'
-        ).ilike('stock_name', f'%{query}%')
-
-        if market_filter in ['A', 'HK']:
-            search_query = search_query.eq('market', market_filter)
-
-        # 获取最近的数据
-        response = search_query.order('date', desc=True).order('time', desc=True).limit(20).execute()
-
-        # 去重处理
+        # 从 stock_basic_info 表中搜索匹配的股票
+        # 支持按股票名称和股票代码搜索
+        all_results = []
         seen_codes = set()
-        unique_results = []
 
-        for row in response.data:
-            code = row['stock_code']
-            if code not in seen_codes:
-                seen_codes.add(code)
-                unique_results.append({
-                    'code': code,
+        # 判断 query 是否为纯数字（可能是股票代码）
+        is_numeric = re.match(r'^\d+$', query)
+        
+        # 搜索股票名称
+        name_query = db.client.table('stock_basic_info').select(
+            'stock_code, stock_name, market, exchange'
+        ).ilike('stock_name', f'{query}%')
+        
+        if market_filter in ['A', 'HK']:
+            name_query = name_query.eq('market', market_filter)
+        
+        name_response = name_query.limit(20).execute()
+        
+        for row in name_response.data:
+            key = f"{row['stock_code']}_{row['market']}"
+            if key not in seen_codes:
+                seen_codes.add(key)
+                all_results.append({
+                    'code': row['stock_code'],
                     'name': row['stock_name'],
                     'market': row['market'],
-                    'change_ratio': row['change_ratio']
+                    'exchange': row['exchange']
                 })
 
-                if len(unique_results) >= 10:  # 限制返回10个结果
-                    break
+        # 如果是纯数字，也搜索股票代码
+        if is_numeric:
+            code_query = db.client.table('stock_basic_info').select(
+                'stock_code, stock_name, market, exchange'
+            ).ilike('stock_code', f'%{query}%')
+            
+            if market_filter in ['A', 'HK']:
+                code_query = code_query.eq('market', market_filter)
+            
+            code_response = code_query.limit(20).execute()
+            
+            for row in code_response.data:
+                key = f"{row['stock_code']}_{row['market']}"
+                if key not in seen_codes:
+                    seen_codes.add(key)
+                    all_results.append({
+                        'code': row['stock_code'],
+                        'name': row['stock_name'],
+                        'market': row['market'],
+                        'exchange': row['exchange']
+                    })
 
-        # 如果没有找到匹配的记录，尝试直接从富途API获取
-        if not unique_results:
-            try:
-                # 简单处理：如果query看起来像股票代码，直接查询
-                if re.match(r'^\d{6}$', query):  # A股代码格式
-                    market_code = 'SH.LIST0600' if query.startswith(('6', '5')) else 'SZ.LIST0600'
-                    stock_codes = [f"{'SH' if query.startswith(('6', '5')) else 'SZ'}.{query}"]
-                elif re.match(r'^\d{5}$', query):  # 港股代码格式
-                    stock_codes = [f"HK.{query}"]
-                else:
-                    stock_codes = []
-
-                if stock_codes:
-                    # 这里需要实现富途API调用来获取实时股价
-                    # 暂时返回空结果，需要进一步实现
-                    pass
-
-            except Exception as e:
-                print(f"富途API查询失败: {e}")
+        # 限制返回结果数量
+        results = all_results[:10]
 
         return jsonify({
             "success": True,
-            "data": unique_results
+            "data": results
         })
 
     except Exception as e:
@@ -360,7 +364,11 @@ def get_stock_price():
             "current_price": 10.5,
             "change_ratio": 2.5,
             "volume": 1000000,
-            "amount": 10500000
+            "amount": 10500000,
+            "open_price": 10.0,
+            "high_price": 10.8,
+            "low_price": 9.9,
+            "prev_close_price": 10.2
         }
     }
     """
@@ -374,29 +382,8 @@ def get_stock_price():
                 "error": "缺少必需参数: code 或 market无效"
             }), 400
 
-        # 从数据库中获取最新价格信息
-        response = db.client.table('stock_records').select(
-            'stock_name, change_ratio, volume, amount'
-        ).eq('stock_code', code).eq('market', market).order('date', desc=True).order('time', desc=True).limit(1).execute()
-
-        if not response.data:
-            return jsonify({
-                "success": False,
-                "error": "未找到该股票的价格信息"
-            }), 404
-
-        row = response.data[0]
-
-        # 计算当前价格（这里简化处理，实际需要从富途API获取最新价格）
-        # 暂时使用数据库中的数据作为参考
-        result = {
-            'code': code,
-            'name': row['stock_name'],
-            'current_price': None,  # 需要从富途API获取
-            'change_ratio': row['change_ratio'],
-            'volume': row['volume'],
-            'amount': row['amount']
-        }
+        # 使用富途API获取实时价格信息
+        result = get_stock_current_price(code, market)
 
         return jsonify({
             "success": True,

@@ -154,3 +154,49 @@ CREATE POLICY "Users can update own investment opportunities" ON investment_oppo
 -- 用户只能删除自己的投资机会记录
 CREATE POLICY "Users can delete own investment opportunities" ON investment_opportunities
     FOR DELETE USING (auth.uid() = user_id);
+
+-- ============================================
+-- 股票基础信息表
+-- ============================================
+CREATE TABLE IF NOT EXISTS stock_basic_info (
+    id BIGSERIAL PRIMARY KEY,
+    stock_code VARCHAR(20) NOT NULL,                          -- 股票代码
+    stock_name VARCHAR(100) NOT NULL,                         -- 股票名称
+    market VARCHAR(10) NOT NULL,                              -- 市场: 'A' 或 'HK'
+    exchange VARCHAR(10) NOT NULL,                            -- 交易所: 'SH'(上海), 'SZ'(深圳), 'HK'(香港)
+    last_synced_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),   -- 最后同步时间
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),        -- 创建时间
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()        -- 更新时间
+);
+
+-- ============================================
+-- 股票基础信息表的索引
+-- ============================================
+-- 唯一索引：股票代码+市场唯一
+CREATE UNIQUE INDEX IF NOT EXISTS idx_stock_basic_info_code_market
+ON stock_basic_info (stock_code, market);
+
+-- 索引：提高按市场查询的性能
+CREATE INDEX IF NOT EXISTS idx_stock_basic_info_market
+ON stock_basic_info (market);
+
+-- 索引：提高按股票代码查询的性能
+CREATE INDEX IF NOT EXISTS idx_stock_basic_info_code
+ON stock_basic_info (stock_code);
+
+-- 索引：提高按交易所查询的性能
+CREATE INDEX IF NOT EXISTS idx_stock_basic_info_exchange
+ON stock_basic_info (exchange);
+
+-- ============================================
+-- 注释
+-- ============================================
+COMMENT ON TABLE stock_basic_info IS '股票基础信息表，存储所有股票的基本信息（代码、名称、市场等）';
+COMMENT ON COLUMN stock_basic_info.stock_code IS '股票代码，如 000001';
+COMMENT ON COLUMN stock_basic_info.stock_name IS '股票名称';
+COMMENT ON COLUMN stock_basic_info.market IS '市场：A-A股市场，HK-港股市场';
+COMMENT ON COLUMN stock_basic_info.exchange IS '交易所：SH-上海交易所，SZ-深圳交易所，HK-香港交易所';
+COMMENT ON COLUMN stock_basic_info.last_synced_at IS '最后同步时间';
+
+
+

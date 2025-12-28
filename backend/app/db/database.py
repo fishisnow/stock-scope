@@ -214,6 +214,44 @@ class StockDatabase:
         except Exception as e:
             print(f"❌ 查询统计摘要失败: {e}")
             raise
+    
+    def save_stocks_basic_info(self, stocks_data: Dict[str, List[Dict]]):
+        """
+        保存股票基础信息到数据库（使用 upsert 方式，如果已存在则更新）
+        :param stocks_data: 股票基础信息字典，格式为 {'A': [...], 'HK': [...]}
+        """
+        try:
+            current_time = datetime.now().isoformat()
+            records_to_upsert = []
+            
+            for market, stocks in stocks_data.items():
+                for stock in stocks:
+                    record = {
+                        'stock_code': str(stock.get('code', '')),
+                        'stock_name': str(stock.get('name', '')),
+                        'market': market,
+                        'exchange': str(stock.get('exchange', '')),
+                        'last_synced_at': current_time,
+                        'updated_at': current_time
+                    }
+                    records_to_upsert.append(record)
+            
+            # 使用 upsert（如果存在则更新，不存在则插入）
+            if records_to_upsert:
+                # Supabase 的 upsert 需要指定唯一约束字段
+                # 由于我们设置了唯一索引 (stock_code, market)，可以直接 upsert
+                self.client.table('stock_basic_info').upsert(
+                    records_to_upsert,
+                    on_conflict='stock_code,market'
+                ).execute()
+                total_count = len(records_to_upsert)
+                a_count = len(stocks_data.get('A', []))
+                hk_count = len(stocks_data.get('HK', []))
+                print(f"✅ 已同步股票基础信息: 总计 {total_count} 条（A股 {a_count} 条，港股 {hk_count} 条）")
+            
+        except Exception as e:
+            print(f"❌ 保存股票基础信息失败: {e}")
+            raise
 
 # 全局数据库实例
 db = StockDatabase()
@@ -226,6 +264,14 @@ def save_futu_data(data: Dict[str, Dict[str, List[Dict]]]):
 def save_tonghuashun_data(data: Dict[str, List[Dict]]):
     """保存同花顺数据"""
     db.save_stock_data('tonghuashun', 'A', data)
+
+
+def save_stock_basic_info(stocks_data: Dict[str, List[Dict]]):
+    """
+    保存股票基础信息到数据库
+    :param stocks_data: 股票基础信息字典，格式为 {'A': [...], 'HK': [...]}
+    """
+    db.save_stocks_basic_info(stocks_data)
 
 if __name__ == '__main__':
     # 测试数据库功能

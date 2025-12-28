@@ -192,6 +192,225 @@ def get_all_stock_data() -> Dict[str, Dict[str, List[Dict]]]:
     }
 
 
+def extract_exchange_from_futu_code(futu_code: str) -> str:
+    """
+    从富途代码中提取交易所代码
+    :param futu_code: 富途格式的股票代码，如 'SH.000001', 'SZ.000001', 'HK.00700'
+    :return: 交易所代码，如 'SH', 'SZ', 'HK'
+    """
+    if '.' in futu_code:
+        return futu_code.split('.')[0]
+    else:
+        raise ValueError(f"无效的富途代码格式: {futu_code}")
+
+
+def convert_to_futu_code(code: str, market: str = None, exchange: str = None) -> str:
+    """
+    将股票代码转换为富途格式
+    :param code: 股票代码，如 '000001'
+    :param market: 市场类型，'A' 或 'HK'（如果未提供 exchange 则必需）
+    :param exchange: 交易所代码，'SH', 'SZ', 'HK'（如果提供则优先使用）
+    :return: 富途格式的股票代码，如 'SH.000001' 或 'HK.00700'
+    """
+    if exchange:
+        # 如果提供了 exchange，直接使用
+        return f'{exchange}.{code}'
+    elif market == 'A':
+        # A股：6开头或5开头是上海，其他是深圳
+        if code.startswith(('6', '5')):
+            return f'SH.{code}'
+        else:
+            return f'SZ.{code}'
+    elif market == 'HK':
+        # 港股：HK.开头
+        return f'HK.{code}'
+    else:
+        raise ValueError(f"必须提供 market 或 exchange 参数")
+
+
+def get_plate_stocks(plate_code: str) -> List[Dict]:
+    """
+    获取板块内所有股票的基础信息
+    
+    :param plate_code: 板块代码，如 'HK.LIST1910'（所有港股）或 'SH.LIST3000005'（全部A股）
+    :return: 股票基础信息列表，格式如下：
+        [
+            {
+                'code': '000001',
+                'name': '股票名称',
+                'exchange': 'SH',
+                'market': 'A'
+            },
+            ...
+        ]
+    """
+    try:
+        # 创建行情上下文
+        futu_host = os.getenv('FUTU_HOST', '127.0.0.1')
+        futu_port = int(os.getenv('FUTU_PORT', '11111'))
+        quote_ctx = OpenQuoteContext(host=futu_host, port=futu_port)
+        
+        try:
+            # 获取板块内所有股票
+            ret, data = quote_ctx.get_plate_stock(plate_code)
+            
+            if ret != RET_OK:
+                quote_ctx.close()
+                raise Exception(f"获取板块股票失败: {data}")
+            
+            if data.empty:
+                quote_ctx.close()
+                return []
+            
+            # 确定市场类型
+            market = 'HK' if plate_code.startswith('HK.') else 'A'
+            
+            # 处理数据
+            stocks = []
+            for _, row in data.iterrows():
+                futu_code = str(row['code']) if pd.notna(row['code']) else ''
+                stock_name = str(row['stock_name']) if pd.notna(row['stock_name']) else ''
+                
+                # 从富途代码中提取股票代码和交易所
+                # 格式: SH.000001, SZ.000001, HK.00700
+                if '.' in futu_code:
+                    exchange = futu_code.split('.')[0]
+                    stock_code = futu_code.split('.')[1]
+                else:
+                    # 如果没有点，尝试从市场推断交易所
+                    if market == 'HK':
+                        exchange = 'HK'
+                    else:
+                        # A股：6开头或5开头是上海，其他是深圳
+                        if futu_code.startswith(('6', '5')):
+                            exchange = 'SH'
+                        else:
+                            exchange = 'SZ'
+                    stock_code = futu_code
+                
+                stocks.append({
+                    'code': stock_code,
+                    'name': stock_name,
+                    'exchange': exchange,
+                    'market': market
+                })
+            
+            return stocks
+            
+        finally:
+            # 关闭连接
+            quote_ctx.close()
+            
+    except Exception as e:
+        raise Exception(f"获取板块股票失败: {str(e)}")
+
+
+def get_all_stocks_basic_info() -> Dict[str, List[Dict]]:
+    """
+    获取所有市场（A股和港股）的股票基础信息
+    
+    :return: 包含A股和港股股票基础信息的字典
+        {
+            'A': [...],
+            'HK': [...]
+        }
+    """
+    try:
+        # 获取A股所有股票
+        a_stocks = get_plate_stocks('SH.LIST3000005')
+        
+        # 获取港股所有股票
+        hk_stocks = get_plate_stocks('HK.LIST1910')
+        
+        return {
+            'A': a_stocks,
+            'HK': hk_stocks
+        }
+    except Exception as e:
+        raise Exception(f"获取所有股票基础信息失败: {str(e)}")
+
+
+def get_stock_current_price(code: str, market: str) -> Dict:
+    """
+    获取指定股票的当前价格信息
+    
+    :param code: 股票代码，如 '000001'
+    :param market: 市场类型，'A' 或 'HK'
+    :return: 包含股票价格信息的字典，格式如下：
+        {
+            'code': '000001',
+            'name': '股票名称',
+            'current_price': 10.5,
+            'change_ratio': 2.5,
+            'volume': 1000000,
+            'amount': 10500000,
+            'open_price': 10.0,
+            'high_price': 10.8,
+            'low_price': 9.9,
+            'prev_close_price': 10.2
+        }
+    """
+    try:
+        # 转换为富途格式的股票代码
+        futu_code = convert_to_futu_code(code, market)
+        
+        # 创建行情上下文
+        futu_host = os.getenv('FUTU_HOST', '127.0.0.1')
+        futu_port = int(os.getenv('FUTU_PORT', '11111'))
+        quote_ctx = OpenQuoteContext(host=futu_host, port=futu_port)
+        
+        try:
+            # 订阅股票报价
+            ret_sub, err_message = quote_ctx.subscribe([futu_code], [SubType.QUOTE], subscribe_push=False)
+            
+            if ret_sub != RET_OK:
+                quote_ctx.close()
+                raise Exception(f"订阅股票失败: {err_message}")
+            
+            # 获取股票报价
+            ret, data = quote_ctx.get_stock_quote([futu_code])
+            
+            if ret != RET_OK:
+                quote_ctx.close()
+                raise Exception(f"获取股票报价失败: {data}")
+            
+            if data.empty:
+                quote_ctx.close()
+                raise Exception(f"未找到股票 {futu_code} 的报价数据")
+            
+            # 提取数据
+            row = data.iloc[0]
+            last_price = float(row['last_price']) if pd.notna(row['last_price']) else None
+            prev_close_price = float(row['prev_close_price']) if pd.notna(row['prev_close_price']) else None
+            
+            # 计算涨跌幅
+            change_ratio = None
+            if last_price is not None and prev_close_price is not None and prev_close_price > 0:
+                change_ratio = (last_price - prev_close_price) / prev_close_price * 100
+            
+            result = {
+                'code': code,
+                'name': str(row['name']) if pd.notna(row['name']) else '',
+                'current_price': last_price,
+                'change_ratio': change_ratio,
+                'volume': int(row['volume']) if pd.notna(row['volume']) else 0,
+                'amount': float(row['turnover']) if pd.notna(row['turnover']) else 0,
+                'open_price': float(row['open_price']) if pd.notna(row['open_price']) else None,
+                'high_price': float(row['high_price']) if pd.notna(row['high_price']) else None,
+                'low_price': float(row['low_price']) if pd.notna(row['low_price']) else None,
+                'prev_close_price': prev_close_price
+            }
+            
+            return result
+            
+        finally:
+            # 关闭连接
+            quote_ctx.close()
+            
+    except Exception as e:
+        raise Exception(f"获取股票价格失败: {str(e)}")
+
+
 if __name__ == '__main__':
     # 测试代码
     data = get_all_stock_data()
