@@ -207,7 +207,8 @@ export function OpportunityOfTheDay({ selectedOpportunity, onOpportunityChange }
                     const isHighGain = priceChangeRatio > 10
                     const recordedPrice = stock.current_price
                     const latestPrice = stock.latest_price
-                    const pricesEqual = recordedPrice !== null && latestPrice !== null && 
+                    const pricesEqual = recordedPrice !== null && recordedPrice !== undefined &&
+                                       latestPrice !== null && latestPrice !== undefined && 
                                        Math.abs(recordedPrice - latestPrice) < 0.01
 
                     return (
