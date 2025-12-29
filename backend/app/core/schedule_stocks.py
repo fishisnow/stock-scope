@@ -11,6 +11,15 @@ from app.utils.wx_push import send_md_message
 
 
 def futu_job():
+    # 检查是否在交易时间（周一到周五，9:00-16:00）
+    now = datetime.now()
+    current_time = now.time()
+    current_weekday = now.weekday()  # 0-6，0是周一，6是周日
+    
+    if not (0 <= current_weekday <= 4 and 9 <= current_time.hour <= 16):
+        # 非交易时间，直接返回
+        return
+    
     try:
         # 获取股票数据
         data = futu_data.get_all_stock_data()
@@ -141,19 +150,9 @@ def main():
     schedule.every().day.at("02:00").do(sync_stock_basic_info_job)
 
     while True:
-        current_time = datetime.now().time()
-        current_weekday = datetime.now().weekday()  # 0-6，0是周一，6是周日
-
-        # 只在周一到周五（0-4）的9:00-16:00之间运行富途数据任务
-        # 股票基础信息同步任务由 schedule 自动管理，会在每天2点检查并执行（如果是1号）
-        if 0 <= current_weekday <= 4 and 9 <= current_time.hour <= 16:
-            schedule.run_pending()
-        else:
-            # 非交易时间也运行 schedule，以便执行股票基础信息同步任务
-            schedule.run_pending()
-        
+        schedule.run_pending()
         time.sleep(60)
 
 
 if __name__ == "__main__":
-    futu_job()
+    main()
