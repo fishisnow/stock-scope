@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { Link } from "@/i18n/routing"
+import { useSearchParams } from 'next/navigation'
 import { Button } from "@/components/ui/button"
 import { TrendingUp, LogOut, User, Plus } from "lucide-react"
 import { LanguageSwitcher } from "./language-switcher"
@@ -27,6 +28,7 @@ export function Header({ onRecordOpportunity }: HeaderProps = {}) {
   const t = useTranslations('header')
   const tOpp = useTranslations('opportunity.recorder')
   const { user, logout } = useAuth()
+  const searchParams = useSearchParams()
   const [showLoginDialog, setShowLoginDialog] = useState(false)
   const [showSignupDialog, setShowSignupDialog] = useState(false)
   const [mounted, setMounted] = useState(false)
@@ -34,6 +36,29 @@ export function Header({ onRecordOpportunity }: HeaderProps = {}) {
   // 修复 Hydration 错误：等待客户端挂载
   useEffect(() => {
     setMounted(true)
+  }, [])
+
+  // 监听 URL 参数，如果存在 login=true，打开登录对话框
+  useEffect(() => {
+    if (mounted && searchParams.get('login') === 'true') {
+      setShowLoginDialog(true)
+      // 清除 URL 参数，避免刷新时重复打开
+      const url = new URL(window.location.href)
+      url.searchParams.delete('login')
+      window.history.replaceState({}, '', url.toString())
+    }
+  }, [mounted, searchParams])
+
+  // 监听自定义事件，打开登录对话框
+  useEffect(() => {
+    const handleOpenLoginDialog = () => {
+      setShowLoginDialog(true)
+    }
+    
+    window.addEventListener('openLoginDialog', handleOpenLoginDialog)
+    return () => {
+      window.removeEventListener('openLoginDialog', handleOpenLoginDialog)
+    }
   }, [])
   
   // 获取邮箱的首字母作为头像

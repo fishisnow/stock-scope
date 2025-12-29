@@ -4,7 +4,8 @@ import { useState, useEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Edit, Trash2, ExternalLink, Plus, TrendingUp } from "lucide-react"
+import { Edit, Trash2, ExternalLink, Plus, TrendingUp, Lock } from "lucide-react"
+import { useRouter, usePathname } from '@/i18n/routing'
 import { InvestmentOpportunityRecorder } from "./investment-opportunity-recorder"
 import { useAuth } from '@/lib/auth-context'
 import { useToast } from "@/hooks/use-toast"
@@ -60,29 +61,41 @@ export function OpportunitiesDatabase({ onSelectOpportunity, selectedOpportunity
   const { session } = useAuth()
   const t = useTranslations('opportunity')
   const tRecorder = useTranslations('opportunity.recorder')
+  const router = useRouter()
+  const pathname = usePathname()
   const [opportunities, setOpportunities] = useState<InvestmentOpportunity[]>([])
   const [mounted, setMounted] = useState(false)
   const { toast } = useToast()
+  const isAuthenticated = !!session?.access_token
+
+  // 处理未登录用户点击股票
+  const handleStockClick = (e: React.MouseEvent) => {
+    if (!isAuthenticated) {
+      e.stopPropagation()
+      // 跳转到首页并添加登录参数
+      const currentPath = pathname || '/'
+      router.push(`${currentPath}?login=true`)
+      // 触发自定义事件来打开登录对话框
+      window.dispatchEvent(new CustomEvent('openLoginDialog'))
+    }
+  }
 
   // 修复 Hydration 错误：等待客户端挂载
   useEffect(() => {
     setMounted(true)
   }, [])
 
-  // 获取认证头
+  // 获取认证头（仅在已登录时添加）
   const getAuthHeaders = () => {
-    return {
-      'Authorization': `Bearer ${session?.access_token}`,
+    const headers: Record<string, string> = {}
+    if (session?.access_token) {
+      headers['Authorization'] = `Bearer ${session.access_token}`
     }
+    return headers
   }
 
-  // 加载投资机会列表
+  // 加载投资机会列表（未登录用户也可以加载）
   const loadOpportunities = async () => {
-    if (!session?.access_token) {
-      console.log('用户未登录，跳过加载投资机会')
-      return
-    }
-
     try {
       const response = await fetch(`${API_URL}/api/investment-opportunities?page=1&limit=100`, {
         headers: getAuthHeaders()
@@ -146,9 +159,8 @@ export function OpportunitiesDatabase({ onSelectOpportunity, selectedOpportunity
   }
 
   useEffect(() => {
-    if (session?.access_token) {
-      loadOpportunities()
-    }
+    // 无论是否登录都加载投资机会（未登录用户会看到隐藏的信息）
+    loadOpportunities()
   }, [session?.access_token])
 
   // 当投资机会记录器添加/更新后，重新加载列表
@@ -197,101 +209,146 @@ export function OpportunitiesDatabase({ onSelectOpportunity, selectedOpportunity
                 <CardHeader className="pb-3">
                   <div className="flex items-start justify-between gap-2">
                     <CardTitle className="text-lg font-serif leading-tight text-balance group-hover:text-primary transition-colors flex-1 line-clamp-2">
-                      {opportunity.core_idea}
+                      {opportunity.core_idea || (
+                        <div className="flex items-center gap-2 text-muted-foreground">
+                          <Lock className="h-4 w-4" />
+                          <span className="italic">{t('hiddenInfo') || '登录后查看完整信息'}</span>
+                        </div>
+                      )}
                     </CardTitle>
-                    <div className="flex gap-1 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8"
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          if (onEditOpportunity) {
-                            onEditOpportunity(opportunity)
-                          }
-                        }}
-                        title={t('edit')}
-                      >
-                        <Edit className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8 text-destructive hover:text-destructive"
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          opportunity.id && deleteOpportunity(opportunity.id)
-                        }}
-                        title={t('delete')}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
+                    {isAuthenticated && (
+                      <div className="flex gap-1 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            if (onEditOpportunity) {
+                              onEditOpportunity(opportunity)
+                            }
+                          }}
+                          title={t('edit')}
+                        >
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-destructive hover:text-destructive"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            opportunity.id && deleteOpportunity(opportunity.id)
+                          }}
+                          title={t('delete')}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    )}
                   </div>
                 </CardHeader>
                 <CardContent className="space-y-3">
-                  {opportunity.source_url && (
-                    <div className="text-sm text-muted-foreground">
-                      <span className="font-medium">来源：</span>
-                      <a
-                        href={opportunity.source_url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-primary hover:underline inline-flex items-center gap-1 ml-1"
-                        title={opportunity.source_url}
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        <span className="truncate max-w-[200px]">{truncateUrl(opportunity.source_url, 40)}</span>
-                        <ExternalLink className="h-3 w-3 flex-shrink-0" />
-                      </a>
-                    </div>
-                  )}
+                  {opportunity.core_idea ? (
+                    <>
+                      {opportunity.source_url ? (
+                        <div className="text-sm text-muted-foreground">
+                          <span className="font-medium">来源：</span>
+                          <a
+                            href={opportunity.source_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-primary hover:underline inline-flex items-center gap-1 ml-1"
+                            title={opportunity.source_url}
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <span className="truncate max-w-[200px]">{truncateUrl(opportunity.source_url, 40)}</span>
+                            <ExternalLink className="h-3 w-3 flex-shrink-0" />
+                          </a>
+                        </div>
+                      ) : null}
 
-                  {opportunity.summary && (
-                    <CardDescription className="text-sm leading-relaxed line-clamp-3">
-                      {opportunity.summary}
-                    </CardDescription>
-                  )}
+                      {opportunity.summary ? (
+                        <CardDescription className="text-sm leading-relaxed line-clamp-3">
+                          {opportunity.summary}
+                        </CardDescription>
+                      ) : null}
 
-                  {opportunity.trigger_words && opportunity.trigger_words.length > 0 && (
-                    <div className="flex flex-wrap gap-2">
-                      {opportunity.trigger_words.map((word, index) => (
-                        <Badge key={index} variant="secondary" className="text-xs">
-                          {word}
-                        </Badge>
-                      ))}
+                      {opportunity.trigger_words && opportunity.trigger_words.length > 0 ? (
+                        <div className="flex flex-wrap gap-2">
+                          {opportunity.trigger_words.map((word, index) => (
+                            <Badge key={index} variant="secondary" className="text-xs">
+                              {word}
+                            </Badge>
+                          ))}
+                        </div>
+                      ) : null}
+                    </>
+                  ) : (
+                    <div className="p-4 bg-primary/5 border border-primary/20 rounded-lg text-center">
+                      <p className="text-sm text-primary font-medium mb-1">
+                        {t('loginToViewStocksTitle') || '解锁完整投资机会'}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {t('loginToViewStocksDesc') || '登录后查看实时股价、涨幅分析和更多投资机会'}
+                      </p>
                     </div>
                   )}
 
                   {opportunity.stocks && opportunity.stocks.length > 0 && (
-                    <div className="text-sm pt-2 border-t space-y-2">
+                    <div className="text-sm pt-2 border-t space-y-2 relative">
                       <div className="flex items-center gap-2 font-medium mb-2">
                         <TrendingUp className="h-4 w-4 text-primary" />
                         <span>{t('relatedStocks') || '关联股票'}</span>
                       </div>
-                      {opportunity.stocks.map((stock, index) => (
-                        <div key={index} className="flex justify-between items-center">
-                          <div className="flex items-center gap-2">
-                            <span className="font-medium">{stock.stock_name}</span>
-                            <Badge variant="outline" className="text-xs">
-                              {stock.stock_code}
-                            </Badge>
-                            <span className="text-xs text-muted-foreground">
-                              {stock.market === 'A' ? t('marketA') : t('marketHK')}
-                            </span>
-                          </div>
-                          {stock.price_change_ratio !== null && stock.price_change_ratio !== undefined && (
-                            <div className={`text-sm font-semibold ${
-                              stock.price_change_ratio > 0 ? 'text-red-600' : 
-                              stock.price_change_ratio < 0 ? 'text-green-600' : 
-                              'text-muted-foreground'
-                            }`}>
-                              {stock.price_change_ratio === 0 ? '' : stock.price_change_ratio > 0 ? '+' : ''}
-                              {stock.price_change_ratio.toFixed(2)}%
+                      {!isAuthenticated && (
+                        <div className="absolute inset-0 z-10 pointer-events-none" />
+                      )}
+                      <div className={`space-y-2 ${!isAuthenticated ? 'blur-sm' : ''}`}>
+                        {opportunity.stocks.map((stock, index) => (
+                          <div 
+                            key={index} 
+                            className={`flex justify-between items-center relative ${
+                              !isAuthenticated ? 'cursor-pointer' : ''
+                            }`}
+                            onClick={handleStockClick}
+                          >
+                            {!isAuthenticated && (
+                              <div className="absolute inset-0 flex items-center justify-center z-20 bg-background/90 rounded backdrop-blur-sm opacity-0 hover:opacity-100 transition-opacity">
+                                <div className="text-center p-2">
+                                  <Lock className="h-6 w-6 text-primary mx-auto mb-1" />
+                                  <p className="text-xs font-medium text-primary">
+                                    {t('loginToViewStockTitle') || '解锁查看详情'}
+                                  </p>
+                                </div>
+                              </div>
+                            )}
+                            <div className="flex items-center gap-2">
+                              <span className="font-medium">{stock.stock_name}</span>
+                              <Badge variant="outline" className="text-xs">
+                                {stock.stock_code}
+                              </Badge>
+                              <span className="text-xs text-muted-foreground">
+                                {stock.market === 'A' ? t('marketA') : t('marketHK')}
+                              </span>
                             </div>
-                          )}
-                        </div>
-                      ))}
+                            {isAuthenticated && stock.price_change_ratio !== null && stock.price_change_ratio !== undefined ? (
+                              <div className={`text-sm font-semibold ${
+                                stock.price_change_ratio > 0 ? 'text-red-600' : 
+                                stock.price_change_ratio < 0 ? 'text-green-600' : 
+                                'text-muted-foreground'
+                              }`}>
+                                {stock.price_change_ratio === 0 ? '' : stock.price_change_ratio > 0 ? '+' : ''}
+                                {stock.price_change_ratio.toFixed(2)}%
+                              </div>
+                            ) : !isAuthenticated ? (
+                              <div className="text-sm font-semibold text-muted-foreground">
+                                •••
+                              </div>
+                            ) : null}
+                          </div>
+                        ))}
+                      </div>
                     </div>
                   )}
                 </CardContent>

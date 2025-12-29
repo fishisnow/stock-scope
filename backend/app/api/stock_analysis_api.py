@@ -4,7 +4,7 @@
 """
 
 from flask import Blueprint, request, jsonify
-from app.api.auth_middleware import token_required, get_user_supabase_client
+from app.api.auth_middleware import token_required, optional_token, get_user_supabase_client
 import os
 import sys
 from dotenv import load_dotenv
@@ -402,6 +402,23 @@ def get_stock_price():
 
 investment_opportunities_bp = Blueprint('investment_opportunities', __name__, url_prefix='/api/investment-opportunities')
 
+def hide_opportunity_info(opportunity: dict) -> dict:
+    """
+    对投资机会进行信息隐藏处理（用于未登录用户查看非最新记录）
+    
+    :param opportunity: 投资机会数据字典
+    :return: 隐藏敏感信息后的投资机会数据
+    """
+    hidden_opportunity = opportunity.copy()
+    # 隐藏敏感信息
+    hidden_opportunity['core_idea'] = None
+    hidden_opportunity['summary'] = None
+    hidden_opportunity['source_url'] = None
+    hidden_opportunity['trigger_words'] = []
+    # 保留基本信息：id, recorded_at, created_at, updated_at
+    return hidden_opportunity
+
+
 def enrich_stock_with_price_change(stock: dict) -> dict:
     """
     为股票数据添加最新价格和涨幅信息
@@ -553,10 +570,15 @@ def create_investment_opportunity():
         }), 500
 
 @investment_opportunities_bp.route('', methods=['GET'])
-@token_required
+@optional_token
 def get_investment_opportunities():
     """
-    获取用户的投资机会记录列表
+    获取投资机会记录列表
+    
+    对于已登录用户：返回该用户的所有投资机会记录（包含股票信息）
+    对于未登录用户：返回所有用户的投资机会记录（支持分页），但：
+        - 最新的一条记录显示完整信息（不包含股票信息）
+        - 其他记录进行信息隐藏处理（隐藏 core_idea, summary, source_url, trigger_words）
 
     查询参数:
     - page: 页码 (默认1)
@@ -565,7 +587,7 @@ def get_investment_opportunities():
     响应:
     {
         "success": true,
-        "data": [ ... 记录列表（每个记录包含stocks数组）... ],
+        "data": [ ... 记录列表（已登录用户包含stocks数组，未登录用户stocks为空）... ],
         "pagination": {
             "page": 1,
             "limit": 10,
@@ -575,48 +597,101 @@ def get_investment_opportunities():
     """
     try:
         user = request.current_user
-        user_id = user['id']
-
         page = int(request.args.get('page', 1))
         limit = int(request.args.get('limit', 10))
         offset = (page - 1) * limit
 
-        # 获取用户认证的数据库客户端
-        user_supabase = get_user_supabase_client()
-        if not user_supabase:
+        # 获取数据库客户端
+        supabase_client = get_user_supabase_client()
+        if not supabase_client:
             return jsonify({
                 "success": False,
                 "error": "数据库连接失败"
             }), 500
 
-        # 查询记录
-        query = user_supabase.table('investment_opportunities').select('*', count='exact').eq('user_id', user_id)
-        response = query.order('created_at', desc=True).range(offset, offset + limit - 1).execute()
-
-        # 为每个投资机会查询关联的股票
-        opportunities = response.data
-        opportunity_ids = [opp['id'] for opp in opportunities]
-        
-        if opportunity_ids:
-            stocks_response = user_supabase.table('investment_opportunity_stocks').select('*').in_('opportunity_id', opportunity_ids).execute()
-            stocks_by_opportunity = {}
-            for stock in stocks_response.data:
-                opp_id = stock['opportunity_id']
-                if opp_id not in stocks_by_opportunity:
-                    stocks_by_opportunity[opp_id] = []
-                stocks_by_opportunity[opp_id].append(stock)
-            
-            # 将股票数据添加到对应的投资机会中，并计算距今涨幅
-            for opp in opportunities:
-                stocks = stocks_by_opportunity.get(opp['id'], [])
-                # 为每个股票获取最新股价并计算涨幅
-                for stock in stocks:
-                    enrich_stock_with_price_change(stock)
-                
-                opp['stocks'] = stocks
+        # 统一查询逻辑：支持分页
+        if user:
+            # 已登录用户：查询该用户的所有投资机会
+            user_id = user['id']
+            query = supabase_client.table('investment_opportunities').select('*', count='exact').eq('user_id', user_id)
         else:
-            for opp in opportunities:
-                opp['stocks'] = []
+            # 未登录用户：查询所有用户的投资机会（不限制 user_id）
+            # 不返回 user_id 字段，避免暴露用户信息
+            query = supabase_client.table('investment_opportunities').select(
+                'id, core_idea, source_url, summary, trigger_words, recorded_at, created_at, updated_at',
+                count='exact'
+            )
+        
+        response = query.order('created_at', desc=True).range(offset, offset + limit - 1).execute()
+        opportunities = response.data if response.data else []
+
+        # 处理未登录用户的数据隐藏逻辑
+        if not user:
+            # 未登录用户：除了第一条（最新的）记录外，其他记录进行信息隐藏
+            opportunity_ids = [opp['id'] for opp in opportunities]
+            
+            # 初始化 stocks_by_opportunity 字典
+            stocks_by_opportunity = {}
+            
+            # 查询所有机会的股票信息（未登录用户也需要第一条的股票信息）
+            if opportunity_ids:
+                try:
+                    stocks_response = supabase_client.table('investment_opportunity_stocks').select('*').in_('opportunity_id', opportunity_ids).execute()
+                    if stocks_response.data:
+                        for stock in stocks_response.data:
+                            opp_id = stock['opportunity_id']
+                            if opp_id not in stocks_by_opportunity:
+                                stocks_by_opportunity[opp_id] = []
+                            stocks_by_opportunity[opp_id].append(stock)
+                except Exception as e:
+                    print(f"查询股票信息失败: {str(e)}")
+                    # 如果查询失败，stocks_by_opportunity 保持为空字典
+            
+            for index, opp in enumerate(opportunities):
+                # 第一条记录（index=0）显示完整信息，其他记录隐藏敏感信息
+                if index > 0:
+                    opportunities[index] = hide_opportunity_info(opp)
+                    # 非第一条记录不返回股票信息
+                    opportunities[index]['stocks'] = []
+                else:
+                    # 第一条记录返回股票信息（但前端会模糊显示）
+                    opp_id = opp.get('id')
+                    stocks = stocks_by_opportunity.get(opp_id, []) if opp_id else []
+                    # 为每个股票获取最新股价并计算涨幅
+                    for stock in stocks:
+                        enrich_stock_with_price_change(stock)
+                    # 确保 stocks 字段被设置（即使为空列表）
+                    opportunities[index]['stocks'] = stocks
+        else:
+            # 已登录用户：查询关联的股票信息
+            opportunity_ids = [opp['id'] for opp in opportunities]
+            
+            if opportunity_ids:
+                stocks_response = supabase_client.table('investment_opportunity_stocks').select('*').in_('opportunity_id', opportunity_ids).execute()
+                stocks_by_opportunity = {}
+                for stock in stocks_response.data:
+                    opp_id = stock['opportunity_id']
+                    if opp_id not in stocks_by_opportunity:
+                        stocks_by_opportunity[opp_id] = []
+                    stocks_by_opportunity[opp_id].append(stock)
+                
+                # 将股票数据添加到对应的投资机会中，并计算距今涨幅
+                for opp in opportunities:
+                    stocks = stocks_by_opportunity.get(opp['id'], [])
+                    # 为每个股票获取最新股价并计算涨幅
+                    for stock in stocks:
+                        enrich_stock_with_price_change(stock)
+                    
+                    opp['stocks'] = stocks
+            else:
+                for opp in opportunities:
+                    opp['stocks'] = []
+
+        # 获取总数（Supabase 返回的 count 在 response.count 中）
+        total_count = getattr(response, 'count', None)
+        if total_count is None:
+            # 如果没有 count，使用当前返回的数据长度（仅作为估算）
+            total_count = len(opportunities) if page == 1 else None
 
         return jsonify({
             "success": True,
@@ -624,7 +699,7 @@ def get_investment_opportunities():
             "pagination": {
                 "page": page,
                 "limit": limit,
-                "total": response.count
+                "total": total_count
             }
         })
 

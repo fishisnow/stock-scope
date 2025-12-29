@@ -3,9 +3,10 @@
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Calendar, ExternalLink, Lightbulb, TrendingUp, ChevronRight } from "lucide-react"
+import { Calendar, ExternalLink, Lightbulb, TrendingUp, ChevronRight, Lock } from "lucide-react"
 import { useAuth } from '@/lib/auth-context'
 import { useTranslations } from 'next-intl'
+import { useRouter, usePathname } from '@/i18n/routing'
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5001"
 
@@ -38,23 +39,23 @@ interface OpportunityOfTheDayProps {
 export function OpportunityOfTheDay({ selectedOpportunity, onOpportunityChange }: OpportunityOfTheDayProps = {}) {
   const { session } = useAuth()
   const t = useTranslations('opportunity')
+  const router = useRouter()
+  const pathname = usePathname()
   const [opportunity, setOpportunity] = useState<InvestmentOpportunity | null>(null)
   const [loading, setLoading] = useState(true)
+  const isAuthenticated = !!session?.access_token
 
-  // 获取认证头
+  // 获取认证头（仅在已登录时添加）
   const getAuthHeaders = () => {
-    return {
-      'Authorization': `Bearer ${session?.access_token}`,
+    const headers: Record<string, string> = {}
+    if (session?.access_token) {
+      headers['Authorization'] = `Bearer ${session.access_token}`
     }
+    return headers
   }
 
-  // 加载最新的投资机会
+  // 加载最新的投资机会（未登录用户也可以加载）
   const loadLatestOpportunity = async () => {
-    if (!session?.access_token) {
-      setLoading(false)
-      return
-    }
-
     try {
       const response = await fetch(`${API_URL}/api/investment-opportunities?page=1&limit=1`, {
         headers: getAuthHeaders()
@@ -73,23 +74,35 @@ export function OpportunityOfTheDay({ selectedOpportunity, onOpportunityChange }
     }
   }
 
+  // 处理未登录用户点击股票卡片
+  const handleStockCardClick = (stock: StockInfo) => {
+    if (!isAuthenticated) {
+      // 跳转到首页并添加登录参数
+      const currentPath = pathname || '/'
+      router.push(`${currentPath}?login=true`)
+      // 触发自定义事件来打开登录对话框
+      window.dispatchEvent(new CustomEvent('openLoginDialog'))
+    } else {
+      // 已登录用户正常跳转
+      window.location.href = `/market?code=${stock.stock_code}&market=${stock.market}`
+    }
+  }
+
   useEffect(() => {
     if (selectedOpportunity) {
       setOpportunity(selectedOpportunity)
       setLoading(false)
-    } else if (session?.access_token) {
-      loadLatestOpportunity()
     } else {
-      setLoading(false)
+      loadLatestOpportunity()
     }
-  }, [session?.access_token, selectedOpportunity])
+  }, [selectedOpportunity])
 
   // 当机会更新时，重新加载
   useEffect(() => {
-    if (onOpportunityChange !== undefined && !selectedOpportunity && session?.access_token) {
+    if (onOpportunityChange !== undefined && !selectedOpportunity) {
       loadLatestOpportunity()
     }
-  }, [onOpportunityChange, selectedOpportunity, session?.access_token])
+  }, [onOpportunityChange, selectedOpportunity])
 
   if (loading) {
     return (
@@ -190,6 +203,17 @@ export function OpportunityOfTheDay({ selectedOpportunity, onOpportunityChange }
                 <p className="text-sm text-muted-foreground ml-7">
                   {t('relatedStocksDesc') || '该投资机会可能受益的相关标的'}
                 </p>
+                {!isAuthenticated && (
+                  <div className="ml-7 mt-2 p-3 bg-primary/5 border border-primary/20 rounded-lg">
+                    <p className="text-sm font-medium text-primary mb-1 flex items-center gap-2">
+                      <Lock className="h-4 w-4" />
+                      <span>{t('loginToViewStocksTitle') || '解锁完整投资机会'}</span>
+                    </p>
+                    <p className="text-xs text-muted-foreground ml-6">
+                      {t('loginToViewStocksDesc') || '登录后查看实时股价、涨幅分析和更多投资机会'}
+                    </p>
+                  </div>
+                )}
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                 {[...opportunity.stocks]
@@ -214,14 +238,24 @@ export function OpportunityOfTheDay({ selectedOpportunity, onOpportunityChange }
                     return (
                       <div
                         key={index}
-                        className={`p-4 bg-card border rounded-lg transition-all cursor-pointer group ${
+                        className={`p-4 bg-card border rounded-lg transition-all cursor-pointer group relative ${
                           isHighGain ? 'border-primary/30 bg-primary/5' : 'hover:shadow-lg hover:border-primary/20'
-                        }`}
-                        onClick={() => {
-                          // 可以跳转到市场页面或股票详情
-                          window.location.href = `/market?code=${stock.stock_code}&market=${stock.market}`
-                        }}
+                        } ${!isAuthenticated ? 'blur-sm' : ''}`}
+                        onClick={() => handleStockCardClick(stock)}
                       >
+                        {!isAuthenticated && (
+                          <div className="absolute inset-0 flex items-center justify-center z-20 bg-background/90 rounded-lg backdrop-blur-sm">
+                            <div className="text-center p-4">
+                              <Lock className="h-10 w-10 text-primary mx-auto mb-3 animate-pulse" />
+                              <p className="text-sm font-semibold text-primary mb-1">
+                                {t('loginToViewStockTitle') || '解锁查看详情'}
+                              </p>
+                              <p className="text-xs text-muted-foreground">
+                                {t('loginToViewStockDesc') || '查看实时价格和涨幅分析'}
+                              </p>
+                            </div>
+                          </div>
+                        )}
                         <div className="space-y-3">
                           {/* 主视觉：股票名称 + 涨幅 */}
                           <div className="flex items-start justify-between">
@@ -233,7 +267,7 @@ export function OpportunityOfTheDay({ selectedOpportunity, onOpportunityChange }
                                 <span>{stock.market === 'A' ? t('marketA') : t('marketHK')}</span>
                               </div>
                             </div>
-                            {priceChangeRatio !== null && priceChangeRatio !== undefined && (
+                            {isAuthenticated && priceChangeRatio !== null && priceChangeRatio !== undefined && (
                               <div className={`text-2xl font-bold ${
                                 isPositive ? 'text-red-600' : 
                                 isNegative ? 'text-green-600' : 
@@ -242,11 +276,18 @@ export function OpportunityOfTheDay({ selectedOpportunity, onOpportunityChange }
                                 {isNeutral ? '' : isPositive ? '+' : ''}{priceChangeRatio.toFixed(2)}%
                               </div>
                             )}
-                            <ChevronRight className="h-5 w-5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0" />
+                            {!isAuthenticated && (
+                              <div className="text-2xl font-bold text-muted-foreground">
+                                •••
+                              </div>
+                            )}
+                            {isAuthenticated && (
+                              <ChevronRight className="h-5 w-5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0" />
+                            )}
                           </div>
                           
-                          {/* 价格信息：智能显示 */}
-                          {(recordedPrice !== null && recordedPrice !== undefined) && (
+                          {/* 价格信息：智能显示（仅已登录用户可见） */}
+                          {isAuthenticated && (recordedPrice !== null && recordedPrice !== undefined) && (
                             <div className="pt-2">
                               {pricesEqual ? (
                                 <div className="flex justify-between items-center text-sm">

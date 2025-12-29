@@ -157,9 +157,9 @@ COMMENT ON COLUMN investment_opportunity_stocks.current_price IS '记录时的�
 -- ============================================
 ALTER TABLE investment_opportunities ENABLE ROW LEVEL SECURITY;
 
--- 用户只能查看自己的投资机会记录
-CREATE POLICY "Users can view own investment opportunities" ON investment_opportunities
-    FOR SELECT USING (auth.uid() = user_id);
+-- 允许所有人查看投资机会记录
+CREATE POLICY "Allow public to view all investment opportunities" ON investment_opportunities
+    FOR SELECT USING (true);
 
 -- 用户只能插入自己的投资机会记录
 CREATE POLICY "Users can insert own investment opportunities" ON investment_opportunities
@@ -179,14 +179,8 @@ CREATE POLICY "Users can delete own investment opportunities" ON investment_oppo
 ALTER TABLE investment_opportunity_stocks ENABLE ROW LEVEL SECURITY;
 
 -- 用户只能查看自己投资机会关联的股票
-CREATE POLICY "Users can view own opportunity stocks" ON investment_opportunity_stocks
-    FOR SELECT USING (
-        EXISTS (
-            SELECT 1 FROM investment_opportunities
-            WHERE investment_opportunities.id = investment_opportunity_stocks.opportunity_id
-            AND investment_opportunities.user_id = auth.uid()
-        )
-    );
+CREATE POLICY "Allow public to view all opportunity stocks" ON investment_opportunity_stocks
+    FOR SELECT USING (true);
 
 -- 用户只能插入自己投资机会关联的股票
 CREATE POLICY "Users can insert own opportunity stocks" ON investment_opportunity_stocks

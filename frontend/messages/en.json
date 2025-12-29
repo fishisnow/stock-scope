@@ -179,6 +179,13 @@
     "latestPrice": "Latest Price",
     "priceChangeSinceRecorded": "Price Change Since Recorded",
     "relatedStocksDesc": "Related stocks that may benefit from this investment opportunity",
+    "loginToView": "Login to View Details",
+    "loginToViewStocks": "Login to view complete stock information",
+    "loginToViewStocksTitle": "Unlock Complete Investment Opportunities",
+    "loginToViewStocksDesc": "Login to view real-time stock prices, gain analysis and more investment opportunities",
+    "loginToViewStockTitle": "Unlock to View Details",
+    "loginToViewStockDesc": "View real-time prices and gain analysis",
+    "hiddenInfo": "Login to view complete information",
     "recorder": {
       "title": "Investment Opportunity Recorder",
       "subtitle": "Capture investment opportunities and business inspiration seen in daily life",
