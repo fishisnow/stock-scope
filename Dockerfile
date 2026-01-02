@@ -29,18 +29,19 @@ RUN npm run build
 # 使用 Python 3.12 作为运行时镜像
 FROM python:3.12-slim
 
-# 安装 Node.js 运行时和时区数据（用于运行 Next.js 和设置时区）
-# 注意：在生产环境中，建议使用官方 Node.js 二进制文件而不是通过脚本安装
+# 安装必要的系统依赖（时区数据等）
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    curl \
     tzdata \
     ca-certificates \
-    && curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
-    && apt-get install -y --no-install-recommends nodejs \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/* \
     && rm -rf /tmp/* \
     && rm -rf /var/tmp/*
+
+# 从 frontend-builder 阶段复制 Node.js 和 npm 二进制文件（因为该阶段已经使用了官方 Node.js 镜像）
+COPY --from=frontend-builder /usr/local/bin/node /usr/local/bin/node
+COPY --from=frontend-builder /usr/local/bin/npm /usr/local/bin/npm
+COPY --from=frontend-builder /usr/local/lib/node_modules /usr/local/lib/node_modules
 
 # 创建非 root 用户（安全最佳实践）
 RUN groupadd -r appuser && useradd -r -g appuser -u 1000 appuser \
