@@ -38,10 +38,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /tmp/* \
     && rm -rf /var/tmp/*
 
-# 从 frontend-builder 阶段复制 Node.js 和 npm 二进制文件（因为该阶段已经使用了官方 Node.js 镜像）
-COPY --from=frontend-builder /usr/local/bin/node /usr/local/bin/node
-COPY --from=frontend-builder /usr/local/bin/npm /usr/local/bin/npm
-COPY --from=frontend-builder /usr/local/lib/node_modules /usr/local/lib/node_modules
+# 从 frontend-builder 阶段复制 Node.js 和 npm（因为该阶段已经使用了官方 Node.js 镜像）
+# 复制整个 Node.js 安装目录，确保包含所有二进制文件、库文件和符号链接
+COPY --from=frontend-builder /usr/local/bin/ /usr/local/bin/
+COPY --from=frontend-builder /usr/local/lib/node_modules/ /usr/local/lib/node_modules/
 
 # 创建非 root 用户（安全最佳实践）
 RUN groupadd -r appuser && useradd -r -g appuser -u 1000 appuser \
