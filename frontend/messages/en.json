@@ -182,9 +182,10 @@
     "loginToView": "Login to View Details",
     "loginToViewStocks": "Login to view complete stock information",
     "loginToViewStocksTitle": "Unlock Complete Investment Opportunities",
-    "loginToViewStocksDesc": "Login to view real-time stock prices, gain analysis and more investment opportunities",
+    "loginToViewStocksDesc": "Login to view more investment opportunities and record your investment ideas.",
     "loginToViewStockTitle": "Unlock to View Details",
     "loginToViewStockDesc": "View real-time prices and gain analysis",
+    "loginNow": "Login Now",
     "hiddenInfo": "Login to view complete information",
     "recorder": {
       "title": "Investment Opportunity Recorder",

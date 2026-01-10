@@ -34,9 +34,10 @@ interface InvestmentOpportunity {
 interface OpportunityOfTheDayProps {
   selectedOpportunity?: InvestmentOpportunity | null
   onOpportunityChange?: number | (() => void)
+  isLatest?: boolean // 标识是否为最新的投资机会
 }
 
-export function OpportunityOfTheDay({ selectedOpportunity, onOpportunityChange }: OpportunityOfTheDayProps = {}) {
+export function OpportunityOfTheDay({ selectedOpportunity, onOpportunityChange, isLatest = true }: OpportunityOfTheDayProps = {}) {
   const { session } = useAuth()
   const t = useTranslations('opportunity')
   const router = useRouter()
@@ -203,17 +204,6 @@ export function OpportunityOfTheDay({ selectedOpportunity, onOpportunityChange }
                 <p className="text-sm text-muted-foreground ml-7">
                   {t('relatedStocksDesc') || '该投资机会可能受益的相关标的'}
                 </p>
-                {!isAuthenticated && (
-                  <div className="ml-7 mt-2 p-3 bg-primary/5 border border-primary/20 rounded-lg">
-                    <p className="text-sm font-medium text-primary mb-1 flex items-center gap-2">
-                      <Lock className="h-4 w-4" />
-                      <span>{t('loginToViewStocksTitle') || '解锁完整投资机会'}</span>
-                    </p>
-                    <p className="text-xs text-muted-foreground ml-6">
-                      {t('loginToViewStocksDesc') || '登录后查看实时股价、涨幅分析和更多投资机会'}
-                    </p>
-                  </div>
-                )}
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                 {[...opportunity.stocks]
@@ -240,22 +230,9 @@ export function OpportunityOfTheDay({ selectedOpportunity, onOpportunityChange }
                         key={index}
                         className={`p-4 bg-card border rounded-lg transition-all cursor-pointer group relative ${
                           isHighGain ? 'border-primary/30 bg-primary/5' : 'hover:shadow-lg hover:border-primary/20'
-                        } ${!isAuthenticated ? 'blur-sm' : ''}`}
+                        } ${!isAuthenticated && !isLatest ? 'blur-[2px]' : ''}`}
                         onClick={() => handleStockCardClick(stock)}
                       >
-                        {!isAuthenticated && (
-                          <div className="absolute inset-0 flex items-center justify-center z-20 bg-background/90 rounded-lg backdrop-blur-sm">
-                            <div className="text-center p-4">
-                              <Lock className="h-10 w-10 text-primary mx-auto mb-3 animate-pulse" />
-                              <p className="text-sm font-semibold text-primary mb-1">
-                                {t('loginToViewStockTitle') || '解锁查看详情'}
-                              </p>
-                              <p className="text-xs text-muted-foreground">
-                                {t('loginToViewStockDesc') || '查看实时价格和涨幅分析'}
-                              </p>
-                            </div>
-                          </div>
-                        )}
                         <div className="space-y-3">
                           {/* 主视觉：股票名称 + 涨幅 */}
                           <div className="flex items-start justify-between">
@@ -318,6 +295,30 @@ export function OpportunityOfTheDay({ selectedOpportunity, onOpportunityChange }
             </div>
           )}
         </div>
+
+        {/* 未登录用户的底部引导 */}
+        {!isAuthenticated && (
+          <div className="mt-12 p-6 bg-gradient-to-r from-primary/5 to-primary/10 border border-primary/20 rounded-xl text-center">
+            <Lock className="h-10 w-10 text-primary mx-auto mb-3" />
+            <h3 className="text-xl font-semibold text-primary mb-2">
+              {t('loginToViewStocksTitle') || '解锁完整投资机会'}
+            </h3>
+            <p className="text-sm text-muted-foreground mb-4">
+              {t('loginToViewStocksDesc') || '登录后查看更多投资机会，记录你的投资灵感"'}
+            </p>
+            <Button 
+              onClick={() => {
+                const currentPath = pathname || '/'
+                router.push(`${currentPath}?login=true`)
+                window.dispatchEvent(new CustomEvent('openLoginDialog'))
+              }}
+              className="gap-2"
+            >
+              <span>{t('loginNow') || '立即登录'}</span>
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          </div>
+        )}
       </div>
     </section>
   )

@@ -182,9 +182,10 @@
     "loginToView": "登录查看详情",
     "loginToViewStocks": "登录后查看完整股票信息",
     "loginToViewStocksTitle": "解锁完整投资机会",
-    "loginToViewStocksDesc": "登录后查看实时股价、涨幅分析和更多投资机会",
+    "loginToViewStocksDesc": "登录后查看更多投资机会，记录你的投资灵感",
     "loginToViewStockTitle": "解锁查看详情",
     "loginToViewStockDesc": "查看实时价格和涨幅分析",
+    "loginNow": "立即登录",
     "hiddenInfo": "登录后查看完整信息",
     "recorder": {
       "title": "投资机会记录器",

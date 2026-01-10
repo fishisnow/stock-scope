@@ -410,12 +410,11 @@ def hide_opportunity_info(opportunity: dict) -> dict:
     :return: 隐藏敏感信息后的投资机会数据
     """
     hidden_opportunity = opportunity.copy()
-    # 隐藏敏感信息
-    hidden_opportunity['core_idea'] = None
+    # 只保留标题和标签来吸引用户
+    # 隐藏摘要、来源URL
     hidden_opportunity['summary'] = None
     hidden_opportunity['source_url'] = None
-    hidden_opportunity['trigger_words'] = []
-    # 保留基本信息：id, recorded_at, created_at, updated_at
+    # 保留基本信息：id, core_idea, trigger_words, recorded_at, created_at, updated_at
     return hidden_opportunity
 
 

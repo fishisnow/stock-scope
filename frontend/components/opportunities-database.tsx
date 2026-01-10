@@ -192,7 +192,7 @@ export function OpportunitiesDatabase({ onSelectOpportunity, selectedOpportunity
         {/* 投资机会列表 */}
         {opportunities.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-12">
-            {opportunities.map((opportunity) => (
+            {opportunities.map((opportunity, index) => (
               <Card 
                 key={opportunity.id} 
                 className={`hover:shadow-lg transition-shadow group cursor-pointer relative ${
@@ -272,6 +272,12 @@ export function OpportunitiesDatabase({ onSelectOpportunity, selectedOpportunity
                         <CardDescription className="text-sm leading-relaxed line-clamp-3">
                           {opportunity.summary}
                         </CardDescription>
+                      ) : !isAuthenticated && index > 0 ? (
+                        <div className="relative cursor-pointer" onClick={handleStockClick}>
+                          <CardDescription className="text-sm leading-relaxed line-clamp-3 blur-[2px] select-none">
+                            这是一个投资机会的详细描述内容，包含了核心逻辑和投资理由。登录后即可查看完整内容，了解投资机会的详细分析和相关标的。
+                          </CardDescription>
+                        </div>
                       ) : null}
 
                       {opportunity.trigger_words && opportunity.trigger_words.length > 0 ? (
@@ -290,39 +296,26 @@ export function OpportunitiesDatabase({ onSelectOpportunity, selectedOpportunity
                         {t('loginToViewStocksTitle') || '解锁完整投资机会'}
                       </p>
                       <p className="text-xs text-muted-foreground">
-                        {t('loginToViewStocksDesc') || '登录后查看实时股价、涨幅分析和更多投资机会'}
+                        {t('loginToViewStocksDesc') || '登录后查看更多投资机会，记录你的投资灵感"'}
                       </p>
                     </div>
                   )}
 
-                  {opportunity.stocks && opportunity.stocks.length > 0 && (
-                    <div className="text-sm pt-2 border-t space-y-2 relative">
+                  {opportunity.stocks && opportunity.stocks.length > 0 ? (
+                    <div className="text-sm pt-2 border-t space-y-2">
                       <div className="flex items-center gap-2 font-medium mb-2">
                         <TrendingUp className="h-4 w-4 text-primary" />
                         <span>{t('relatedStocks') || '关联股票'}</span>
                       </div>
-                      {!isAuthenticated && (
-                        <div className="absolute inset-0 z-10 pointer-events-none" />
-                      )}
-                      <div className={`space-y-2 ${!isAuthenticated ? 'blur-sm' : ''}`}>
-                        {opportunity.stocks.map((stock, index) => (
+                      <div className={`space-y-2 ${!isAuthenticated && index > 0 ? 'blur-[2px]' : ''}`}>
+                        {opportunity.stocks.map((stock, stockIndex) => (
                           <div 
-                            key={index} 
-                            className={`flex justify-between items-center relative ${
+                            key={stockIndex} 
+                            className={`flex justify-between items-center ${
                               !isAuthenticated ? 'cursor-pointer' : ''
                             }`}
-                            onClick={handleStockClick}
+                            onClick={!isAuthenticated ? handleStockClick : undefined}
                           >
-                            {!isAuthenticated && (
-                              <div className="absolute inset-0 flex items-center justify-center z-20 bg-background/90 rounded backdrop-blur-sm opacity-0 hover:opacity-100 transition-opacity">
-                                <div className="text-center p-2">
-                                  <Lock className="h-6 w-6 text-primary mx-auto mb-1" />
-                                  <p className="text-xs font-medium text-primary">
-                                    {t('loginToViewStockTitle') || '解锁查看详情'}
-                                  </p>
-                                </div>
-                              </div>
-                            )}
                             <div className="flex items-center gap-2">
                               <span className="font-medium">{stock.stock_name}</span>
                               <Badge variant="outline" className="text-xs">
@@ -350,7 +343,32 @@ export function OpportunitiesDatabase({ onSelectOpportunity, selectedOpportunity
                         ))}
                       </div>
                     </div>
-                  )}
+                  ) : !isAuthenticated && index > 0 ? (
+                    <div className="text-sm pt-2 border-t space-y-2 cursor-pointer" onClick={handleStockClick}>
+                      <div className="flex items-center gap-2 font-medium mb-2">
+                        <TrendingUp className="h-4 w-4 text-primary" />
+                        <span>{t('relatedStocks') || '关联股票'}</span>
+                      </div>
+                      <div className="space-y-2 blur-[2px] select-none">
+                        {[1, 2, 3].map((i) => (
+                          <div key={i} className="flex justify-between items-center">
+                            <div className="flex items-center gap-2">
+                              <span className="font-medium">示例股票 {i}</span>
+                              <Badge variant="outline" className="text-xs">
+                                00000{i}
+                              </Badge>
+                              <span className="text-xs text-muted-foreground">
+                                A股
+                              </span>
+                            </div>
+                            <div className="text-sm font-semibold text-red-600">
+                              +8.88%
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ) : null}
                 </CardContent>
               </Card>
             ))}
