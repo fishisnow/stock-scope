@@ -1,23 +1,12 @@
 import type React from "react"
 import type { Metadata } from "next"
-import { GeistSans } from "geist/font/sans"
-import { GeistMono } from "geist/font/mono"
-import { Playfair_Display } from "next/font/google"
 import { Analytics } from "@vercel/analytics/next"
 import { Suspense } from "react"
-import { NextIntlClientProvider } from 'next-intl';
-import { getMessages } from 'next-intl/server';
-import { routing } from '@/i18n/routing';
-import { notFound } from 'next/navigation';
-import { AuthProvider } from '@/lib/auth-context';
-import { Toaster } from '@/components/ui/toaster';
-import "../globals.css"
-
-const playfair = Playfair_Display({
-  subsets: ["latin"],
-  variable: "--font-playfair",
-  display: "swap",
-})
+import { NextIntlClientProvider } from "next-intl"
+import { getMessages } from "next-intl/server"
+import { routing } from "@/i18n/routing"
+import { notFound } from "next/navigation"
+import { Toaster } from "@/components/ui/toaster"
 
 export const metadata: Metadata = {
   title: "StockScope - AI-Powered Investment Opportunities",
@@ -48,17 +37,11 @@ export default async function LocaleLayout({
   const messages = await getMessages();
 
   return (
-    <html lang={locale}>
-      <body className={`font-sans ${GeistSans.variable} ${GeistMono.variable} ${playfair.variable}`} suppressHydrationWarning>
-        <NextIntlClientProvider messages={messages}>
-          <AuthProvider>
-            <Suspense fallback={null}>{children}</Suspense>
-            <Toaster />
-            <Analytics />
-          </AuthProvider>
-        </NextIntlClientProvider>
-      </body>
-    </html>
+    <NextIntlClientProvider messages={messages}>
+      <Suspense fallback={null}>{children}</Suspense>
+      <Toaster />
+      <Analytics />
+    </NextIntlClientProvider>
   )
 }
 
