@@ -611,8 +611,7 @@ def get_investment_opportunities():
         # 统一查询逻辑：支持分页
         if user:
             # 已登录用户：查询该用户的所有投资机会
-            user_id = user['id']
-            query = supabase_client.table('investment_opportunities').select('*', count='exact').eq('user_id', user_id)
+            query = supabase_client.table('investment_opportunities').select('*', count='exact')
         else:
             # 未登录用户：查询所有用户的投资机会（不限制 user_id）
             # 不返回 user_id 字段，避免暴露用户信息

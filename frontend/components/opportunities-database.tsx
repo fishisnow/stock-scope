@@ -32,6 +32,7 @@ interface InvestmentOpportunity {
   recorded_at: string
   created_at?: string
   updated_at?: string
+  user_id?: string
 }
 
 // 截断 URL 显示
@@ -58,7 +59,7 @@ interface OpportunitiesDatabaseProps {
 }
 
 export function OpportunitiesDatabase({ onSelectOpportunity, selectedOpportunityId, onOpportunityChange, onOpenRecorder, onEditOpportunity }: OpportunitiesDatabaseProps = {}) {
-  const { session } = useAuth()
+  const { session, user } = useAuth()
   const t = useTranslations('opportunity')
   const tRecorder = useTranslations('opportunity.recorder')
   const router = useRouter()
@@ -216,7 +217,7 @@ export function OpportunitiesDatabase({ onSelectOpportunity, selectedOpportunity
                         </div>
                       )}
                     </CardTitle>
-                    {isAuthenticated && (
+                    {isAuthenticated && opportunity.user_id === user?.id && (
                       <div className="flex gap-1 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
                         <Button
                           variant="ghost"
