@@ -6,7 +6,7 @@ import remarkGfm from "remark-gfm"
 import remarkBreaks from "remark-breaks"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Calendar, ExternalLink, Lightbulb, TrendingUp, ChevronRight, Lock } from "lucide-react"
+import { Calendar, ExternalLink, Lightbulb, TrendingUp, ChevronRight, ChevronLeft, Lock } from "lucide-react"
 import { useAuth } from '@/lib/auth-context'
 import { useTranslations } from 'next-intl'
 import { useRouter, usePathname } from '@/i18n/routing'
@@ -37,16 +37,19 @@ interface InvestmentOpportunity {
 interface OpportunityOfTheDayProps {
   selectedOpportunity?: InvestmentOpportunity | null
   onOpportunityChange?: number | (() => void)
+  opportunityId?: number | string
   isLatest?: boolean // 标识是否为最新的投资机会
 }
 
-export function OpportunityOfTheDay({ selectedOpportunity, onOpportunityChange, isLatest = true }: OpportunityOfTheDayProps = {}) {
+export function OpportunityOfTheDay({ selectedOpportunity, onOpportunityChange, opportunityId, isLatest = true }: OpportunityOfTheDayProps = {}) {
   const { session } = useAuth()
   const t = useTranslations('opportunity')
   const router = useRouter()
   const pathname = usePathname()
   const [opportunity, setOpportunity] = useState<InvestmentOpportunity | null>(null)
   const [loading, setLoading] = useState(true)
+  const [prevOpportunityId, setPrevOpportunityId] = useState<number | null>(null)
+  const [nextOpportunityId, setNextOpportunityId] = useState<number | null>(null)
   const isAuthenticated = !!session?.access_token
 
   // 获取认证头（仅在已登录时添加）
@@ -78,6 +81,58 @@ export function OpportunityOfTheDay({ selectedOpportunity, onOpportunityChange, 
     }
   }
 
+  const loadOpportunityById = async (id: number | string) => {
+    try {
+      const response = await fetch(`${API_URL}/api/investment-opportunities/${id}`, {
+        headers: getAuthHeaders()
+      })
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
+      }
+      const result = await response.json()
+      if (result.success && result.data) {
+        setOpportunity(result.data)
+      }
+    } catch (error) {
+      console.error('加载投资机会失败:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const loadAdjacentOpportunities = async (id: number | string) => {
+    try {
+      const response = await fetch(`${API_URL}/api/investment-opportunities?page=1&limit=100`, {
+        headers: getAuthHeaders()
+      })
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
+      }
+      const result = await response.json()
+      if (!result.success || !Array.isArray(result.data)) {
+        setPrevOpportunityId(null)
+        setNextOpportunityId(null)
+        return
+      }
+      const opportunities: InvestmentOpportunity[] = result.data
+      const currentId = typeof id === 'string' ? Number(id) : id
+      const currentIndex = opportunities.findIndex((item) => item.id === currentId)
+      if (currentIndex === -1) {
+        setPrevOpportunityId(null)
+        setNextOpportunityId(null)
+        return
+      }
+      const prevItem = opportunities[currentIndex + 1]
+      const nextItem = opportunities[currentIndex - 1]
+      setPrevOpportunityId(prevItem?.id ?? null)
+      setNextOpportunityId(nextItem?.id ?? null)
+    } catch (error) {
+      console.error('加载相邻投资机会失败:', error)
+      setPrevOpportunityId(null)
+      setNextOpportunityId(null)
+    }
+  }
+
   // 处理未登录用户点击股票卡片
   const handleStockCardClick = (stock: StockInfo) => {
     if (!isAuthenticated) {
@@ -98,8 +153,15 @@ export function OpportunityOfTheDay({ selectedOpportunity, onOpportunityChange, 
       setLoading(false)
       return
     }
+    if (opportunityId !== undefined && opportunityId !== null) {
+      setLoading(true)
+      loadOpportunityById(opportunityId)
+      loadAdjacentOpportunities(opportunityId)
+      return
+    }
+    setLoading(true)
     loadLatestOpportunity()
-  }, [selectedOpportunity, onOpportunityChange])
+  }, [selectedOpportunity, onOpportunityChange, opportunityId])
 
   if (loading) {
     return (
@@ -144,13 +206,37 @@ export function OpportunityOfTheDay({ selectedOpportunity, onOpportunityChange, 
             {t('title')}
           </h1>
 
-          <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground mb-8">
-            <Calendar className="h-4 w-4" />
-            <span>{new Date(opportunity.recorded_at).toLocaleDateString(undefined, { 
-              year: 'numeric', 
-              month: 'long', 
-              day: 'numeric' 
-            })}</span>
+          <div className="flex items-center justify-center gap-3 text-sm text-muted-foreground mb-8">
+            {opportunityId !== undefined && opportunityId !== null && (
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={() => prevOpportunityId && router.push(`/opportunity/${prevOpportunityId}`)}
+                disabled={!prevOpportunityId}
+                aria-label={t('previous') || '上一个'}
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+            )}
+            <div className="flex items-center gap-2">
+              <Calendar className="h-4 w-4" />
+              <span>{new Date(opportunity.recorded_at).toLocaleDateString(undefined, { 
+                year: 'numeric', 
+                month: 'long', 
+                day: 'numeric' 
+              })}</span>
+            </div>
+            {opportunityId !== undefined && opportunityId !== null && (
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={() => nextOpportunityId && router.push(`/opportunity/${nextOpportunityId}`)}
+                disabled={!nextOpportunityId}
+                aria-label={t('next') || '下一个'}
+              >
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            )}
           </div>
         </div>
 

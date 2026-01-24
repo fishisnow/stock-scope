@@ -29,18 +29,12 @@ interface InvestmentOpportunity {
 }
 
 export default function Home() {
-  const [selectedOpportunity, setSelectedOpportunity] = useState<InvestmentOpportunity | null>(null)
   const [opportunityChangeTrigger, setOpportunityChangeTrigger] = useState(0)
   const [recorderOpen, setRecorderOpen] = useState(false)
   const [editingOpportunity, setEditingOpportunity] = useState<InvestmentOpportunity | null>(null)
 
-  const handleSelectOpportunity = (opportunity: InvestmentOpportunity) => {
-    setSelectedOpportunity(opportunity)
-  }
-
   const handleOpportunityChange = () => {
     setOpportunityChangeTrigger(prev => prev + 1)
-    setSelectedOpportunity(null) // 重置选中，显示最新的
   }
 
   const handleOpenRecorder = () => {
@@ -62,13 +56,10 @@ export default function Home() {
       <Header onRecordOpportunity={handleOpenRecorder} />
       <main>
         <OpportunityOfTheDay 
-          selectedOpportunity={selectedOpportunity}
           onOpportunityChange={opportunityChangeTrigger}
         />
         {/* <TrendsSection /> */}
         <OpportunitiesDatabase 
-          onSelectOpportunity={handleSelectOpportunity}
-          selectedOpportunityId={selectedOpportunity?.id}
           onOpportunityChange={handleOpportunityChange}
           onOpenRecorder={handleOpenRecorder}
           onEditOpportunity={handleEditOpportunity}

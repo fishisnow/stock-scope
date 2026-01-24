@@ -51,14 +51,12 @@ const truncateUrl = (url: string, maxLength: number = 50) => {
 }
 
 interface OpportunitiesDatabaseProps {
-  onSelectOpportunity?: (opportunity: InvestmentOpportunity) => void
-  selectedOpportunityId?: number
   onOpportunityChange?: () => void
   onOpenRecorder?: () => void
   onEditOpportunity?: (opportunity: InvestmentOpportunity) => void
 }
 
-export function OpportunitiesDatabase({ onSelectOpportunity, selectedOpportunityId, onOpportunityChange, onOpenRecorder, onEditOpportunity }: OpportunitiesDatabaseProps = {}) {
+export function OpportunitiesDatabase({ onOpportunityChange, onOpenRecorder, onEditOpportunity }: OpportunitiesDatabaseProps = {}) {
   const { session, user, isLoading } = useAuth()
   const t = useTranslations('opportunity')
   const tRecorder = useTranslations('opportunity.recorder')
@@ -197,15 +195,11 @@ export function OpportunitiesDatabase({ onSelectOpportunity, selectedOpportunity
             {opportunities.map((opportunity, index) => (
               <Card 
                 key={opportunity.id} 
-                className={`hover:shadow-lg transition-shadow group cursor-pointer relative ${
-                  selectedOpportunityId === opportunity.id ? 'ring-2 ring-primary' : ''
-                }`}
+                className="hover:shadow-lg transition-shadow group cursor-pointer relative"
                 onClick={() => {
-                  if (onSelectOpportunity) {
-                    onSelectOpportunity(opportunity)
+                  if (opportunity.id) {
+                    router.push(`/opportunity/${opportunity.id}`)
                   }
-                  // 点击卡片可以滚动到顶部查看详情
-                  window.scrollTo({ top: 0, behavior: 'smooth' })
                 }}
               >
                 <CardHeader className="pb-3">

@@ -707,6 +707,76 @@ def get_investment_opportunities():
             "error": f"获取投资机会记录失败: {str(e)}"
         }), 500
 
+@investment_opportunities_bp.route('/<int:opportunity_id>', methods=['GET'])
+@optional_token
+def get_investment_opportunity(opportunity_id):
+    """
+    获取单条投资机会记录详情
+
+    对于已登录用户：只能访问自己的记录（包含股票信息）
+    对于未登录用户：
+        - 如果是最新记录，返回完整信息（包含股票信息）
+        - 其他记录进行信息隐藏处理（隐藏 summary, source_url，stocks 为空）
+    """
+    try:
+        user = request.current_user
+        supabase_client = get_user_supabase_client()
+        if not supabase_client:
+            return jsonify({
+                "success": False,
+                "error": "数据库连接失败"
+            }), 500
+
+        if user:
+            # 已登录用户：只能访问自己的记录
+            response = supabase_client.table('investment_opportunities').select('*').eq('id', opportunity_id).eq('user_id', user['id']).execute()
+            if not response.data:
+                return jsonify({
+                    "success": False,
+                    "error": "记录不存在或无权限访问"
+                }), 404
+            opportunity = response.data[0]
+        else:
+            # 未登录用户：不返回 user_id 字段
+            response = supabase_client.table('investment_opportunities').select(
+                'id, core_idea, source_url, summary, trigger_words, recorded_at, created_at, updated_at'
+            ).eq('id', opportunity_id).execute()
+            if not response.data:
+                return jsonify({
+                    "success": False,
+                    "error": "记录不存在"
+                }), 404
+            opportunity = response.data[0]
+
+        # 判断是否为最新记录（仅未登录用户需要）
+        is_latest = False
+        if not user:
+            latest_response = supabase_client.table('investment_opportunities').select('id').order('created_at', desc=True).limit(1).execute()
+            if latest_response.data:
+                is_latest = latest_response.data[0].get('id') == opportunity_id
+
+        # 查询关联股票并补充涨幅
+        if user or is_latest:
+            stocks_response = supabase_client.table('investment_opportunity_stocks').select('*').eq('opportunity_id', opportunity_id).execute()
+            stocks = stocks_response.data if stocks_response.data else []
+            for stock in stocks:
+                enrich_stock_with_price_change(stock)
+            opportunity['stocks'] = stocks
+        else:
+            opportunity = hide_opportunity_info(opportunity)
+            opportunity['stocks'] = []
+
+        return jsonify({
+            "success": True,
+            "data": opportunity
+        })
+
+    except Exception as e:
+        return jsonify({
+            "success": False,
+            "error": f"获取投资机会记录失败: {str(e)}"
+        }), 500
+
 @investment_opportunities_bp.route('/<int:opportunity_id>', methods=['PUT'])
 @token_required
 def update_investment_opportunity(opportunity_id):

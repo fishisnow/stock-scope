@@ -179,6 +179,8 @@
     "latestPrice": "Latest Price",
     "priceChangeSinceRecorded": "Price Change Since Recorded",
     "relatedStocksDesc": "Related stocks that may benefit from this investment opportunity",
+    "previous": "Previous",
+    "next": "Next",
     "loginToView": "Login to View Details",
     "loginToViewStocks": "Login to view complete stock information",
     "loginToViewStocksTitle": "Unlock Complete Investment Opportunities",

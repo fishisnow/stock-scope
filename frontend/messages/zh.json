@@ -179,6 +179,8 @@
     "latestPrice": "最新价",
     "priceChangeSinceRecorded": "距今涨幅",
     "relatedStocksDesc": "该投资机会可能受益的相关标的",
+    "previous": "上一个",
+    "next": "下一个",
     "loginToView": "登录查看详情",
     "loginToViewStocks": "登录后查看完整股票信息",
     "loginToViewStocksTitle": "解锁完整投资机会",
