@@ -1,6 +1,9 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import ReactMarkdown from "react-markdown"
+import remarkGfm from "remark-gfm"
+import remarkBreaks from "remark-breaks"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Calendar, ExternalLink, Lightbulb, TrendingUp, ChevronRight, Lock } from "lucide-react"
@@ -93,17 +96,10 @@ export function OpportunityOfTheDay({ selectedOpportunity, onOpportunityChange, 
     if (selectedOpportunity) {
       setOpportunity(selectedOpportunity)
       setLoading(false)
-    } else {
-      loadLatestOpportunity()
+      return
     }
-  }, [selectedOpportunity])
-
-  // 当机会更新时，重新加载
-  useEffect(() => {
-    if (onOpportunityChange !== undefined && !selectedOpportunity) {
-      loadLatestOpportunity()
-    }
-  }, [onOpportunityChange, selectedOpportunity])
+    loadLatestOpportunity()
+  }, [selectedOpportunity, onOpportunityChange])
 
   if (loading) {
     return (
@@ -188,9 +184,14 @@ export function OpportunityOfTheDay({ selectedOpportunity, onOpportunityChange, 
             </div>
           )}
 
-          {opportunity.summary && (
-            <div className="prose prose-lg max-w-none space-y-4 text-foreground/90 leading-relaxed">
-              <p className="whitespace-pre-wrap">{opportunity.summary}</p>
+          {opportunity.summary?.trim() && (
+            <div className="prose prose-lg max-w-none text-foreground/90 leading-relaxed">
+              <ReactMarkdown remarkPlugins={[remarkGfm, remarkBreaks]}>
+                {opportunity.summary.replace(/\n{2,}/g, (match) => {
+                  const blanks = match.length - 1
+                  return `\n${Array(blanks).fill("&nbsp;").join("\n")}\n`
+                })}
+              </ReactMarkdown>
             </div>
           )}
 

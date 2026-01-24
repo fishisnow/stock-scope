@@ -59,7 +59,7 @@ interface OpportunitiesDatabaseProps {
 }
 
 export function OpportunitiesDatabase({ onSelectOpportunity, selectedOpportunityId, onOpportunityChange, onOpenRecorder, onEditOpportunity }: OpportunitiesDatabaseProps = {}) {
-  const { session, user } = useAuth()
+  const { session, user, isLoading } = useAuth()
   const t = useTranslations('opportunity')
   const tRecorder = useTranslations('opportunity.recorder')
   const router = useRouter()
@@ -160,9 +160,10 @@ export function OpportunitiesDatabase({ onSelectOpportunity, selectedOpportunity
   }
 
   useEffect(() => {
+    if (isLoading) return
     // 无论是否登录都加载投资机会（未登录用户会看到隐藏的信息）
     loadOpportunities()
-  }, [session?.access_token])
+  }, [isLoading, session?.access_token])
 
   // 当投资机会记录器添加/更新后，重新加载列表
   const handleOpportunityChange = () => {

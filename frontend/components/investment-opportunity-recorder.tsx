@@ -433,10 +433,14 @@ export function InvestmentOpportunityRecorder({
                       {formData.trigger_words?.map((word, index) => (
                         <Badge key={index} variant="secondary" className="gap-1">
                           {word}
-                          <X
-                            className="h-3 w-3 cursor-pointer"
+                          <button
+                            type="button"
+                            aria-label={`${t('removeTriggerWord') || '删除触发词'}: ${word}`}
                             onClick={() => removeTriggerWord(word)}
-                          />
+                            className="inline-flex h-4 w-4 items-center justify-center rounded-sm hover:bg-muted-foreground/10"
+                          >
+                            <X className="h-3 w-3" />
+                          </button>
                         </Badge>
                       ))}
                     </div>

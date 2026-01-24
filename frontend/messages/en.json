@@ -204,6 +204,7 @@
       "summaryPlaceholder": "Describe this investment opportunity in detail...",
       "triggerWordsLabel": "Trigger Words (3-5 keywords)",
       "triggerWordPlaceholder": "Enter keyword",
+      "removeTriggerWord": "Remove trigger word",
       "add": "Add",
       "marketLabel": "Market",
       "stockNameLabel": "Stock Name",

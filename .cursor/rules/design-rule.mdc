@@ -7,3 +7,8 @@ alwaysApply: false
 - Clean white background with subtle secondary sections
 - Card-based layouts with hover effects
 - Professional editorial aesthetic with generous white space
+
+**Internationalization:**
+
+- This is a multilingual website.
+- When generating frontend UI, add i18n message keys/constants for all user-facing strings and use the translation helper to render them (avoid hardcoded text).

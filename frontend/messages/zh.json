@@ -204,6 +204,7 @@
       "summaryPlaceholder": "详细描述这个投资机会...",
       "triggerWordsLabel": "触发词（3-5个关键词）",
       "triggerWordPlaceholder": "输入关键词",
+      "removeTriggerWord": "删除触发词",
       "add": "添加",
       "marketLabel": "市场",
       "stockNameLabel": "股票名称",
