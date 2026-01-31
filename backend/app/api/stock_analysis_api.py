@@ -2,6 +2,7 @@
 股票分析API端点
 提供基于搜索和AI的股票投资机会分析接口
 """
+import logging
 
 from flask import Blueprint, request, jsonify
 from app.api.auth_middleware import token_required, optional_token, get_user_supabase_client
@@ -21,7 +22,7 @@ from app.search_engine import (
     DeepSeekAnalyzer,
     StockAnalysisWorkflow
 )
-from app.utils.futu_data import get_stock_current_price
+from app.utils.futu_data import get_stock_current_price, get_stock_history_kline
 
 # 加载环境变量
 load_dotenv()
@@ -394,6 +395,74 @@ def get_stock_price():
         return jsonify({
             "success": False,
             "error": f"获取股票价格失败: {str(e)}"
+        }), 500
+
+
+@stock_analysis_bp.route('/kline-history', methods=['GET'])
+def get_kline_history():
+    """
+    获取指定股票的历史K线数据（默认日K）
+    
+    查询参数:
+    - code: 股票代码
+    - market: 市场 ('A' 或 'HK')
+    - start: 开始日期 'YYYY-MM-DD'
+    - end: 结束日期 'YYYY-MM-DD'
+    - max_count: 最大返回条数（可选，默认1000）
+    - ktype: K线类型（K_DAY, K_WEEK, K_MON, K_QUARTER, K_YEAR）
+    
+    响应:
+    {
+        "success": true,
+        "data": [
+            {
+                "date": "2024-01-01",
+                "open": 10.0,
+                "close": 10.5,
+                "high": 10.8,
+                "low": 9.9,
+                "volume": 1000000
+            }
+        ]
+    }
+    """
+    try:
+        code = request.args.get('code', '').strip()
+        market = request.args.get('market', '').upper()
+        start = request.args.get('start', '').strip()
+        end = request.args.get('end', '').strip()
+        max_count = request.args.get('max_count', '1000').strip()
+        ktype = request.args.get('ktype', 'K_DAY').strip().upper()
+        
+        if not code or market not in ['A', 'HK'] or not start or not end:
+            return jsonify({
+                "success": False,
+                "error": "缺少必需参数: code, market, start 或 end"
+            }), 400
+        
+        try:
+            max_count = int(max_count)
+        except ValueError:
+            max_count = 1000
+        
+        result = get_stock_history_kline(
+            code=code,
+            market=market,
+            start=start,
+            end=end,
+            max_count=max_count,
+            ktype=ktype
+        )
+        
+        return jsonify({
+            "success": True,
+            "data": result
+        })
+    except Exception as e:
+        logging.error(f"get_kline_history error:{e}")
+        return jsonify({
+            "success": False,
+            "error": f"获取K线历史数据失败: {str(e)}"
         }), 500
 
 # ============================================

@@ -142,8 +142,9 @@ export function OpportunityOfTheDay({ selectedOpportunity, onOpportunityChange, 
       // 触发自定义事件来打开登录对话框
       window.dispatchEvent(new CustomEvent('openLoginDialog'))
     } else {
-      // 已登录用户正常跳转
-      window.location.href = `/market?code=${stock.stock_code}&market=${stock.market}`
+      // 已登录用户跳转到K线详情页
+      const query = new URLSearchParams({ name: stock.stock_name })
+      router.push(`/stock/${stock.market}/${encodeURIComponent(stock.stock_code)}?${query.toString()}`)
     }
   }
 

@@ -411,6 +411,86 @@ def get_stock_current_price(code: str, market: str) -> Dict:
         raise Exception(f"获取股票价格失败: {str(e)}")
 
 
+def get_stock_history_kline(code: str, market: str, start: str, end: str, max_count: int = 1000, ktype: str = "K_DAY") -> List[Dict]:
+    """
+    获取指定股票的历史K线数据（默认日K）
+    
+    :param code: 股票代码，如 '000001'
+    :param market: 市场类型，'A' 或 'HK'
+    :param start: 开始日期，格式 'YYYY-MM-DD'
+    :param end: 结束日期，格式 'YYYY-MM-DD'
+    :param max_count: 最大返回条数
+    :return: K线数据列表，格式如下：
+        [
+            {
+                'date': '2024-01-01',
+                'open': 10.0,
+                'close': 10.5,
+                'high': 10.8,
+                'low': 9.9,
+                'volume': 1000000
+            },
+            ...
+        ]
+    """
+    try:
+        futu_code = convert_to_futu_code(code, market)
+        futu_host = os.getenv('FUTU_HOST', '127.0.0.1')
+        futu_port = int(os.getenv('FUTU_PORT', '11111'))
+        quote_ctx = OpenQuoteContext(host=futu_host, port=futu_port)
+        
+        try:
+            result = []
+            page_req_key = None
+            remaining = max_count
+            
+            ktype_mapping = {
+                "K_DAY": KLType.K_DAY,
+                "K_WEEK": KLType.K_WEEK,
+                "K_MON": KLType.K_MON,
+                "K_QUARTER": KLType.K_QUARTER,
+                "K_YEAR": KLType.K_YEAR
+            }
+            ktype_value = ktype_mapping.get(ktype, KLType.K_DAY)
+            
+            while remaining > 0:
+                ret, data, page_req_key = quote_ctx.request_history_kline(
+                    code=futu_code,
+                    start=start,
+                    end=end,
+                    max_count=remaining,
+                    ktype=ktype_value,
+                    page_req_key=page_req_key
+                )
+                
+                if ret != RET_OK:
+                    raise Exception(f"获取K线数据失败: {data}")
+                
+                if data.empty:
+                    break
+                
+                for _, row in data.iterrows():
+                    time_key = str(row.get('time_key', '')).split(' ')[0]
+                    result.append({
+                        'date': time_key,
+                        'open': float(row['open']) if pd.notna(row['open']) else None,
+                        'close': float(row['close']) if pd.notna(row['close']) else None,
+                        'high': float(row['high']) if pd.notna(row['high']) else None,
+                        'low': float(row['low']) if pd.notna(row['low']) else None,
+                        'volume': int(row['volume']) if pd.notna(row['volume']) else 0
+                    })
+                
+                remaining = max_count - len(result)
+                if not page_req_key:
+                    break
+            
+            return result
+        finally:
+            quote_ctx.close()
+    except Exception as e:
+        raise Exception(f"获取K线历史数据失败: {str(e)}")
+
+
 if __name__ == '__main__':
     # 测试代码
     data = get_all_stock_data()

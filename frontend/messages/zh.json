@@ -229,6 +229,21 @@
       "coreIdeaRequired": "请输入核心观点",
       "selectedStocks": "已选择的股票"
     }
+  },
+  "stock": {
+    "title": "股票K线",
+    "subtitle": "股票K线详情",
+    "startDate": "开始日期",
+    "endDate": "结束日期",
+    "klineType": "K线类型",
+    "klineDay": "日线",
+    "klineWeek": "周线",
+    "klineMonth": "月线",
+    "klineQuarter": "季线",
+    "klineYear": "年线",
+    "refresh": "刷新",
+    "back": "返回",
+    "loadFailed": "加载K线数据失败"
   }
 }
 

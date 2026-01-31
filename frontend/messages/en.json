@@ -229,6 +229,21 @@
       "coreIdeaRequired": "Please enter core idea",
       "selectedStocks": "Selected Stocks"
     }
+  },
+  "stock": {
+    "title": "Stock K-Line",
+    "subtitle": "K-Line Details",
+    "startDate": "Start Date",
+    "endDate": "End Date",
+    "klineType": "K-Line Type",
+    "klineDay": "Day",
+    "klineWeek": "Week",
+    "klineMonth": "Month",
+    "klineQuarter": "Quarter",
+    "klineYear": "Year",
+    "refresh": "Refresh",
+    "back": "Back",
+    "loadFailed": "Failed to load K-line data"
   }
 }
 
