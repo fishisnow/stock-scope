@@ -1,6 +1,5 @@
 import type React from "react"
 import type { Metadata } from "next"
-import { Analytics } from "@vercel/analytics/next"
 import { Suspense } from "react"
 import { NextIntlClientProvider } from "next-intl"
 import { getMessages } from "next-intl/server"
@@ -40,7 +39,6 @@ export default async function LocaleLayout({
     <NextIntlClientProvider messages={messages}>
       <Suspense fallback={null}>{children}</Suspense>
       <Toaster />
-      <Analytics />
     </NextIntlClientProvider>
   )
 }

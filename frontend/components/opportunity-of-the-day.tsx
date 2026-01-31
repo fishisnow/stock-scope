@@ -161,7 +161,7 @@ export function OpportunityOfTheDay({ selectedOpportunity, onOpportunityChange, 
     }
     setLoading(true)
     loadLatestOpportunity()
-  }, [selectedOpportunity, onOpportunityChange, opportunityId])
+  }, [selectedOpportunity, onOpportunityChange, opportunityId, session?.access_token])
 
   if (loading) {
     return (
