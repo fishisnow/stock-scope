@@ -42,15 +42,22 @@ export function StockKLinePage({ code, market, name }: StockKLinePageProps) {
   const getRangeByType = useCallback((type: string) => {
     const now = new Date()
     const start = new Date(now)
+    // 长期趋势带需要至少90个数据点才能计算EMA(90)
+    // 为了保证数据充足，我们需要获取更多的历史数据
     if (type === "K_WEEK") {
+      // 周K：至少需要90周 ≈ 1.73年，取3年保证数据充足
       start.setFullYear(start.getFullYear() - 3)
     } else if (type === "K_MON") {
-      start.setFullYear(start.getFullYear() - 5)
-    } else if (type === "K_QUARTER") {
+      // 月K：至少需要90个月 ≈ 7.5年，取10年保证数据充足
       start.setFullYear(start.getFullYear() - 10)
+    } else if (type === "K_QUARTER") {
+      // 季K：至少需要90个季度 ≈ 22.5年，取25年保证数据充足
+      start.setFullYear(start.getFullYear() - 25)
     } else if (type === "K_YEAR") {
-      start.setFullYear(start.getFullYear() - 20)
+      // 年K：从2000年开始查询（避免接口报错，且覆盖大部分有效数据）
+      start.setFullYear(2000, 0, 1)
     } else {
+      // 日K：至少需要90天，取1年保证数据充足
       start.setFullYear(start.getFullYear() - 1)
     }
     return { start: formatDate(start), end: formatDate(now) }
