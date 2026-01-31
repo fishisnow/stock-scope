@@ -29,6 +29,9 @@ const getCssVar = (name: string, fallback: string) => {
   return value || fallback
 }
 
+const formatNumber = (value: number | null | undefined, digits = 3) =>
+  typeof value === "number" ? value.toFixed(digits) : "--"
+
 const calculateMA = (data: CandleData[], period: number): (number | null)[] => {
   const ma: (number | null)[] = []
   for (let i = 0; i < data.length; i += 1) {
@@ -466,6 +469,7 @@ export function KLineChart({
           const [open, close, low, high] = candleValue || []
           const priceValue = isIntraday ? chartData.lineValues[dataIndex] : close
           if (priceValue === null || priceValue === undefined) return ""
+          if (!isIntraday && (open === null || close === null || low === null || high === null)) return ""
           const refOpen = !isIntraday ? open : (data[dataIndex]?.last_close ?? chartData.lineValues[0])
           const changeValue =
             typeof refOpen === "number" ? priceValue - refOpen : 0
@@ -492,19 +496,19 @@ export function KLineChart({
                   : `
               <div style="display: flex; justify-content: space-between; margin-bottom: 6px;">
                 <span style="color: ${colors.textMuted}">开盘价</span>
-                <span style="color: ${colors.text}">${open.toFixed(3)}</span>
+                <span style="color: ${colors.text}">${formatNumber(open)}</span>
               </div>
               <div style="display: flex; justify-content: space-between; margin-bottom: 6px;">
                 <span style="color: ${colors.textMuted}">最高价</span>
-                <span style="color: ${colors.up}">${high.toFixed(3)}</span>
+                <span style="color: ${colors.up}">${formatNumber(high)}</span>
               </div>
               <div style="display: flex; justify-content: space-between; margin-bottom: 6px;">
                 <span style="color: ${colors.textMuted}">最低价</span>
-                <span style="color: ${colors.down}">${low.toFixed(3)}</span>
+                <span style="color: ${colors.down}">${formatNumber(low)}</span>
               </div>
               <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
                 <span style="color: ${colors.textMuted}">收盘价</span>
-                <span style="color: ${changeColor}">${close.toFixed(3)}</span>
+                <span style="color: ${changeColor}">${formatNumber(close)}</span>
               </div>
               `
               }
