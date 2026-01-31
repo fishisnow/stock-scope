@@ -470,7 +470,10 @@ export function KLineChart({
           const priceValue = isIntraday ? chartData.lineValues[dataIndex] : close
           if (priceValue === null || priceValue === undefined) return ""
           if (!isIntraday && (open === null || close === null || low === null || high === null)) return ""
-          const refOpen = !isIntraday ? open : (data[dataIndex]?.last_close ?? chartData.lineValues[0])
+          const prevClose = !isIntraday && dataIndex > 0 ? data[dataIndex - 1]?.close : null
+          const refOpen = isIntraday
+            ? (data[dataIndex]?.last_close ?? chartData.lineValues[0])
+            : (prevClose ?? open)
           const changeValue =
             typeof refOpen === "number" ? priceValue - refOpen : 0
           const changeRate =
