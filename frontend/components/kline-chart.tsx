@@ -862,7 +862,7 @@ export function KLineChart({
               },
             ]
           : []),
-      ],
+      ] as echarts.SeriesOption[],
       legend: showMA
         ? {
             data: ["MA5", "MA10", "MA20"],
