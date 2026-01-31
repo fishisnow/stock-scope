@@ -7,11 +7,13 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Calendar, TrendingUp, TrendingDown, ChevronLeft, ChevronRight, Sparkles } from "lucide-react"
 import { useTranslations } from 'next-intl'
+import { Link } from "@/i18n/routing"
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5001"
 
 interface Stock {
   name: string
+  code?: string
   changeRatio: string | number
   volume: string | number
   volumeRatio: string | number
@@ -33,10 +35,29 @@ interface FutuData {
 }
 
 // StockTable Component
-function StockTable({ title, data, dataType, t }: { title: string; data: Stock[]; dataType: string; t: any }) {
+function StockTable({
+  title,
+  data,
+  dataType,
+  marketKey,
+  t,
+}: {
+  title: string
+  data: Stock[]
+  dataType: string
+  marketKey: string
+  t: any
+}) {
   const [showAll, setShowAll] = useState(false)
   const displayData = showAll ? data : data.slice(0, 8)
   const hasMore = data.length > 8
+  const getStockHref = (stock: Stock) => {
+    const rawCode = String(stock.code || "").trim()
+    if (!rawCode) return ""
+    const normalizedCode = rawCode.includes(".") ? rawCode.split(".")[1] : rawCode
+    const nameParam = stock.name ? `?name=${encodeURIComponent(stock.name)}` : ""
+    return `/stock/${marketKey}/${normalizedCode}${nameParam}`
+  }
 
   return (
     <Card className="hover:shadow-lg transition-all duration-300">
@@ -91,6 +112,7 @@ function StockTable({ title, data, dataType, t }: { title: string; data: Stock[]
                 const isNegative = changeRatio < 0
                 const isTopThree = index < 3
 
+                const stockHref = getStockHref(stock)
                 return (
                   <tr
                     key={index}
@@ -104,7 +126,19 @@ function StockTable({ title, data, dataType, t }: { title: string; data: Stock[]
                       </span>
                     </td>
                     <td className="py-3 px-2">
-                      <span className="text-xs sm:text-sm font-semibold truncate block max-w-[120px]">{stock.name || "-"}</span>
+                      {stockHref ? (
+                        <Link
+                          href={stockHref}
+                          className="text-xs sm:text-sm font-semibold truncate block max-w-[120px] text-primary hover:underline"
+                          title={stock.name || ""}
+                        >
+                          {stock.name || "-"}
+                        </Link>
+                      ) : (
+                        <span className="text-xs sm:text-sm font-semibold truncate block max-w-[120px]">
+                          {stock.name || "-"}
+                        </span>
+                      )}
                     </td>
                     {(dataType === "top_turnover" || dataType === "intersection") && (
                       <td className="py-3 px-2 text-right hidden sm:table-cell">
@@ -139,8 +173,8 @@ function StockTable({ title, data, dataType, t }: { title: string; data: Stock[]
                     <td className="py-3 px-2 text-right hidden lg:table-cell">
                       <span className="text-xs sm:text-sm font-mono">{parseFloat(String(stock.pe || 0)).toFixed(1)}</span>
                     </td>
-                  </tr>
-                )
+                    </tr>
+                  )
               })}
             </tbody>
           </table>
@@ -272,7 +306,13 @@ export default function MarketPage() {
                 <h3 className="font-serif text-2xl text-primary">{t('sections.topPerformers')}</h3>
                 <div className="h-1 flex-1 bg-primary/20 rounded-full" />
               </div>
-              <StockTable title={t('sections.highChangeVolume')} data={marketData.intersection} dataType="intersection" t={t} />
+              <StockTable
+                title={t('sections.highChangeVolume')}
+                data={marketData.intersection}
+                dataType="intersection"
+                marketKey={marketKey}
+                t={t}
+              />
             </div>
           )}
 
@@ -287,10 +327,22 @@ export default function MarketPage() {
               </div>
               <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
                 {marketData.top_change && marketData.top_change.length > 0 && (
-                  <StockTable title={t('sections.topGainers')} data={marketData.top_change} dataType="top_change" t={t} />
+                  <StockTable
+                    title={t('sections.topGainers')}
+                    data={marketData.top_change}
+                    dataType="top_change"
+                    marketKey={marketKey}
+                    t={t}
+                  />
                 )}
                 {marketData.top_turnover && marketData.top_turnover.length > 0 && (
-                  <StockTable title={t('sections.highestVolume')} data={marketData.top_turnover} dataType="top_turnover" t={t} />
+                  <StockTable
+                    title={t('sections.highestVolume')}
+                    data={marketData.top_turnover}
+                    dataType="top_turnover"
+                    marketKey={marketKey}
+                    t={t}
+                  />
                 )}
               </div>
             </>

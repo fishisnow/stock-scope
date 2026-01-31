@@ -44,7 +44,10 @@ export function StockKLinePage({ code, market, name }: StockKLinePageProps) {
     const start = new Date(now)
     // 长期趋势带需要至少90个数据点才能计算EMA(90)
     // 为了保证数据充足，我们需要获取更多的历史数据
-    if (type === "K_WEEK") {
+    if (type === "K_RT") {
+      // 分时：默认取近24小时（按日期查询）
+      start.setDate(start.getDate() - 1)
+    } else if (type === "K_WEEK") {
       // 周K：至少需要90周 ≈ 1.73年，取3年保证数据充足
       start.setFullYear(start.getFullYear() - 3)
     } else if (type === "K_MON") {

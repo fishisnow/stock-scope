@@ -409,7 +409,7 @@ def get_kline_history():
     - start: 开始日期 'YYYY-MM-DD'
     - end: 结束日期 'YYYY-MM-DD'
     - max_count: 最大返回条数（可选，默认1000）
-    - ktype: K线类型（K_DAY, K_WEEK, K_MON, K_QUARTER, K_YEAR）
+    - ktype: K线类型（K_RT, K_DAY, K_WEEK, K_MON, K_QUARTER, K_YEAR）
     
     响应:
     {

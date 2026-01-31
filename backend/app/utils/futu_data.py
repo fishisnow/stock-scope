@@ -411,6 +411,70 @@ def get_stock_current_price(code: str, market: str) -> Dict:
         raise Exception(f"获取股票价格失败: {str(e)}")
 
 
+def get_stock_rt_data(code: str, market: str) -> List[Dict]:
+    """
+    获取指定股票的分时数据（返回结构与K线兼容）
+    
+    :param code: 股票代码，如 '000001'
+    :param market: 市场类型，'A' 或 'HK'
+    :return: 分时数据列表，格式如下：
+        [
+            {
+                'date': '2024-01-01 09:30:00',
+                'open': 10.0,
+                'close': 10.0,
+                'high': 10.0,
+                'low': 10.0,
+                'volume': 100000
+            },
+            ...
+        ]
+    """
+    try:
+        futu_code = convert_to_futu_code(code, market)
+        futu_host = os.getenv('FUTU_HOST', '127.0.0.1')
+        futu_port = int(os.getenv('FUTU_PORT', '11111'))
+        quote_ctx = OpenQuoteContext(host=futu_host, port=futu_port)
+        
+        try:
+            ret_sub, err_message = quote_ctx.subscribe([futu_code], [SubType.RT_DATA], subscribe_push=False)
+            if ret_sub != RET_OK:
+                raise Exception(f"订阅分时数据失败: {err_message}")
+
+            ret, data = quote_ctx.get_rt_data(futu_code)
+            if ret != RET_OK:
+                raise Exception(f"获取分时数据失败: {data}")
+            
+            if data.empty:
+                return []
+            
+            result = []
+            for _, row in data.iterrows():
+                if bool(row.get('is_blank')):
+                    continue
+                time_value = str(row.get('time', '')).strip()
+                cur_price = float(row['cur_price']) if pd.notna(row.get('cur_price')) else None
+                volume = int(row['volume']) if pd.notna(row.get('volume')) else 0
+                last_close = float(row['last_close']) if pd.notna(row.get('last_close')) else None
+                turnover = float(row['turnover']) if pd.notna(row.get('turnover')) else None
+                result.append({
+                    'date': time_value,
+                    'open': cur_price,
+                    'close': cur_price,
+                    'high': cur_price,
+                    'low': cur_price,
+                    'volume': volume,
+                    'last_close': last_close,
+                    'turnover': turnover
+                })
+            
+            return result
+        finally:
+            quote_ctx.close()
+    except Exception as e:
+        raise Exception(f"获取分时数据失败: {str(e)}")
+
+
 def get_stock_history_kline(code: str, market: str, start: str, end: str, max_count: int = 1000, ktype: str = "K_DAY") -> List[Dict]:
     """
     获取指定股票的历史K线数据（默认日K）
@@ -434,6 +498,8 @@ def get_stock_history_kline(code: str, market: str, start: str, end: str, max_co
         ]
     """
     try:
+        if ktype == "K_RT":
+            return get_stock_rt_data(code, market)
         futu_code = convert_to_futu_code(code, market)
         futu_host = os.getenv('FUTU_HOST', '127.0.0.1')
         futu_port = int(os.getenv('FUTU_PORT', '11111'))

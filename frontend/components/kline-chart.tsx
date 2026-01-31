@@ -10,6 +10,8 @@ export interface CandleData {
   high: number | null
   low: number | null
   volume: number
+  last_close?: number | null
+  turnover?: number | null
 }
 
 interface KLineChartProps {
@@ -256,11 +258,26 @@ export function KLineChart({
   const [showVolume, setShowVolume] = useState(true)
   const [showMA, setShowMA] = useState(true)
   const [showTrendBands, setShowTrendBands] = useState(true)
+  const isIntraday = klineType === "K_RT"
 
   const chartData = useMemo(() => {
     const dates = data.map((item) => item.date)
     const values = data.map((item) => [item.open, item.close, item.low, item.high])
+    const lineValues = data.map((item) => item.close)
     const volumes = data.map((item) => item.volume)
+    const turnovers = data.map((item) => item.turnover)
+    const vwapValues: (number | null)[] = []
+    let cumulativeTurnover = 0
+    let cumulativeVolume = 0
+    for (let i = 0; i < data.length; i += 1) {
+      const turnover = turnovers[i]
+      const volume = volumes[i]
+      if (typeof turnover === "number" && typeof volume === "number") {
+        cumulativeTurnover += turnover
+        cumulativeVolume += volume
+      }
+      vwapValues.push(cumulativeVolume > 0 ? cumulativeTurnover / cumulativeVolume : null)
+    }
     const trendBands = calculateTrendBands(data)
     const trendBandSeries = {
       shortAUp: maskValues(trendBands.shortA, trendBands.shortCond1),
@@ -317,7 +334,9 @@ export function KLineChart({
     return {
       dates,
       values,
+      lineValues,
       volumes,
+      vwapValues,
       ma5: calculateMA(data, 5),
       ma10: calculateMA(data, 10),
       ma20: calculateMA(data, 20),
@@ -380,15 +399,14 @@ export function KLineChart({
     }
 
     const hasVolume = showVolume && chartData.volumes.length > 0
-    const zoomStart = chartData.dates.length > 80 ? 70 : 0
+    const zoomStart = isIntraday ? 0 : chartData.dates.length > 80 ? 70 : 0
     const volumeHeight = Math.max(190, Math.round(height * 0.36))
     const zoomHeight = 16
     const zoomBottom = 4
     const volumeBottom = zoomBottom + zoomHeight + 8
     const mainBottom = volumeBottom + volumeHeight + 16
 
-    const priceValues = chartData.values
-      .flatMap((item) => item)
+    const priceValues = (isIntraday ? chartData.lineValues : chartData.values.flatMap((item) => item))
       .filter((value) => typeof value === "number") as number[]
     const volumeValues = chartData.volumes.filter((value) => typeof value === "number")
     const priceMin = priceValues.length ? Math.min(...priceValues) : 0
@@ -445,12 +463,17 @@ export function KLineChart({
           const date = chartData.dates[dataIndex]
           const candleValue = chartData.values[dataIndex]
           const volume = chartData.volumes[dataIndex]
-          if (!candleValue) return ""
-          const [open, close, low, high] = candleValue
-          if (open === null || close === null || low === null || high === null) return ""
-          const changeValue = close - open
-          const changeRate = ((close - open) / open * 100).toFixed(2)
-          const changeColor = close >= open ? colors.up : colors.down
+          const [open, close, low, high] = candleValue || []
+          const priceValue = isIntraday ? chartData.lineValues[dataIndex] : close
+          if (priceValue === null || priceValue === undefined) return ""
+          const refOpen = !isIntraday ? open : (data[dataIndex]?.last_close ?? chartData.lineValues[0])
+          const changeValue =
+            typeof refOpen === "number" ? priceValue - refOpen : 0
+          const changeRate =
+            typeof refOpen === "number" && refOpen !== 0
+              ? ((priceValue - refOpen) / refOpen * 100).toFixed(2)
+              : "0.00"
+          const changeColor = priceValue >= (refOpen ?? priceValue) ? colors.up : colors.down
           return `
             <div style="padding: 10px; min-width: 220px;">
               <div style="font-weight: 600; margin-bottom: 10px;">${symbol}</div>
@@ -458,6 +481,15 @@ export function KLineChart({
                 <span style="color: ${colors.textMuted}">时间</span>
                 <span style="color: ${colors.text}">${date}</span>
               </div>
+              ${
+                isIntraday
+                  ? `
+              <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+                <span style="color: ${colors.textMuted}">价格</span>
+                <span style="color: ${changeColor}">${Number(priceValue).toFixed(3)}</span>
+              </div>
+              `
+                  : `
               <div style="display: flex; justify-content: space-between; margin-bottom: 6px;">
                 <span style="color: ${colors.textMuted}">开盘价</span>
                 <span style="color: ${colors.text}">${open.toFixed(3)}</span>
@@ -474,6 +506,8 @@ export function KLineChart({
                 <span style="color: ${colors.textMuted}">收盘价</span>
                 <span style="color: ${changeColor}">${close.toFixed(3)}</span>
               </div>
+              `
+              }
               <div style="display: flex; justify-content: space-between; margin-bottom: 6px;">
                 <span style="color: ${colors.textMuted}">涨跌额</span>
                 <span style="color: ${changeColor}">${changeValue.toFixed(3)}</span>
@@ -614,18 +648,48 @@ export function KLineChart({
         },
       ],
       series: [
-        {
-          type: "candlestick",
-          data: chartData.values,
-          itemStyle: {
-            color: "transparent",
-            color0: colors.down,
-            borderColor: colors.up,
-            borderColor0: colors.down,
-            borderWidth: 1,
-          },
-        },
-        ...(showTrendBands
+        ...(isIntraday
+          ? [
+              {
+                name: "分时线",
+                type: "line",
+                data: chartData.lineValues,
+                smooth: true,
+                lineStyle: { width: 1.5, color: colors.up },
+                areaStyle: { color: "rgba(239, 68, 68, 0.2)" },
+                showSymbol: false,
+                emphasis: { disabled: true },
+                z: 2,
+              },
+              ...(showTrendBands
+                ? [
+                    {
+                      name: "分时均线",
+                      type: "line",
+                      data: chartData.vwapValues,
+                      smooth: true,
+                      lineStyle: { width: 1.5, color: "#E3C46A" },
+                      showSymbol: false,
+                      emphasis: { disabled: true },
+                      z: 3,
+                    },
+                  ]
+                : []),
+            ]
+          : [
+              {
+                type: "candlestick",
+                data: chartData.values,
+                itemStyle: {
+                  color: "transparent",
+                  color0: colors.down,
+                  borderColor: colors.up,
+                  borderColor0: colors.down,
+                  borderWidth: 1,
+                },
+              },
+            ]),
+        ...(!isIntraday && showTrendBands
           ? [
               // 短期趋势带基准线
               {
@@ -809,7 +873,7 @@ export function KLineChart({
               },
             ]
           : []),
-        ...(showMA
+        ...(!isIntraday && showMA
           ? [
               {
                 name: "MA5",
@@ -852,6 +916,13 @@ export function KLineChart({
                 data: chartData.volumes,
                 itemStyle: {
                   color: (params: any) => {
+                    if (isIntraday) {
+                      const current = chartData.lineValues[params.dataIndex]
+                      const prev = chartData.lineValues[params.dataIndex - 1]
+                      if (current === null || current === undefined) return colors.textMuted
+                      if (prev === null || prev === undefined) return colors.textMuted
+                      return current >= prev ? colors.up : colors.down
+                    }
                     const candleValue = chartData.values[params.dataIndex]
                     if (!candleValue) return colors.textMuted
                     const [open, close] = candleValue
@@ -863,9 +934,18 @@ export function KLineChart({
             ]
           : []),
       ] as echarts.SeriesOption[],
-      legend: showMA
+      legend: !isIntraday && showMA
         ? {
             data: ["MA5", "MA10", "MA20"],
+            top: 60,
+            left: 12,
+            textStyle: { color: colors.textMuted, fontSize: 11 },
+            itemWidth: 12,
+            itemHeight: 8,
+          }
+        : isIntraday && showTrendBands
+        ? {
+            data: ["分时均线"],
             top: 60,
             left: 12,
             textStyle: { color: colors.textMuted, fontSize: 11 },
@@ -992,6 +1072,7 @@ export function KLineChart({
       <div className="absolute left-3 right-3 top-2 z-10 flex items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-2 rounded-full border bg-background/90 px-2 py-1 shadow-sm">
           {[
+            { label: "分时", value: "K_RT" },
             { label: "日K", value: "K_DAY" },
             { label: "周K", value: "K_WEEK" },
             { label: "月K", value: "K_MON" },
@@ -1022,24 +1103,28 @@ export function KLineChart({
           </button>
         </div>
         <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={() => setShowMA((prev) => !prev)}
-            className={`rounded-md border px-2 py-1 text-xs transition ${
-              showMA ? "border-primary bg-primary text-primary-foreground" : "border-border bg-background text-muted-foreground"
-            }`}
-          >
-            MA
-          </button>
-          <button
-            type="button"
-            onClick={() => setShowTrendBands((prev) => !prev)}
-            className={`rounded-md border px-2 py-1 text-xs transition ${
-              showTrendBands ? "border-primary bg-primary text-primary-foreground" : "border-border bg-background text-muted-foreground"
-            }`}
-          >
-            趋势
-          </button>
+          {!isIntraday ? (
+            <>
+              <button
+                type="button"
+                onClick={() => setShowMA((prev) => !prev)}
+                className={`rounded-md border px-2 py-1 text-xs transition ${
+                  showMA ? "border-primary bg-primary text-primary-foreground" : "border-border bg-background text-muted-foreground"
+                }`}
+              >
+                MA
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowTrendBands((prev) => !prev)}
+                className={`rounded-md border px-2 py-1 text-xs transition ${
+                  showTrendBands ? "border-primary bg-primary text-primary-foreground" : "border-border bg-background text-muted-foreground"
+                }`}
+              >
+                趋势
+              </button>
+            </>
+          ) : null}
           <button
             type="button"
             onClick={() => setShowVolume((prev) => !prev)}
