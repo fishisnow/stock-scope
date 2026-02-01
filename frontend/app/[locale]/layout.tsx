@@ -11,6 +11,9 @@ export const metadata: Metadata = {
   title: "StockScope - AI-Powered Investment Opportunities",
   description: "Discover emerging stock investment opportunities powered by AI",
   generator: "v0.app",
+  icons: {
+    icon: [{ url: "/icon.svg", type: "image/svg+xml" }],
+  },
 }
 
 export function generateStaticParams() {

@@ -4,8 +4,9 @@ import { useState, useEffect } from 'react'
 import { Link } from "@/i18n/routing"
 import { useSearchParams } from 'next/navigation'
 import { Button } from "@/components/ui/button"
-import { TrendingUp, LogOut, User, Plus } from "lucide-react"
+import { LogOut, User, Plus } from "lucide-react"
 import { LanguageSwitcher } from "./language-switcher"
+import { Logo } from "./logo"
 import { LoginDialog } from "./login-dialog"
 import { SignupDialog } from "./signup-dialog"
 import { useTranslations } from 'next-intl'
@@ -72,7 +73,11 @@ export function Header({ onRecordOpportunity }: HeaderProps = {}) {
         <div className="container mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex h-16 items-center justify-between">
             <div className="flex items-center gap-2">
-              <TrendingUp className="h-6 w-6 text-primary" />
+              <Logo
+                className="h-6 w-6 text-primary"
+                aria-hidden="true"
+                focusable="false"
+              />
               <Link href="/" className="text-xl font-semibold">
                 {t('title')}
               </Link>
