@@ -64,6 +64,25 @@ def get_futu_data(date):
         }), 500
 
 
+@app.route('/api/market_breadth')
+def get_market_breadth():
+    """获取市场宽度数据（默认中证800）"""
+    try:
+        limit = int(request.args.get('limit', 30))
+        index_code = request.args.get('index_code', 'SH.000906')
+        data = db.get_market_breadth_records(limit=limit, index_code=index_code)
+        return jsonify({
+            'success': True,
+            'data': data,
+            'index_code': index_code
+        })
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
 # ============================================
 # 认证相关路由示例
 # ============================================

@@ -253,6 +253,78 @@ class StockDatabase:
             print(f"❌ 保存股票基础信息失败: {e}")
             raise
 
+    def get_stock_basic_info(self, market: Optional[str] = None) -> List[Dict]:
+        """
+        获取股票基础信息
+        :param market: 市场筛选，可选 'A' 或 'HK'
+        :return: 股票基础信息列表
+        """
+        try:
+            query = self.client.table('stock_basic_info').select('*')
+            if market:
+                query = query.eq('market', market)
+            response = query.execute()
+            return response.data or []
+        except Exception as e:
+            print(f"❌ 查询股票基础信息失败: {e}")
+            raise
+
+    def upsert_stock_basic_metadata(self, records: List[Dict]):
+        """
+        批量更新股票板块/指数等扩展字段（使用 upsert）
+        :param records: 包含 stock_code, market 以及其他字段的记录
+        """
+        try:
+            if not records:
+                return
+            self.client.table('stock_basic_info').upsert(
+                records,
+                on_conflict='stock_code,market'
+            ).execute()
+        except Exception as e:
+            print(f"❌ 更新股票扩展信息失败: {e}")
+            raise
+
+    def upsert_market_breadth(self, records: List[Dict]):
+        """
+        批量写入市场宽度日度数据
+        """
+        try:
+            if not records:
+                return
+            self.client.table('market_breadth_daily').upsert(
+                records,
+                on_conflict='date,index_code,sector'
+            ).execute()
+        except Exception as e:
+            print(f"❌ 写入市场宽度数据失败: {e}")
+            raise
+
+    def get_market_breadth_records(self, limit: int = 30, index_code: Optional[str] = None) -> Dict:
+        """
+        获取最近N天市场宽度数据
+        """
+        try:
+            dates_resp = self.client.table('market_breadth_daily').select('date').order('date', desc=True).execute()
+            dates = []
+            for row in dates_resp.data:
+                date_value = row.get('date')
+                if date_value and date_value not in dates:
+                    dates.append(date_value)
+                if len(dates) >= limit:
+                    break
+            if not dates:
+                return {"dates": [], "records": []}
+
+            query = self.client.table('market_breadth_daily').select('*').in_('date', dates)
+            if index_code:
+                query = query.eq('index_code', index_code)
+            data_resp = query.execute()
+            return {"dates": dates, "records": data_resp.data or []}
+        except Exception as e:
+            print(f"❌ 查询市场宽度数据失败: {e}")
+            raise
+
 # 全局数据库实例
 db = StockDatabase()
 

@@ -34,6 +34,34 @@ interface FutuData {
   HK?: MarketData
 }
 
+interface MarketBreadthRecord {
+  date: string
+  index_code: string
+  sector: string
+  total_count: number
+  above_ma20_count: number
+  breadth_pct: number
+}
+
+interface MarketBreadthData {
+  dates: string[]
+  records: MarketBreadthRecord[]
+}
+
+const SECTOR_ORDER = [
+  "大消费",
+  "医药健康",
+  "科技成长",
+  "大金融",
+  "新能源",
+  "周期资源",
+  "高端制造",
+  "公用事业",
+  "房地产基建",
+  "交通运输",
+  "未分类",
+]
+
 // StockTable Component
 function StockTable({
   title,
@@ -212,11 +240,14 @@ export default function MarketPage() {
   const [availableDates, setAvailableDates] = useState<string[]>([])
   const [selectedDate, setSelectedDate] = useState<string>("")
   const [futuData, setFutuData] = useState<FutuData | null>(null)
+  const [breadthData, setBreadthData] = useState<MarketBreadthData | null>(null)
+  const [breadthLoading, setBreadthLoading] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     loadAvailableDates()
+    loadBreadthData()
   }, [])
 
   const loadAvailableDates = async () => {
@@ -261,6 +292,43 @@ export default function MarketPage() {
     } finally {
       setLoading(false)
     }
+  }
+
+  const loadBreadthData = async () => {
+    setBreadthLoading(true)
+    try {
+      const response = await fetch(`${API_URL}/api/market_breadth?limit=30`)
+      const result = await response.json()
+      if (result.success) {
+        setBreadthData(result.data)
+      } else {
+        setError(t('errors.failedToLoadData') + ": " + result.error)
+      }
+    } catch (err) {
+      setError(t('errors.networkError') + ": " + (err as Error).message)
+    } finally {
+      setBreadthLoading(false)
+    }
+  }
+
+  const getBreadthValue = (date: string, sector: string) => {
+    if (!breadthData) return null
+    const record = breadthData.records.find(
+      (item) => item.date === date && item.sector === sector
+    )
+    return record ? Number(record.breadth_pct) : null
+  }
+
+  const getBreadthColor = (value: number | null) => {
+    if (value === null) return "transparent"
+    const clamped = Math.max(0, Math.min(100, value))
+    const hue = 120 - (clamped / 100) * 120
+    return `hsl(${hue}, 65%, 70%)`
+  }
+
+  const getBreadthTextColor = (value: number | null) => {
+    if (value === null) return "text-muted-foreground"
+    return value >= 70 ? "text-white" : "text-slate-900"
   }
 
   const handleDateChange = (date: string) => {
@@ -367,6 +435,65 @@ export default function MarketPage() {
           <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
             {t('pageSubtitle')}
           </p>
+        </div>
+
+        {/* Market Breadth */}
+        <div className="mb-16 space-y-6">
+          <div className="flex items-center gap-3">
+            <div className="h-1 w-12 bg-primary rounded-full" />
+            <h2 className="font-serif text-3xl text-primary">{t('breadth.title')}</h2>
+            <div className="h-1 flex-1 bg-primary/20 rounded-full" />
+          </div>
+          <p className="text-sm text-muted-foreground">{t('breadth.subtitle')}</p>
+
+          <Card className="overflow-hidden">
+            <CardContent className="p-6">
+              {breadthLoading && (
+                <div className="text-sm text-muted-foreground">{t('breadth.loading')}</div>
+              )}
+              {!breadthLoading && breadthData && breadthData.dates.length > 0 && (
+                <div className="overflow-x-auto">
+                  <table className="w-full border-collapse text-sm">
+                    <thead>
+                      <tr>
+                        <th className="text-left py-2 pr-4 text-muted-foreground whitespace-nowrap">
+                          {t('breadth.date')}
+                        </th>
+                        {SECTOR_ORDER.map((sector) => (
+                          <th key={sector} className="py-2 px-2 text-center text-muted-foreground whitespace-nowrap">
+                            {sector}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {breadthData.dates.map((date) => (
+                        <tr key={date} className="border-t border-border/50">
+                          <td className="py-2 pr-4 text-muted-foreground whitespace-nowrap">{date}</td>
+                          {SECTOR_ORDER.map((sector) => {
+                            const value = getBreadthValue(date, sector)
+                            return (
+                              <td key={`${date}-${sector}`} className="py-2 px-2 text-center">
+                                <div
+                                  className={`rounded-md px-2 py-1 text-xs font-mono ${getBreadthTextColor(value)}`}
+                                  style={{ backgroundColor: getBreadthColor(value) }}
+                                >
+                                  {value === null ? "-" : value.toFixed(0)}
+                                </div>
+                              </td>
+                            )
+                          })}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+              {!breadthLoading && (!breadthData || breadthData.dates.length === 0) && (
+                <div className="text-sm text-muted-foreground">{t('breadth.noData')}</div>
+              )}
+            </CardContent>
+          </Card>
         </div>
 
         {/* Date Navigation */}

@@ -7,6 +7,8 @@ import schedule
 
 from app.db.database import save_futu_data, save_stock_basic_info
 from app.utils import futu_data
+from app.utils.sector_classifier import classify_and_tag_a_stocks
+from app.utils.market_breadth import compute_market_breadth_daily
 from app.utils.wx_push import send_md_message
 
 
@@ -104,6 +106,7 @@ def futu_job():
 
 # 记录上次同步股票基础信息的月份，避免同一个月重复执行
 _last_sync_month = None
+_last_enrich_month = None
 
 def sync_stock_basic_info_job(manual: bool = False):
     """
@@ -142,12 +145,39 @@ def sync_stock_basic_info_job(manual: bool = False):
         print(f"同步股票基础信息失败: {e}")
 
 
+def enrich_stock_metadata_job(manual: bool = False):
+    """
+    使用 DeepSeek 进行板块分类 + 指数归属标记（月初执行）
+    """
+    global _last_enrich_month
+    try:
+        now = datetime.now()
+        current_day = now.day
+        current_month = now.strftime('%Y-%m')
+
+        if current_day != 1 and not manual:
+            return
+
+        if _last_enrich_month == current_month:
+            return
+
+        print(f"开始板块/指数归属补齐: {now.strftime('%Y-%m-%d %H:%M')}")
+        result = classify_and_tag_a_stocks()
+        _last_enrich_month = current_month
+        print(f"板块/指数归属补齐完成: 总计 {result.get('total', 0)} 条")
+    except Exception as e:
+        print(f"板块/指数归属补齐失败: {e}")
+
 def main():
     schedule.every().hour.at(":55").do(futu_job)
     
     # 每天凌晨2点检查是否需要同步股票基础信息（每月1号执行）
     # 函数内部会检查是否是1号，避免非1号时执行
     schedule.every().day.at("02:00").do(sync_stock_basic_info_job)
+    # 每天凌晨2点10分检查是否需要补齐板块/指数（每月1号执行）
+    schedule.every().day.at("02:10").do(enrich_stock_metadata_job)
+    # 每天收盘后计算市场宽度
+    schedule.every().day.at("16:30").do(compute_market_breadth_daily)
 
     while True:
         schedule.run_pending()

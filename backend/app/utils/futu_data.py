@@ -1,3 +1,5 @@
+import time
+
 from futu import *
 from datetime import date
 import pandas as pd
@@ -328,6 +330,63 @@ def get_all_stocks_basic_info() -> Dict[str, List[Dict]]:
         }
     except Exception as e:
         raise Exception(f"获取所有股票基础信息失败: {str(e)}")
+
+
+def get_above_ma20_stock_codes() -> set:
+    """
+    获取A股市场（沪深）收盘价高于MA20的股票代码集合
+    :return: set(['000001', ...])
+    """
+    quote_ctx = None
+    try:
+        futu_host = os.getenv('FUTU_HOST', '127.0.0.1')
+        futu_port = int(os.getenv('FUTU_PORT', '11111'))
+        quote_ctx = OpenQuoteContext(host=futu_host, port=futu_port)
+
+        custom_filter = CustomIndicatorFilter()
+        custom_filter.ktype = KLType.K_DAY
+        custom_filter.stock_field1 = StockField.PRICE
+        custom_filter.stock_field2 = StockField.MA
+        custom_filter.stock_field2_para = [20]
+        custom_filter.relative_position = RelativePosition.MORE
+        custom_filter.is_no_filter = False
+
+        def fetch_market_codes(market) -> set:
+            codes = set()
+            begin = 0
+            while True:
+                ret, ls = quote_ctx.get_stock_filter(
+                    market=market,
+                    filter_list=[custom_filter],
+                    begin=begin
+                )
+                if ret != RET_OK:
+                    raise Exception(ls)
+
+                time.sleep(3)
+                last_page, _, ret_list = ls
+                if not ret_list:
+                    break
+                for item in ret_list:
+                    raw_code = getattr(item, 'stock_code', '')
+                    if '.' in raw_code:
+                        raw_code = raw_code.split('.')[1]
+                    if raw_code:
+                        codes.add(raw_code)
+                if last_page:
+                    break
+                begin += len(ret_list)
+            return codes
+
+        sh_codes = fetch_market_codes(Market.SH)
+        sz_codes = fetch_market_codes(Market.SZ)
+        return sh_codes.union(sz_codes)
+    finally:
+        if quote_ctx is not None:
+            try:
+                quote_ctx.close()
+            except Exception:
+                pass
 
 
 def get_stock_current_price(code: str, market: str) -> Dict:

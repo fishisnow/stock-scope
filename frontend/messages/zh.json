@@ -74,6 +74,13 @@
       "selectDate": "选择日期",
       "viewingDataFor": "查看日期"
     },
+    "breadth": {
+      "title": "A股市场宽度（中证800）",
+      "subtitle": "按板块统计高于MA20的股票比例，反映市场健康度",
+      "loading": "加载市场宽度中...",
+      "noData": "暂无市场宽度数据",
+      "date": "日期"
+    },
     "loading": "加载市场数据中...",
     "errors": {
       "errorLoadingData": "数据加载错误",
