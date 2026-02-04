@@ -269,20 +269,155 @@ class StockDatabase:
             print(f"❌ 查询股票基础信息失败: {e}")
             raise
 
-    def upsert_stock_basic_metadata(self, records: List[Dict]):
+    def get_stock_basic_info_paginated(
+        self,
+        market: Optional[str] = None,
+        page_size: int = 1000,
+        columns: str = '*'
+    ) -> List[Dict]:
         """
-        批量更新股票板块/指数等扩展字段（使用 upsert）
-        :param records: 包含 stock_code, market 以及其他字段的记录
+        分页获取股票基础信息（避免 Supabase 单次查询限制）
+        :param market: 市场筛选，可选 'A' 或 'HK'
+        :param page_size: 每页数量
+        :param columns: 查询字段
+        :return: 股票基础信息列表
+        """
+        try:
+            results: List[Dict] = []
+            offset = 0
+            while True:
+                query = self.client.table('stock_basic_info').select(columns)
+                if market:
+                    query = query.eq('market', market)
+                response = query.range(offset, offset + page_size - 1).execute()
+                batch = response.data or []
+                if not batch:
+                    break
+                results.extend(batch)
+                if len(batch) < page_size:
+                    break
+                offset += page_size
+            return results
+        except Exception as e:
+            print(f"❌ 分页查询股票基础信息失败: {e}")
+            raise
+
+    def get_stock_basic_info_by_codes(
+        self,
+        codes: List[str],
+        market: Optional[str] = None,
+        batch_size: int = 500
+    ) -> List[Dict]:
+        """
+        按股票代码批量获取基础信息
+        :param codes: 股票代码列表
+        :param market: 市场筛选，可选 'A' 或 'HK'
+        :param batch_size: 每批次查询的代码数量
+        :return: 股票基础信息列表
+        """
+        try:
+            if not codes:
+                return []
+            results: List[Dict] = []
+            total = len(codes)
+            for start in range(0, total, batch_size):
+                end = min(start + batch_size, total)
+                batch = codes[start:end]
+                query = self.client.table('stock_basic_info').select('*').in_(
+                    'stock_code', batch
+                )
+                if market:
+                    query = query.eq('market', market)
+                response = query.execute()
+                if response.data:
+                    results.extend(response.data)
+            return results
+        except Exception as e:
+            print(f"❌ 按代码查询股票基础信息失败: {e}")
+            raise
+
+    def upsert_stock_basic_metadata(self, records: List[Dict], batch_size: int = 500):
+        """
+        按主键批量更新股票板块等扩展字段（仅更新，不插入）
+        :param records: 包含 id 以及其他字段的记录
+        :param batch_size: 每批次 upsert 的记录数量
         """
         try:
             if not records:
                 return
-            self.client.table('stock_basic_info').upsert(
-                records,
-                on_conflict='stock_code,market'
-            ).execute()
+            total = len(records)
+            for start in range(0, total, batch_size):
+                end = min(start + batch_size, total)
+                batch = records[start:end]
+                response = self.client.rpc(
+                    'update_stock_basic_metadata_batch',
+                    {'p_records': batch}
+                ).execute()
+                updated = response.data or 0
+                print(
+                    f"✅ 已更新股票扩展信息: {end}/{total} "
+                    f"(batch {start // batch_size + 1}, updated {updated})"
+                )
         except Exception as e:
             print(f"❌ 更新股票扩展信息失败: {e}")
+            raise
+
+    def update_stock_basic_index_membership(self, records: List[Dict]):
+        """
+        更新股票指数归属信息（仅更新，不插入）
+        :param records: 包含 stock_code, market, index_membership 的记录
+        """
+        try:
+            if not records:
+                return
+            updated = 0
+            for record in records:
+                stock_code = record.get('stock_code')
+                market = record.get('market')
+                if not stock_code or not market:
+                    continue
+                payload = {
+                    'index_membership': record.get('index_membership', []),
+                    'updated_at': record.get('updated_at')
+                }
+                response = self.client.table('stock_basic_info').update(
+                    payload
+                ).eq('stock_code', stock_code).eq('market', market).execute()
+                if response.data:
+                    updated += 1
+            print(f"✅ 已更新股票指数归属: {updated}/{len(records)}")
+        except Exception as e:
+            print(f"❌ 更新股票指数归属失败: {e}")
+            raise
+
+    def update_stock_basic_index_membership_batch(
+        self,
+        records: List[Dict],
+        batch_size: int = 500
+    ):
+        """
+        按主键批量更新股票指数归属（仅更新，不插入）
+        :param records: 包含 id, index_membership, updated_at 的记录
+        :param batch_size: 每批次更新数量
+        """
+        try:
+            if not records:
+                return
+            total = len(records)
+            for start in range(0, total, batch_size):
+                end = min(start + batch_size, total)
+                batch = records[start:end]
+                response = self.client.rpc(
+                    'update_stock_basic_index_membership_batch',
+                    {'p_records': batch}
+                ).execute()
+                updated = response.data or 0
+                print(
+                    f"✅ 已批量更新指数归属: {end}/{total} "
+                    f"(batch {start // batch_size + 1}, updated {updated})"
+                )
+        except Exception as e:
+            print(f"❌ 批量更新指数归属失败: {e}")
             raise
 
     def upsert_market_breadth(self, records: List[Dict]):
@@ -294,13 +429,13 @@ class StockDatabase:
                 return
             self.client.table('market_breadth_daily').upsert(
                 records,
-                on_conflict='date,index_code,sector'
+                on_conflict='date,breadth_type,sector'
             ).execute()
         except Exception as e:
             print(f"❌ 写入市场宽度数据失败: {e}")
             raise
 
-    def get_market_breadth_records(self, limit: int = 30, index_code: Optional[str] = None) -> Dict:
+    def get_market_breadth_records(self, limit: int = 30, breadth_type: Optional[str] = None) -> Dict:
         """
         获取最近N天市场宽度数据
         """
@@ -317,8 +452,8 @@ class StockDatabase:
                 return {"dates": [], "records": []}
 
             query = self.client.table('market_breadth_daily').select('*').in_('date', dates)
-            if index_code:
-                query = query.eq('index_code', index_code)
+            if breadth_type:
+                query = query.eq('breadth_type', breadth_type)
             data_resp = query.execute()
             return {"dates": dates, "records": data_resp.data or []}
         except Exception as e:

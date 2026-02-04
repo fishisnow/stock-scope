@@ -36,7 +36,7 @@ interface FutuData {
 
 interface MarketBreadthRecord {
   date: string
-  index_code: string
+  breadth_type: string
   sector: string
   total_count: number
   above_ma20_count: number
@@ -59,7 +59,13 @@ const SECTOR_ORDER = [
   "公用事业",
   "房地产基建",
   "交通运输",
-  "未分类",
+]
+
+const INDEX_OPTIONS = [
+  { code: "SH.000906", label: "中证800" },
+  { code: "SZ.399102", label: "创业板指" },
+  { code: "SH.000688", label: "科创50" },
+  { code: "SH.000016", label: "上证50" },
 ]
 
 // StockTable Component
@@ -322,13 +328,23 @@ export default function MarketPage() {
   const getBreadthColor = (value: number | null) => {
     if (value === null) return "transparent"
     const clamped = Math.max(0, Math.min(100, value))
-    const hue = 120 - (clamped / 100) * 120
-    return `hsl(${hue}, 65%, 70%)`
+    const midpoint = 50
+    const isHigh = clamped >= midpoint
+    const ratio = isHigh ? (clamped - midpoint) / midpoint : (midpoint - clamped) / midpoint
+    const lightness = 95 - ratio * 60
+    const hue = isHigh ? 0 : 120
+    return `hsl(${hue}, 55%, ${lightness}%)`
   }
 
   const getBreadthTextColor = (value: number | null) => {
     if (value === null) return "text-muted-foreground"
-    return value >= 70 ? "text-white" : "text-slate-900"
+    const clamped = Math.max(0, Math.min(100, value))
+    const midpoint = 50
+    const isHigh = clamped >= midpoint
+    const ratio = isHigh ? (clamped - midpoint) / midpoint : (midpoint - clamped) / midpoint
+    const lightness = 95 - ratio * 60
+    if (lightness <= 55) return "text-white"
+    return "text-slate-900"
   }
 
   const handleDateChange = (date: string) => {
@@ -456,11 +472,22 @@ export default function MarketPage() {
                   <table className="w-full border-collapse text-sm">
                     <thead>
                       <tr>
-                        <th className="text-left py-2 pr-4 text-muted-foreground whitespace-nowrap">
+                        <th className="text-left py-2 px-3 text-muted-foreground whitespace-nowrap border border-border/30">
                           {t('breadth.date')}
                         </th>
+                        {INDEX_OPTIONS.map((indexOption) => (
+                          <th
+                            key={indexOption.code}
+                            className="py-2 px-2 text-center text-muted-foreground whitespace-nowrap border border-border/30"
+                          >
+                            {indexOption.label}
+                          </th>
+                        ))}
                         {SECTOR_ORDER.map((sector) => (
-                          <th key={sector} className="py-2 px-2 text-center text-muted-foreground whitespace-nowrap">
+                          <th
+                            key={sector}
+                            className="py-2 px-2 text-center text-muted-foreground whitespace-nowrap border border-border/30"
+                          >
                             {sector}
                           </th>
                         ))}
@@ -469,17 +496,30 @@ export default function MarketPage() {
                     <tbody>
                       {breadthData.dates.map((date) => (
                         <tr key={date} className="border-t border-border/50">
-                          <td className="py-2 pr-4 text-muted-foreground whitespace-nowrap">{date}</td>
+                          <td className="py-2 px-3 text-muted-foreground whitespace-nowrap border border-border/30 bg-background">
+                            {date}
+                          </td>
+                          {INDEX_OPTIONS.map((indexOption) => {
+                            const value = getBreadthValue(date, indexOption.label)
+                            return (
+                              <td
+                                key={`${date}-${indexOption.code}`}
+                                className={`py-2 px-2 text-center text-xs font-mono border border-border/30 ${getBreadthTextColor(value)}`}
+                                style={{ backgroundColor: getBreadthColor(value) }}
+                              >
+                                {value === null ? "-" : value.toFixed(0)}
+                              </td>
+                            )
+                          })}
                           {SECTOR_ORDER.map((sector) => {
                             const value = getBreadthValue(date, sector)
                             return (
-                              <td key={`${date}-${sector}`} className="py-2 px-2 text-center">
-                                <div
-                                  className={`rounded-md px-2 py-1 text-xs font-mono ${getBreadthTextColor(value)}`}
-                                  style={{ backgroundColor: getBreadthColor(value) }}
-                                >
-                                  {value === null ? "-" : value.toFixed(0)}
-                                </div>
+                              <td
+                                key={`${date}-${sector}`}
+                                className={`py-2 px-2 text-center text-xs font-mono border border-border/30 ${getBreadthTextColor(value)}`}
+                                style={{ backgroundColor: getBreadthColor(value) }}
+                              >
+                                {value === null ? "-" : value.toFixed(0)}
                               </td>
                             )
                           })}

@@ -254,6 +254,73 @@ ON stock_basic_info (exchange);
 COMMENT ON TABLE stock_basic_info IS '股票基础信息表，存储所有股票的基本信息（代码、名称、市场等）';
 COMMENT ON COLUMN stock_basic_info.stock_code IS '股票代码，如 000001';
 COMMENT ON COLUMN stock_basic_info.stock_name IS '股票名称';
+
+-- ============================================
+-- 批量更新指数归属（仅更新，不插入）
+-- ============================================
+CREATE OR REPLACE FUNCTION update_stock_basic_index_membership_batch(p_records JSONB)
+RETURNS INTEGER
+LANGUAGE plpgsql
+AS $$
+DECLARE
+    updated_count INTEGER;
+BEGIN
+    WITH input_data AS (
+        SELECT
+            (elem->>'id')::BIGINT AS id,
+            elem->'index_membership' AS index_membership,
+            (elem->>'updated_at')::TIMESTAMPTZ AS updated_at
+        FROM jsonb_array_elements(p_records) AS elem
+    ),
+    updated AS (
+        UPDATE stock_basic_info s
+        SET
+            index_membership = i.index_membership,
+            updated_at = COALESCE(i.updated_at, NOW())
+        FROM input_data i
+        WHERE s.id = i.id
+        RETURNING s.id
+    )
+    SELECT COUNT(*) INTO updated_count FROM updated;
+
+    RETURN updated_count;
+END;
+$$;
+
+-- ============================================
+-- 按主键批量更新板块扩展信息（仅更新，不插入）
+-- ============================================
+CREATE OR REPLACE FUNCTION update_stock_basic_metadata_batch(p_records JSONB)
+RETURNS INTEGER
+LANGUAGE plpgsql
+AS $$
+DECLARE
+    updated_count INTEGER;
+BEGIN
+    WITH input_data AS (
+        SELECT
+            (elem->>'id')::BIGINT AS id,
+            elem->>'sector' AS sector,
+            (elem->>'sector_confidence')::NUMERIC AS sector_confidence,
+            (elem->>'updated_at')::TIMESTAMPTZ AS updated_at
+        FROM jsonb_array_elements(p_records) AS elem
+        WHERE elem ? 'id'
+    ),
+    updated AS (
+        UPDATE stock_basic_info s
+        SET
+            sector = i.sector,
+            sector_confidence = i.sector_confidence,
+            updated_at = COALESCE(i.updated_at, NOW())
+        FROM input_data i
+        WHERE s.id = i.id
+        RETURNING s.id
+    )
+    SELECT COUNT(*) INTO updated_count FROM updated;
+
+    RETURN updated_count;
+END;
+$$;
 COMMENT ON COLUMN stock_basic_info.market IS '市场：A-A股市场，HK-港股市场';
 COMMENT ON COLUMN stock_basic_info.exchange IS '交易所：SH-上海交易所，SZ-深圳交易所，HK-香港交易所';
 COMMENT ON COLUMN stock_basic_info.sector IS '板块分类（自定义行业）';
@@ -267,8 +334,8 @@ COMMENT ON COLUMN stock_basic_info.last_synced_at IS '最后同步时间';
 CREATE TABLE IF NOT EXISTS market_breadth_daily (
     id BIGSERIAL PRIMARY KEY,
     date DATE NOT NULL,
-    index_code VARCHAR(20) NOT NULL,                          -- 指数代码，如 SH.000906
-    sector VARCHAR(50) NOT NULL,                              -- 板块
+    breadth_type VARCHAR(20) NOT NULL,                        -- 宽度类型: index/sector
+    sector VARCHAR(50) NOT NULL,                              -- 指数名称或行业名称
     total_count INTEGER NOT NULL DEFAULT 0,                   -- 板块内总股票数
     above_ma20_count INTEGER NOT NULL DEFAULT 0,              -- 高于MA20数量
     breadth_pct NUMERIC(5,2) NOT NULL DEFAULT 0,              -- 宽度比例(0-100)
@@ -277,14 +344,14 @@ CREATE TABLE IF NOT EXISTS market_breadth_daily (
 );
 
 CREATE UNIQUE INDEX IF NOT EXISTS idx_market_breadth_daily_unique
-ON market_breadth_daily (date, index_code, sector);
+ON market_breadth_daily (date, breadth_type, sector);
 
 CREATE INDEX IF NOT EXISTS idx_market_breadth_daily_date
 ON market_breadth_daily (date);
 
 COMMENT ON TABLE market_breadth_daily IS '市场宽度日度统计';
-COMMENT ON COLUMN market_breadth_daily.index_code IS '指数代码';
-COMMENT ON COLUMN market_breadth_daily.sector IS '板块';
+COMMENT ON COLUMN market_breadth_daily.breadth_type IS '宽度类型';
+COMMENT ON COLUMN market_breadth_daily.sector IS '指数或行业名称';
 COMMENT ON COLUMN market_breadth_daily.total_count IS '板块内总股票数';
 COMMENT ON COLUMN market_breadth_daily.above_ma20_count IS '高于MA20数量';
 COMMENT ON COLUMN market_breadth_daily.breadth_pct IS '宽度比例(%)';

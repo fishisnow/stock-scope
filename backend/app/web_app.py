@@ -66,15 +66,15 @@ def get_futu_data(date):
 
 @app.route('/api/market_breadth')
 def get_market_breadth():
-    """获取市场宽度数据（默认中证800）"""
+    """获取市场宽度数据（默认全部指数）"""
     try:
         limit = int(request.args.get('limit', 30))
-        index_code = request.args.get('index_code', 'SH.000906')
-        data = db.get_market_breadth_records(limit=limit, index_code=index_code)
+        breadth_type = request.args.get('breadth_type')
+        data = db.get_market_breadth_records(limit=limit, breadth_type=breadth_type)
         return jsonify({
             'success': True,
             'data': data,
-            'index_code': index_code
+            'breadth_type': breadth_type or 'all'
         })
     except Exception as e:
         return jsonify({

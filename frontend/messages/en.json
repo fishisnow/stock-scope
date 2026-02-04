@@ -77,7 +77,8 @@
     "breadth": {
       "title": "A-Share Market Breadth (CSI 800)",
       "subtitle": "Sector breadth based on % of stocks above MA20",
-      "loading": "Loading market breadth...",
+    "loading": "Loading market breadth...",
+    "index": "Index",
       "noData": "No market breadth data yet",
       "date": "Date"
     },

@@ -77,9 +77,11 @@ quote_ctx = OpenQuoteContext(host='127.0.0.1', port=11111)
 
 
 # 获取中证800成分股
-ret, stocks = quote_ctx.get_plate_stock('SH.000906')
+ret, stocks = quote_ctx.get_plate_stock('SZ.399102')
 if ret == RET_OK:
     print(f"SH.000906 stocks count: {len(stocks)}")
+else:
+    print(stocks)
 # 获取每只股票的申万行业信息
 # for code in stocks['code'].head(10):
 #     ret, info = quote_ctx.get_stock_basicinfo(Market.SH, SecurityType.STOCK, code)
