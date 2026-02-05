@@ -75,10 +75,11 @@
       "viewingDataFor": "Viewing data for"
     },
     "breadth": {
-      "title": "A-Share Market Breadth (CSI 800)",
+      "title": "A-Share Market Breadth",
       "subtitle": "Sector breadth based on % of stocks above MA20",
-    "loading": "Loading market breadth...",
-    "index": "Index",
+      "thresholdHint": "When market breadth approaches or exceeds a specific threshold (e.g., 85%), it may signal a cyclical peak; when it nears or falls below another threshold (e.g., 15%), it may signal a cyclical bottom.",
+      "loading": "Loading market breadth...",
+      "index": "Index",
       "noData": "No market breadth data yet",
       "date": "Date"
     },

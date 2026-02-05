@@ -460,7 +460,10 @@ export default function MarketPage() {
             <h2 className="font-serif text-3xl text-primary">{t('breadth.title')}</h2>
             <div className="h-1 flex-1 bg-primary/20 rounded-full" />
           </div>
-          <p className="text-sm text-muted-foreground">{t('breadth.subtitle')}</p>
+          <div className="space-y-2 text-sm text-muted-foreground">
+            <p>{t('breadth.subtitle')}</p>
+            <p>{t('breadth.thresholdHint')}</p>
+          </div>
 
           <Card className="overflow-hidden">
             <CardContent className="p-6">
@@ -584,11 +587,6 @@ export default function MarketPage() {
             </Button>
           </div>
 
-          {selectedDate && !loading && (
-            <div className="text-sm text-muted-foreground">
-              {t('date.viewingDataFor')} <span className="font-semibold text-foreground">{selectedDate}</span>
-            </div>
-          )}
         </div>
 
         {/* Content Area */}
