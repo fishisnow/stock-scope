@@ -1,6 +1,7 @@
 {
   "header": {
     "title": "StockScope",
+    "home": "Home",
     "market": "Market",
     "review": "Investment Review",
     "pricing": "Pricing",
@@ -37,6 +38,81 @@
   "home": {
     "metaTitle": "StockScope - AI-Powered Investment Opportunities",
     "metaDescription": "Discover emerging stock investment opportunities powered by AI"
+  },
+  "landing": {
+    "hero": {
+      "badge": "AI-Powered Opportunity Platform",
+      "title": "Make Investment Opportunities Traceable",
+      "subtitle": "Aggregate market signals, capture ideas, and turn them into a repeatable workflow from discovery to validation.",
+      "primaryCta": "Enter App",
+      "secondaryCta": "View Market Data",
+      "note": "Explore core features at no cost"
+    },
+    "value": {
+      "title": "Three Core Values",
+      "subtitle": "From discovery to review, build a sustainable investment system",
+      "items": {
+        "discovery": {
+          "title": "Opportunity Discovery",
+          "desc": "Use AI to surface signals and form testable investment theses"
+        },
+        "market": {
+          "title": "Market Insight",
+          "desc": "Filter strong momentum and focus on the right targets"
+        },
+        "review": {
+          "title": "Review & Growth",
+          "desc": "Capture decisions and outcomes to turn experience into assets"
+        }
+      }
+    },
+    "workflow": {
+      "title": "Three Steps, One Workflow",
+      "subtitle": "Connect ideas, data, and review into a repeatable loop",
+      "note": "Built for individual investors and research-driven users",
+      "steps": {
+        "capture": {
+          "title": "Capture Ideas",
+          "desc": "Record industry shifts, product trends, and company events"
+        },
+        "analyze": {
+          "title": "Validate Opportunities",
+          "desc": "Use market data and related stocks to decide what to track"
+        },
+        "learn": {
+          "title": "Review & Learn",
+          "desc": "Document decisions and results to build your playbook"
+        }
+      },
+      "highlight": {
+        "title": "From Fragments to System",
+        "desc": "Turn scattered ideas into a traceable opportunity archive",
+        "cta": "Start Recording"
+      }
+    },
+    "modules": {
+      "title": "Product Modules",
+      "subtitle": "A complete loop around investment opportunities",
+      "items": {
+        "opportunity": {
+          "title": "Investment Opportunities",
+          "desc": "Manage ideas, sources, trigger words, and related stocks"
+        },
+        "market": {
+          "title": "Market Data",
+          "desc": "Track moves, volume, and breadth to spot momentum"
+        },
+        "review": {
+          "title": "Investment Review",
+          "desc": "Import trades and analyze performance and risk"
+        }
+      }
+    },
+    "cta": {
+      "title": "Ready to build your opportunity library?",
+      "subtitle": "Start with your first record and turn insight into edge",
+      "button": "Get Started"
+    }
   },
   "market": {
     "pageTitle": "Market Data",
@@ -165,6 +241,7 @@
     "loading": "Loading...",
     "noOpportunity": "No Investment Opportunity",
     "noOpportunityDesc": "Start recording your first investment opportunity",
+    "nextPage": "Next page",
     "recordedAt": "Recorded at",
     "source": "Source",
     "coreIdea": "Core Idea",

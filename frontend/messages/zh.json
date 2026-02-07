@@ -1,6 +1,7 @@
 {
   "header": {
     "title": "股市望远镜",
+    "home": "首页",
     "market": "市场",
     "review": "投资复盘",
     "pricing": "定价",
@@ -37,6 +38,81 @@
   "home": {
     "metaTitle": "股市望远镜 - AI 驱动的投资机会",
     "metaDescription": "发现由人工智能驱动的新兴股票投资机会"
+  },
+  "landing": {
+    "hero": {
+      "badge": "AI 驱动的投资机会平台",
+      "title": "让投资机会有迹可循",
+      "subtitle": "聚合市场信号、记录灵感、沉淀复盘，用一套工作流把机会从发现到验证串起来。",
+      "primaryCta": "进入应用",
+      "secondaryCta": "查看市场数据",
+      "note": "无需付费即可体验核心功能"
+    },
+    "value": {
+      "title": "三个关键价值",
+      "subtitle": "从机会捕捉到复盘沉淀，帮你建立长期可用的投资体系",
+      "items": {
+        "discovery": {
+          "title": "机会发现",
+          "desc": "用 AI 汇集新闻与趋势，快速形成可验证的核心观点"
+        },
+        "market": {
+          "title": "市场洞察",
+          "desc": "从数据中筛选强势信号，聚焦真正值得跟踪的标的"
+        },
+        "review": {
+          "title": "复盘成长",
+          "desc": "沉淀交易逻辑与情绪变化，让经验成为可复用的资产"
+        }
+      }
+    },
+    "workflow": {
+      "title": "三步完成一条机会链路",
+      "subtitle": "把灵感、数据、复盘串联为可持续的工作流",
+      "note": "为个人投资者与研究型用户打造",
+      "steps": {
+        "capture": {
+          "title": "捕捉灵感",
+          "desc": "记录看到的行业变化、产品趋势或公司事件"
+        },
+        "analyze": {
+          "title": "验证机会",
+          "desc": "结合市场数据与关联标的，判断是否值得继续跟踪"
+        },
+        "learn": {
+          "title": "复盘沉淀",
+          "desc": "记录决策过程与结果，形成个人投资知识库"
+        }
+      },
+      "highlight": {
+        "title": "从碎片到体系",
+        "desc": "把分散的想法变成可追踪、可复盘的机会档案",
+        "cta": "开始记录"
+      }
+    },
+    "modules": {
+      "title": "产品模块",
+      "subtitle": "围绕投资机会的完整闭环",
+      "items": {
+        "opportunity": {
+          "title": "投资机会",
+          "desc": "集中管理灵感、来源、触发词与关联股票"
+        },
+        "market": {
+          "title": "市场数据",
+          "desc": "追踪涨跌、成交与宽度，发现市场热度变化"
+        },
+        "review": {
+          "title": "投资复盘",
+          "desc": "导入交易记录，分析收益与风险"
+        }
+      }
+    },
+    "cta": {
+      "title": "准备好构建你的机会库了吗？",
+      "subtitle": "从第一条记录开始，把洞察变成优势",
+      "button": "立即开始"
+    }
   },
   "market": {
     "pageTitle": "市场数据",
@@ -165,6 +241,7 @@
     "loading": "加载中...",
     "noOpportunity": "还没有记录的投资机会",
     "noOpportunityDesc": "开始记录你的第一个投资机会吧",
+    "nextPage": "下一页",
     "recordedAt": "记录时间",
     "source": "来源",
     "coreIdea": "核心观点",

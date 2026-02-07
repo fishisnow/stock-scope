@@ -54,9 +54,17 @@ interface OpportunitiesDatabaseProps {
   onOpportunityChange?: () => void
   onOpenRecorder?: () => void
   onEditOpportunity?: (opportunity: InvestmentOpportunity) => void
+  pageSize?: number
+  enablePagination?: boolean
 }
 
-export function OpportunitiesDatabase({ onOpportunityChange, onOpenRecorder, onEditOpportunity }: OpportunitiesDatabaseProps = {}) {
+export function OpportunitiesDatabase({
+  onOpportunityChange,
+  onOpenRecorder,
+  onEditOpportunity,
+  pageSize,
+  enablePagination
+}: OpportunitiesDatabaseProps = {}) {
   const { session, user, isLoading } = useAuth()
   const t = useTranslations('opportunity')
   const tRecorder = useTranslations('opportunity.recorder')
@@ -64,8 +72,13 @@ export function OpportunitiesDatabase({ onOpportunityChange, onOpenRecorder, onE
   const pathname = usePathname()
   const [opportunities, setOpportunities] = useState<InvestmentOpportunity[]>([])
   const [mounted, setMounted] = useState(false)
+  const [pageIndex, setPageIndex] = useState(0)
   const { toast } = useToast()
   const isAuthenticated = !!session?.access_token
+  const itemsPerPage = pageSize && pageSize > 0 ? pageSize : opportunities.length
+  const totalPages = itemsPerPage ? Math.max(1, Math.ceil(opportunities.length / itemsPerPage)) : 1
+  const startIndex = pageIndex * itemsPerPage
+  const pagedOpportunities = opportunities.slice(startIndex, startIndex + itemsPerPage)
 
   // 处理未登录用户点击股票
   const handleStockClick = (e: React.MouseEvent) => {
@@ -163,6 +176,16 @@ export function OpportunitiesDatabase({ onOpportunityChange, onOpenRecorder, onE
     loadOpportunities()
   }, [isLoading, session?.access_token])
 
+  useEffect(() => {
+    if (pageIndex > totalPages - 1) {
+      setPageIndex(0)
+    }
+  }, [pageIndex, totalPages])
+
+  const handleNextPage = () => {
+    setPageIndex((prev) => (prev + 1) % totalPages)
+  }
+
   // 当投资机会记录器添加/更新后，重新加载列表
   const handleOpportunityChange = () => {
     loadOpportunities()
@@ -191,8 +214,11 @@ export function OpportunitiesDatabase({ onOpportunityChange, onOpenRecorder, onE
 
         {/* 投资机会列表 */}
         {opportunities.length > 0 ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-12">
-            {opportunities.map((opportunity, index) => (
+          <>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+              {pagedOpportunities.map((opportunity, index) => {
+                const displayIndex = startIndex + index
+                return (
               <Card 
                 key={opportunity.id} 
                 className="hover:shadow-lg transition-shadow group cursor-pointer relative"
@@ -268,7 +294,7 @@ export function OpportunitiesDatabase({ onOpportunityChange, onOpenRecorder, onE
                         <CardDescription className="text-sm leading-relaxed line-clamp-3">
                           {opportunity.summary}
                         </CardDescription>
-                      ) : !isAuthenticated && index > 0 ? (
+                      ) : !isAuthenticated && displayIndex > 0 ? (
                         <div className="relative cursor-pointer" onClick={handleStockClick}>
                           <CardDescription className="text-sm leading-relaxed line-clamp-3 blur-[2px] select-none">
                             这是一个投资机会的详细描述内容，包含了核心逻辑和投资理由。登录后即可查看完整内容，了解投资机会的详细分析和相关标的。
@@ -303,7 +329,7 @@ export function OpportunitiesDatabase({ onOpportunityChange, onOpenRecorder, onE
                         <TrendingUp className="h-4 w-4 text-primary" />
                         <span>{t('relatedStocks') || '关联股票'}</span>
                       </div>
-                      <div className={`space-y-2 ${!isAuthenticated && index > 0 ? 'blur-[2px]' : ''}`}>
+                      <div className={`space-y-2 ${!isAuthenticated && displayIndex > 0 ? 'blur-[2px]' : ''}`}>
                         {opportunity.stocks.map((stock, stockIndex) => (
                           <div 
                             key={stockIndex} 
@@ -339,7 +365,7 @@ export function OpportunitiesDatabase({ onOpportunityChange, onOpenRecorder, onE
                         ))}
                       </div>
                     </div>
-                  ) : !isAuthenticated && index > 0 ? (
+                  ) : !isAuthenticated && displayIndex > 0 ? (
                     <div className="text-sm pt-2 border-t space-y-2 cursor-pointer" onClick={handleStockClick}>
                       <div className="flex items-center gap-2 font-medium mb-2">
                         <TrendingUp className="h-4 w-4 text-primary" />
@@ -367,8 +393,17 @@ export function OpportunitiesDatabase({ onOpportunityChange, onOpenRecorder, onE
                   ) : null}
                 </CardContent>
               </Card>
-            ))}
-          </div>
+                )
+              })}
+            </div>
+            {enablePagination && totalPages > 1 ? (
+              <div className="flex justify-center">
+                <Button variant="outline" size="sm" onClick={handleNextPage}>
+                  {t('nextPage')}
+                </Button>
+              </div>
+            ) : null}
+          </>
         ) : (
           <div className="text-center py-12 mb-12">
             <h3 className="text-xl font-medium mb-2">{t('noOpportunities')}</h3>
