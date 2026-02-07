@@ -12,3 +12,4 @@ python-dotenv
 wxpusher
 pydantic>=2.0.0
 openai>=1.0.0
+pandas-market-calendars
