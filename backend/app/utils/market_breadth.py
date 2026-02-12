@@ -4,7 +4,7 @@ from typing import Dict, List, Any
 
 from app.db.database import db
 from app.utils.futu_data import get_above_ma20_stock_codes, get_plate_stocks
-from app.utils.sector_classifier import SECTOR_DEFINITIONS, INDEX_CODES, INDEX_CODE_ZZ800
+from app.utils.sector_classifier import SECTOR_DEFINITIONS, SECTOR_INDUSTRY_MAP, INDEX_CODES
 from app.utils.date_utils import is_trading_day
 INDEX_LABELS = {
     "SH.000906": "中证800",
@@ -59,23 +59,14 @@ def _compute_index_breadth(index_code: str, above_ma20_codes: set):
     db.upsert_market_breadth(records)
 
 
-def _compute_sector_breadth_by_zz800(above_ma20_codes: set):
+def _compute_sector_breadth_all_a(above_ma20_codes: set):
     """
-    使用中证800成分股计算各行业的MA20市场宽度
+    使用全A股股票计算各一级分类的MA20市场宽度
     """
-    index_members_list = [
-        stock for stock in get_plate_stocks(INDEX_CODE_ZZ800)
-        if stock.get('market') == 'A'
-    ]
-    if not index_members_list:
-        return
-    index_member_codes = [
-        stock.get("code") for stock in index_members_list if stock.get("code")
-    ]
-    if not index_member_codes:
-        return
-
-    stocks = db.get_stock_basic_info_by_codes(index_member_codes, market='A')
+    stocks = db.get_stock_basic_info_paginated(
+        market='A',
+        columns='stock_code,sector,industry'
+    )
     if not stocks:
         return
 
@@ -114,9 +105,64 @@ def _compute_sector_breadth_by_zz800(above_ma20_codes: set):
     db.upsert_market_breadth(records)
 
 
+def _compute_industry_breadth_all_a(above_ma20_codes: set):
+    """
+    使用全A股股票计算各二级行业的MA20市场宽度
+    """
+    stocks = db.get_stock_basic_info_paginated(
+        market='A',
+        columns='stock_code,sector,industry'
+    )
+    if not stocks:
+        return
+
+    industry_stats: Dict[str, Dict[str, int]] = {
+        industry: {"total": 0, "above": 0}
+        for industries in SECTOR_INDUSTRY_MAP.values()
+        for industry in industries
+    }
+
+    for stock in stocks:
+        stock_code = stock.get("stock_code")
+        sector = stock.get("sector")
+        industry = stock.get("industry")
+        if not stock_code:
+            continue
+        if sector not in SECTOR_INDUSTRY_MAP:
+            logging.warning(f"{stock_code} 一级分类缺失或无效: {sector}")
+            continue
+        if industry not in SECTOR_INDUSTRY_MAP[sector]:
+            logging.warning(f"{stock_code} 二级行业缺失或无效: {industry}")
+            continue
+        industry_stats[industry]["total"] += 1
+        if stock_code in above_ma20_codes:
+            industry_stats[industry]["above"] += 1
+
+    current_date = datetime.now().strftime('%Y-%m-%d')
+    records = []
+    for industry, stats in industry_stats.items():
+        total = stats["total"]
+        above = stats["above"]
+        if total == 0:
+            breadth_pct = 0
+        else:
+            breadth_pct = round(above / total * 100, 2)
+        records.append({
+            "date": current_date,
+            "breadth_type": "industry",
+            "sector": industry,
+            "total_count": total,
+            "above_ma20_count": above,
+            "breadth_pct": breadth_pct,
+            "updated_at": datetime.now().isoformat()
+        })
+
+    db.upsert_market_breadth(records)
+
+
 def compute_market_breadth_daily(index_codes: List[str] = None):
     """
-    计算指数整体宽度 + 中证800行业宽度，并写入数据库
+    计算指数宽度 + 一级分类宽度 + 二级行业宽度，并写入数据库
     """
     if not is_trading_day(datetime.now()):
         # 非交易时间，直接返回
@@ -132,9 +178,13 @@ def compute_market_breadth_daily(index_codes: List[str] = None):
             logging.error(f"❌ 计算市场宽度失败: {index_code} - {exc}")
             continue
     try:
-        _compute_sector_breadth_by_zz800(above_ma20_codes)
+        _compute_sector_breadth_all_a(above_ma20_codes)
     except Exception as exc:
-        logging.error(f"❌ 计算行业宽度失败: {exc}")
+        logging.error(f"❌ 计算一级分类宽度失败: {exc}")
+    try:
+        _compute_industry_breadth_all_a(above_ma20_codes)
+    except Exception as exc:
+        logging.error(f"❌ 计算二级行业宽度失败: {exc}")
 
 
 __all__ = ["compute_market_breadth_daily"]

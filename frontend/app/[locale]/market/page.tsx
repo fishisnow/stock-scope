@@ -94,6 +94,20 @@ const SECTOR_ORDER = [
   "交运物流",
 ]
 
+const INDUSTRY_GROUPS: Array<{ sector: string; industries: string[] }> = [
+  { sector: "科技", industries: ["半导体", "消费电子", "光学光电子", "通信设备", "计算机应用", "软件开发", "传媒"] },
+  { sector: "医药", industries: ["化学制药", "生物制品", "中药", "医疗器械", "医疗服务"] },
+  { sector: "消费", industries: ["食品饮料", "家电"] },
+  { sector: "汽车", industries: ["汽车整车", "汽车零部件"] },
+  { sector: "新能源", industries: ["锂电池", "光伏", "风电"] },
+  { sector: "军工", industries: ["军工"] },
+  { sector: "原材料", industries: ["化工", "有色金属", "钢铁", "煤炭"] },
+  { sector: "公用事业和基建", industries: ["电力", "环保", "建筑", "房地产"] },
+  { sector: "金融", industries: ["银行", "证券", "保险"] },
+  { sector: "交运物流", industries: ["物流", "航空", "机场", "港口", "高速", "铁路", "航运"] },
+]
+const INDUSTRY_ORDER = INDUSTRY_GROUPS.flatMap((group) => group.industries)
+
 const INDEX_OPTIONS = [
   { code: "SH.000906", label: "中证800" },
   { code: "SZ.399102", label: "创业板指" },
@@ -350,10 +364,13 @@ export default function MarketPage() {
     }
   }
 
-  const getBreadthValue = (date: string, sector: string) => {
+  const getBreadthValue = (date: string, label: string, breadthType?: string) => {
     if (!breadthData) return null
     const record = breadthData.records.find(
-      (item) => item.date === date && item.sector === sector
+      (item) =>
+        item.date === date &&
+        item.sector === label &&
+        (!breadthType || item.breadth_type === breadthType)
     )
     return record ? Number(record.breadth_pct) : null
   }
@@ -536,7 +553,7 @@ export default function MarketPage() {
                             {date}
                           </td>
                           {INDEX_OPTIONS.map((indexOption) => {
-                            const value = getBreadthValue(date, indexOption.label)
+                            const value = getBreadthValue(date, indexOption.label, "index")
                             return (
                               <td
                                 key={`${date}-${indexOption.code}`}
@@ -548,10 +565,83 @@ export default function MarketPage() {
                             )
                           })}
                           {SECTOR_ORDER.map((sector) => {
-                            const value = getBreadthValue(date, sector)
+                            const value = getBreadthValue(date, sector, "sector")
                             return (
                               <td
                                 key={`${date}-${sector}`}
+                                className={`py-2 px-2 text-center text-xs font-mono border border-border/30 ${getBreadthTextColor(value)}`}
+                                style={{ backgroundColor: getBreadthColor(value) }}
+                              >
+                                {value === null ? "-" : value.toFixed(0)}
+                              </td>
+                            )
+                          })}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+              {!breadthLoading && (!breadthData || breadthData.dates.length === 0) && (
+                <div className="text-sm text-muted-foreground">{t('breadth.noData')}</div>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card className="overflow-hidden">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-xl">{t('breadth.industryTitle')}</CardTitle>
+              <CardDescription>{t('breadth.industrySubtitle')}</CardDescription>
+            </CardHeader>
+            <CardContent className="p-6 pt-0">
+              {breadthLoading && (
+                <div className="text-sm text-muted-foreground">{t('breadth.loading')}</div>
+              )}
+              {!breadthLoading && breadthData && breadthData.dates.length > 0 && (
+                <div className="overflow-x-auto">
+                  <table className="w-full border-collapse text-sm">
+                    <thead>
+                      <tr>
+                        <th
+                          rowSpan={2}
+                          className="text-left py-2 px-3 text-muted-foreground whitespace-nowrap border border-border/30"
+                        >
+                          {t('breadth.date')}
+                        </th>
+                        {INDUSTRY_GROUPS.map((group) => (
+                          <th
+                            key={group.sector}
+                            colSpan={group.industries.length}
+                            className="py-2 px-2 text-center text-muted-foreground whitespace-nowrap border border-border/30"
+                          >
+                            {group.sector}
+                          </th>
+                        ))}
+                      </tr>
+                      <tr>
+                        {INDUSTRY_GROUPS.map((group) =>
+                          group.industries.map((industry) => (
+                            <th
+                              key={`${group.sector}-${industry}`}
+                              className="py-2 px-2 text-center text-muted-foreground whitespace-nowrap border border-border/30"
+                            >
+                              {industry}
+                            </th>
+                          ))
+                        )}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {breadthData.dates.map((date) => (
+                        <tr key={`industry-${date}`} className="border-t border-border/50">
+                          <td className="py-2 px-3 text-muted-foreground whitespace-nowrap border border-border/30 bg-background">
+                            {date}
+                          </td>
+                          {INDUSTRY_ORDER.map((industry) => {
+                            const value = getBreadthValue(date, industry, "industry")
+                            return (
+                              <td
+                                key={`${date}-${industry}`}
                                 className={`py-2 px-2 text-center text-xs font-mono border border-border/30 ${getBreadthTextColor(value)}`}
                                 style={{ backgroundColor: getBreadthColor(value) }}
                               >

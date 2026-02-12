@@ -342,7 +342,7 @@ COMMENT ON COLUMN stock_basic_info.last_synced_at IS '最后同步时间';
 CREATE TABLE IF NOT EXISTS market_breadth_daily (
     id BIGSERIAL PRIMARY KEY,
     date DATE NOT NULL,
-    breadth_type VARCHAR(20) NOT NULL,                        -- 宽度类型: index/sector
+    breadth_type VARCHAR(20) NOT NULL,                        -- 宽度类型: index/sector/industry
     sector VARCHAR(50) NOT NULL,                              -- 指数名称或行业名称
     total_count INTEGER NOT NULL DEFAULT 0,                   -- 板块内总股票数
     above_ma20_count INTEGER NOT NULL DEFAULT 0,              -- 高于MA20数量
@@ -358,7 +358,7 @@ CREATE INDEX IF NOT EXISTS idx_market_breadth_daily_date
 ON market_breadth_daily (date);
 
 COMMENT ON TABLE market_breadth_daily IS '市场宽度日度统计';
-COMMENT ON COLUMN market_breadth_daily.breadth_type IS '宽度类型';
+COMMENT ON COLUMN market_breadth_daily.breadth_type IS '宽度类型：index-指数，sector-一级分类，industry-二级行业';
 COMMENT ON COLUMN market_breadth_daily.sector IS '指数或行业名称';
 COMMENT ON COLUMN market_breadth_daily.total_count IS '板块内总股票数';
 COMMENT ON COLUMN market_breadth_daily.above_ma20_count IS '高于MA20数量';
