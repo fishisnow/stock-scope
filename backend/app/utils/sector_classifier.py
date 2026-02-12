@@ -8,17 +8,25 @@ import requests
 from app.db.database import db
 from app.utils.futu_data import get_plate_stocks
 
+SECTOR_INDUSTRY_MAP: Dict[str, List[str]] = {
+    "科技": ["半导体", "消费电子", "光学光电子", "通信设备", "计算机应用", "软件开发", "传媒"],
+    "医药": ["化学制药", "生物制品", "中药", "医疗器械", "医疗服务"],
+    "消费": ["食品饮料", "家电"],
+    "汽车": ["汽车整车", "汽车零部件"],
+    "新能源": ["锂电池", "光伏", "风电"],
+    "军工": ["军工"],
+    "原材料": ["化工", "有色金属", "钢铁", "煤炭"],
+    "公用事业和基建": ["电力", "环保", "建筑", "房地产"],
+    "金融": ["银行", "证券", "保险"],
+    "交运物流": ["物流", "航空", "机场", "港口", "高速", "铁路", "航运"],
+}
 SECTOR_DEFINITIONS = {
-    '大消费': '白酒、食品、家电、零售',
-    '医药健康': '医药、医疗、生物制药',
-    '科技成长': '半导体、软件、互联网、通信',
-    '大金融': '银行、证券、保险',
-    '新能源': '光伏、锂电、储能、新能源汽车',
-    '周期资源': '煤炭、钢铁、有色、化工',
-    '高端制造': '军工、机械、自动化',
-    '公用事业': '电力、燃气、环保',
-    '房地产基建': '房地产、建筑、建材',
-    '交通运输': '物流、航运、港口、航空'
+    sector: "、".join(industries) for sector, industries in SECTOR_INDUSTRY_MAP.items()
+}
+INDUSTRY_TO_SECTOR = {
+    industry: sector
+    for sector, industries in SECTOR_INDUSTRY_MAP.items()
+    for industry in industries
 }
 
 INDEX_CODE_ZZ800 = 'SH.000906'
@@ -49,20 +57,25 @@ def _build_sector_prompt(stock_items: List[Dict]) -> str:
         for item in stock_items
     ])
 
-    return f"""你是资深A股行业研究员，请根据股票名称和常识判断板块归属。
+    return f"""你是资深A股行业研究员，请根据股票名称和常识判断一级分类和二级行业。
 
-板块候选（只能从以下10个中选择）：
+一级分类候选（只能从以下10个中选择）：
 {sector_list}
 
-板块定义：
+二级行业范围：
 {definitions}
 
 请输出严格JSON对象，格式如下：
-{{"items":[{{"stock_code":"000001","sector":"大金融","confidence":85}}]}}
+{{"items":[{{"stock_code":"000001","sector":"金融","industry":"银行","confidence":85}}]}}
 
 items 中每个元素包含：
-stock_code, sector, confidence
+stock_code, sector, industry, confidence
 其中 confidence 为 0-100 的整数。
+
+要求：
+1. sector 必须是上述10个一级分类之一。
+2. industry 必须是对应 sector 下的二级行业之一。
+3. 若信息不足，返回 sector="未分类"、industry="未分类"。
 
 股票列表：
 {stock_lines}
@@ -129,6 +142,13 @@ def _normalize_sector(sector: str) -> str:
     return "未分类"
 
 
+def _normalize_industry(industry: str, sector: str) -> str:
+    valid_industries = set(SECTOR_INDUSTRY_MAP.get(sector, []))
+    if industry in valid_industries:
+        return industry
+    return "未分类"
+
+
 def _classify_stock_items(stock_items: List[Dict]) -> List[Dict]:
     prompt = _build_sector_prompt(stock_items)
     try:
@@ -148,7 +168,7 @@ def _classify_stock_items(stock_items: List[Dict]) -> List[Dict]:
 
 def _merge_sector_metadata(
     a_stocks: List[Dict],
-    sector_map: Dict[str, Tuple[str, float]]
+    sector_map: Dict[str, Tuple[str, str, float]]
 ) -> List[Dict]:
     current_time = datetime.now().isoformat()
     records = []
@@ -157,10 +177,11 @@ def _merge_sector_metadata(
         stock_id = stock.get('id')
         if not stock_id:
             continue
-        sector, confidence = sector_map.get(stock_code, ("未分类", 0))
+        sector, industry, confidence = sector_map.get(stock_code, ("未分类", "未分类", 0))
         records.append({
             "id": stock_id,
             "sector": sector,
+            "industry": industry,
             "sector_confidence": confidence,
             "updated_at": current_time
         })
@@ -169,7 +190,7 @@ def _merge_sector_metadata(
 
 def _get_a_stock_basic_info(full_refresh: bool = False) -> List[Dict]:
     """
-    获取A股基础信息，默认仅返回未分类股票
+    获取A股基础信息，默认仅返回待补齐行业分类的股票
     """
     return [
         {
@@ -178,15 +199,24 @@ def _get_a_stock_basic_info(full_refresh: bool = False) -> List[Dict]:
             "stock_name": stock.get("stock_name"),
             "market": stock.get("market"),
             "exchange": stock.get("exchange"),
-            "sector": stock.get("sector")
+            "sector": stock.get("sector"),
+            "industry": stock.get("industry"),
         }
         for stock in db.get_stock_basic_info_paginated(
             market='A',
-            columns='id,stock_code,stock_name,market,exchange,sector'
+            columns='id,stock_code,stock_name,market,exchange,sector,industry'
         )
         if stock.get("id")
         and stock.get("stock_code")
-        and (full_refresh or not str(stock.get("sector") or "").strip() or str(stock.get("sector")).strip() == "未分类")
+        and (
+            full_refresh
+            or not str(stock.get("sector") or "").strip()
+            or str(stock.get("sector")).strip() not in SECTOR_DEFINITIONS
+            or not str(stock.get("industry") or "").strip()
+            or str(stock.get("industry")).strip() not in INDUSTRY_TO_SECTOR
+            or INDUSTRY_TO_SECTOR.get(str(stock.get("industry")).strip())
+            != str(stock.get("sector") or "").strip()
+        )
     ]
 
 
@@ -226,14 +256,14 @@ def _build_index_membership_map(index_codes: List[str]) -> Dict[str, List[str]]:
 
 def classify_and_tag_a_stocks(batch_size: int = 50, full_refresh: bool = False) -> Dict:
     """
-    使用 DeepSeek 为A股股票打板块标签
-    :param full_refresh: 是否全量分类（默认仅分类未分类股票）
+    使用 DeepSeek 为A股股票打一级分类/二级行业标签
+    :param full_refresh: 是否全量分类（默认仅分类未补齐或旧分类股票）
     """
     a_stocks = _get_a_stock_basic_info(full_refresh=full_refresh)
     if not a_stocks:
         return {"total": 0, "updated": 0}
 
-    sector_map: Dict[str, Tuple[str, float]] = {}
+    sector_map: Dict[str, Tuple[str, str, float]] = {}
     for i in range(0, len(a_stocks), batch_size):
         batch = a_stocks[i:i + batch_size]
         stock_items = [
@@ -246,15 +276,22 @@ def classify_and_tag_a_stocks(batch_size: int = 50, full_refresh: bool = False) 
         try:
             result = _classify_stock_items(stock_items)
         except Exception as exc:
-            print(f"❌ DeepSeek 板块分类失败: {exc}")
+            print(f"❌ DeepSeek 行业分类失败: {exc}")
             continue
 
         for item in result:
             stock_code = str(item.get("stock_code", "")).strip()
-            sector = _normalize_sector(str(item.get("sector", "")).strip())
+            raw_sector = str(item.get("sector", "")).strip()
+            raw_industry = str(item.get("industry", "")).strip()
+            mapped_sector = INDUSTRY_TO_SECTOR.get(raw_industry)
+            if mapped_sector:
+                sector = mapped_sector
+            else:
+                sector = _normalize_sector(raw_sector)
+            industry = _normalize_industry(raw_industry, sector)
             confidence = float(item.get("confidence", 0) or 0)
             if stock_code:
-                sector_map[stock_code] = (sector, confidence)
+                sector_map[stock_code] = (sector, industry, confidence)
 
     records = _merge_sector_metadata(a_stocks, sector_map)
     db.upsert_stock_basic_metadata(records)

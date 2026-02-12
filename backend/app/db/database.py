@@ -338,7 +338,7 @@ class StockDatabase:
 
     def upsert_stock_basic_metadata(self, records: List[Dict], batch_size: int = 500):
         """
-        按主键批量更新股票板块等扩展字段（仅更新，不插入）
+        按主键批量更新股票行业分类等扩展字段（仅更新，不插入）
         :param records: 包含 id 以及其他字段的记录
         :param batch_size: 每批次 upsert 的记录数量
         """

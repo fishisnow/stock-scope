@@ -221,13 +221,18 @@ CREATE TABLE IF NOT EXISTS stock_basic_info (
     stock_name VARCHAR(100) NOT NULL,                         -- 股票名称
     market VARCHAR(10) NOT NULL,                              -- 市场: 'A' 或 'HK'
     exchange VARCHAR(10) NOT NULL,                            -- 交易所: 'SH'(上海), 'SZ'(深圳), 'HK'(香港)
-    sector VARCHAR(50),                                       -- 自定义板块
+    sector VARCHAR(50),                                       -- 一级分类
+    industry VARCHAR(50),                                     -- 二级行业
     sector_confidence NUMERIC(5,2),                           -- 板块识别置信度
     index_membership JSONB,                                   -- 指数归属(JSON数组)
     last_synced_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),   -- 最后同步时间
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),        -- 创建时间
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()        -- 更新时间
 );
+
+-- 已存在表的增量字段补齐（幂等）
+ALTER TABLE stock_basic_info
+ADD COLUMN IF NOT EXISTS industry VARCHAR(50);
 
 -- ============================================
 -- 股票基础信息表的索引
@@ -301,6 +306,7 @@ BEGIN
         SELECT
             (elem->>'id')::BIGINT AS id,
             elem->>'sector' AS sector,
+            elem->>'industry' AS industry,
             (elem->>'sector_confidence')::NUMERIC AS sector_confidence,
             (elem->>'updated_at')::TIMESTAMPTZ AS updated_at
         FROM jsonb_array_elements(p_records) AS elem
@@ -310,6 +316,7 @@ BEGIN
         UPDATE stock_basic_info s
         SET
             sector = i.sector,
+            industry = i.industry,
             sector_confidence = i.sector_confidence,
             updated_at = COALESCE(i.updated_at, NOW())
         FROM input_data i
@@ -323,8 +330,9 @@ END;
 $$;
 COMMENT ON COLUMN stock_basic_info.market IS '市场：A-A股市场，HK-港股市场';
 COMMENT ON COLUMN stock_basic_info.exchange IS '交易所：SH-上海交易所，SZ-深圳交易所，HK-香港交易所';
-COMMENT ON COLUMN stock_basic_info.sector IS '板块分类（自定义行业）';
-COMMENT ON COLUMN stock_basic_info.sector_confidence IS '板块分类置信度';
+COMMENT ON COLUMN stock_basic_info.sector IS '一级分类（如 科技、医药、金融）';
+COMMENT ON COLUMN stock_basic_info.industry IS '二级行业（如 半导体、银行）';
+COMMENT ON COLUMN stock_basic_info.sector_confidence IS '行业分类置信度';
 COMMENT ON COLUMN stock_basic_info.index_membership IS '指数归属，JSON数组';
 COMMENT ON COLUMN stock_basic_info.last_synced_at IS '最后同步时间';
 
