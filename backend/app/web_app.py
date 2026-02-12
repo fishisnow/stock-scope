@@ -7,6 +7,7 @@ from db.database import StockDatabase
 from api.auth_middleware import token_required, optional_token
 from api.trading_api import trading_bp
 from api.stock_analysis_api import register_stock_analysis_api, register_investment_opportunities_api
+from utils.date_utils import TradingDateUtils
 import json
 
 app = Flask(__name__)
@@ -16,6 +17,7 @@ app.config['JSON_AS_ASCII'] = False
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024
 CORS(app)  # 启用 CORS 支持
 db = StockDatabase()
+trading_date_utils = TradingDateUtils()
 
 # 注册交易API蓝图
 app.register_blueprint(trading_bp)
@@ -33,12 +35,24 @@ register_investment_opportunities_api(app)
 
 @app.route('/api/dates')
 def get_available_dates():
-    """获取可用的统计日期"""
+    """获取可用的统计日期（港股和A股最近30个交易日的并集）"""
     try:
-        dates = db.get_available_dates(30)
+        now = datetime.now()
+        # 9点之前排除当天（尚未开盘，无数据）
+        end_date = (now - timedelta(days=1)).strftime('%Y-%m-%d') if now.hour < 9 else now.strftime('%Y-%m-%d')
+        # 往前推60个自然日，确保覆盖至少30个交易日
+        start_date = (now - timedelta(days=60)).strftime('%Y-%m-%d')
+
+        # 分别获取A股和港股的交易日
+        cn_days = set(trading_date_utils.get_trading_days_in_range(start_date, end_date, market="CN"))
+        hk_days = set(trading_date_utils.get_trading_days_in_range(start_date, end_date, market="HK"))
+
+        # 取并集，降序排列，取最近30天
+        all_days = sorted(cn_days | hk_days, reverse=True)[:30]
+
         return jsonify({
             'success': True,
-            'data': dates
+            'data': all_days
         })
     except Exception as e:
         return jsonify({

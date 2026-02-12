@@ -6,10 +6,43 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Calendar, TrendingUp, TrendingDown, ChevronLeft, ChevronRight, Sparkles } from "lucide-react"
+import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectSeparator, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useTranslations } from 'next-intl'
 import { Link } from "@/i18n/routing"
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5001"
+
+const WEEKDAY_LABELS = ["周日", "周一", "周二", "周三", "周四", "周五", "周六"]
+
+/** 将 "2026-02-13" 格式化为 "02-13 周五" */
+function formatDateLabel(dateStr: string): string {
+  const d = new Date(dateStr + "T00:00:00")
+  const mm = String(d.getMonth() + 1).padStart(2, "0")
+  const dd = String(d.getDate()).padStart(2, "0")
+  return `${mm}-${dd} ${WEEKDAY_LABELS[d.getDay()]}`
+}
+
+/** 从日期字符串获取 "YYYY年MM月" 分组标签 */
+function getMonthGroup(dateStr: string): string {
+  const [year, month] = dateStr.split("-")
+  return `${year}年${month}月`
+}
+
+/** 将日期列表按月份分组，保持原顺序 */
+function groupDatesByMonth(dates: string[]): { label: string; dates: string[] }[] {
+  const groups: { label: string; dates: string[] }[] = []
+  let currentLabel = ""
+  for (const date of dates) {
+    const label = getMonthGroup(date)
+    if (label !== currentLabel) {
+      groups.push({ label, dates: [date] })
+      currentLabel = label
+    } else {
+      groups[groups.length - 1].dates.push(date)
+    }
+  }
+  return groups
+}
 
 interface Stock {
   name: string
@@ -552,29 +585,34 @@ export default function MarketPage() {
               <ChevronLeft className="h-4 w-4" />
             </Button>
 
-            <div className="relative">
-              <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
-              <select
-                value={selectedDate}
-                onChange={(e) => handleDateChange(e.target.value)}
-                disabled={loading}
-                className="appearance-none pl-10 pr-8 py-2.5 border border-border rounded-lg text-sm font-medium bg-background text-foreground transition-all focus:outline-none focus:ring-2 focus:ring-ring focus:border-ring disabled:opacity-50 min-w-[180px] cursor-pointer hover:bg-secondary/50"
-              >
-                {availableDates.length === 0 ? (
-                  <option value="">{t('date.loadingDates')}</option>
-                ) : (
-                  <>
-                    <option value="">{t('date.selectDate')}</option>
-                    {availableDates.map((date) => (
-                      <option key={date} value={date}>
-                        {date}
-                      </option>
+            <Select
+              value={selectedDate}
+              onValueChange={handleDateChange}
+              disabled={loading || availableDates.length === 0}
+            >
+              <SelectTrigger className="min-w-[200px] h-10 gap-2 font-medium">
+                <Calendar className="h-4 w-4 text-muted-foreground shrink-0" />
+                <SelectValue placeholder={availableDates.length === 0 ? t('date.loadingDates') : t('date.selectDate')} />
+              </SelectTrigger>
+              <SelectContent className="max-h-[320px]">
+                {groupDatesByMonth(availableDates).map((group, groupIdx) => (
+                  <SelectGroup key={group.label}>
+                    {groupIdx > 0 && <SelectSeparator />}
+                    <SelectLabel className="text-xs text-muted-foreground font-semibold tracking-wide">
+                      {group.label}
+                    </SelectLabel>
+                    {group.dates.map((date) => (
+                      <SelectItem key={date} value={date} className="font-mono text-sm">
+                        <span className="flex items-center gap-2">
+                          <span>{date}</span>
+                          <span className="text-muted-foreground text-xs">{formatDateLabel(date).split(" ")[1]}</span>
+                        </span>
+                      </SelectItem>
                     ))}
-                  </>
-                )}
-              </select>
-              <ChevronLeft className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none rotate-[-90deg]" />
-            </div>
+                  </SelectGroup>
+                ))}
+              </SelectContent>
+            </Select>
 
             <Button
               variant="outline"
