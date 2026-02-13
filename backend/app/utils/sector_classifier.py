@@ -263,9 +263,11 @@ def classify_and_tag_a_stocks(batch_size: int = 50, full_refresh: bool = False) 
     if not a_stocks:
         return {"total": 0, "updated": 0}
 
-    sector_map: Dict[str, Tuple[str, str, float]] = {}
+    updated_count = 0
     for i in range(0, len(a_stocks), batch_size):
         batch = a_stocks[i:i + batch_size]
+        batch_codes = {s.get("stock_code") for s in batch if s.get("stock_code")}
+        batch_sector_map: Dict[str, Tuple[str, str, float]] = {}
         stock_items = [
             {"stock_code": s["stock_code"], "stock_name": s["stock_name"]}
             for s in batch
@@ -290,12 +292,15 @@ def classify_and_tag_a_stocks(batch_size: int = 50, full_refresh: bool = False) 
                 sector = _normalize_sector(raw_sector)
             industry = _normalize_industry(raw_industry, sector)
             confidence = float(item.get("confidence", 0) or 0)
-            if stock_code:
-                sector_map[stock_code] = (sector, industry, confidence)
+            if stock_code in batch_codes:
+                batch_sector_map[stock_code] = (sector, industry, confidence)
 
-    records = _merge_sector_metadata(a_stocks, sector_map)
-    db.upsert_stock_basic_metadata(records)
-    return {"total": len(a_stocks), "updated": len(records)}
+        # 每个批次分类完成后立即落库，避免全部批次结束后才更新
+        batch_records = _merge_sector_metadata(batch, batch_sector_map)
+        db.upsert_stock_basic_metadata(batch_records)
+        updated_count += len(batch_records)
+
+    return {"total": len(a_stocks), "updated": updated_count}
 
 
 def update_index_membership_for_a_stocks() -> Dict:
