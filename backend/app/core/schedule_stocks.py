@@ -193,4 +193,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    classify_and_tag_a_stocks()

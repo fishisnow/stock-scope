@@ -38,8 +38,9 @@ def get_available_dates():
     """获取可用的统计日期（港股和A股最近30个交易日的并集）"""
     try:
         now = datetime.now()
-        # 9点之前排除当天（尚未开盘，无数据）
-        end_date = (now - timedelta(days=1)).strftime('%Y-%m-%d') if now.hour < 9 else now.strftime('%Y-%m-%d')
+        # 9点30分之前排除当天（尚未开盘，无数据）
+        before_open = now.hour < 9 or (now.hour == 9 and now.minute < 55)
+        end_date = (now - timedelta(days=1)).strftime('%Y-%m-%d') if before_open else now.strftime('%Y-%m-%d')
         # 往前推60个自然日，确保覆盖至少30个交易日
         start_date = (now - timedelta(days=60)).strftime('%Y-%m-%d')
 
