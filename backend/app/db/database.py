@@ -1,10 +1,11 @@
 # -*- coding: utf-8 -*-
 
 import os
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Dict, List, Optional
 from supabase import create_client, Client
 from dotenv import load_dotenv
+from app.utils.date_utils import TradingDateUtils
 
 # 加载环境变量
 load_dotenv()
@@ -19,6 +20,7 @@ class StockDatabase:
             raise ValueError("请在.env文件中配置SUPABASE_URL和SUPABASE_KEY")
         
         self.client: Client = create_client(self.supabase_url, self.supabase_key)
+        self.trading_date_utils = TradingDateUtils()
         print("✅ Supabase客户端初始化成功")
     
     def save_stock_data(self, data_source: str, market: str, data: Dict[str, List[Dict]]):
@@ -440,14 +442,18 @@ class StockDatabase:
         获取最近N天市场宽度数据
         """
         try:
-            dates_resp = self.client.table('market_breadth_daily').select('date').order('date', desc=True).execute()
-            dates = []
-            for row in dates_resp.data:
-                date_value = row.get('date')
-                if date_value and date_value not in dates:
-                    dates.append(date_value)
-                if len(dates) >= limit:
-                    break
+            # A股开盘前不使用当天，避免请求到尚未产出的日度数据
+            now = datetime.now()
+            before_open = now.hour < 9 or (now.hour == 9 and now.minute < 55)
+            end_date = (now - timedelta(days=1)).strftime('%Y-%m-%d') if before_open else now.strftime('%Y-%m-%d')
+
+            # 先用交易日历计算近 N 个 A 股交易日，再下推到数据库按 date IN 查询
+            # 预留更长自然日窗口，确保节假日较多时也能覆盖到足够交易日
+            lookback_days = max(limit * 4, 120)
+            start_date = (now - timedelta(days=lookback_days)).strftime('%Y-%m-%d')
+            dates = self.trading_date_utils.get_trading_days_in_range(start_date, end_date, market='CN')
+            dates = sorted(set(dates), reverse=True)[:limit]
+
             if not dates:
                 return {"dates": [], "records": []}
 
@@ -455,7 +461,13 @@ class StockDatabase:
             if breadth_type:
                 query = query.eq('breadth_type', breadth_type)
             data_resp = query.execute()
-            return {"dates": dates, "records": data_resp.data or []}
+            records = data_resp.data or []
+
+            # 只返回实际有数据的日期（例如当天无数据时不返回当天）
+            existing_dates = {row.get('date') for row in records if row.get('date')}
+            filtered_dates = [date for date in dates if date in existing_dates]
+
+            return {"dates": filtered_dates, "records": records}
         except Exception as e:
             print(f"❌ 查询市场宽度数据失败: {e}")
             raise

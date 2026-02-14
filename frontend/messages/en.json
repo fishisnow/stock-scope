@@ -153,8 +153,10 @@
     "breadth": {
       "title": "A-Share Market Breadth",
       "subtitle": "Sector breadth based on % of stocks above MA20",
-      "industryTitle": "A-Share Industry Breadth",
-      "industrySubtitle": "Breadth by level-1 sectors and level-2 industries",
+      "marketSectorTitle": "Index & Sector Breadth",
+      "marketSectorInlineNote": "by major indices and level-1 sectors",
+      "industryTitle": "Industry Breadth",
+      "industryInlineNote": "by level-1 sectors and level-2 industries",
       "thresholdHint": "When market breadth approaches or exceeds a specific threshold (e.g., 85%), it may signal a cyclical peak; when it nears or falls below another threshold (e.g., 15%), it may signal a cyclical bottom.",
       "loading": "Loading market breadth...",
       "index": "Index",

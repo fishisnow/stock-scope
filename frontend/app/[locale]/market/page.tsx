@@ -378,23 +378,21 @@ export default function MarketPage() {
   const getBreadthColor = (value: number | null) => {
     if (value === null) return "transparent"
     const clamped = Math.max(0, Math.min(100, value))
-    const midpoint = 50
-    const isHigh = clamped >= midpoint
-    const ratio = isHigh ? (clamped - midpoint) / midpoint : (midpoint - clamped) / midpoint
-    const lightness = 95 - ratio * 60
-    const hue = isHigh ? 0 : 120
-    return `hsl(${hue}, 55%, ${lightness}%)`
+    const linear = Math.abs(clamped - 50) / 50
+    // 用幂函数加速着色，让中间值也有明显颜色（参考富途热力图风格）
+    const ratio = Math.pow(linear, 0.65)
+    // 富途风格：红 #cf2a2a / 绿 #00873a，从白色渐变
+    const r = clamped >= 50 ? Math.round(255 - ratio * (255 - 207)) : Math.round(255 - ratio * (255 - 0))
+    const g = clamped >= 50 ? Math.round(255 - ratio * (255 - 42))  : Math.round(255 - ratio * (255 - 135))
+    const b = clamped >= 50 ? Math.round(255 - ratio * (255 - 42))  : Math.round(255 - ratio * (255 - 58))
+    return `rgb(${r}, ${g}, ${b})`
   }
 
   const getBreadthTextColor = (value: number | null) => {
     if (value === null) return "text-muted-foreground"
-    const clamped = Math.max(0, Math.min(100, value))
-    const midpoint = 50
-    const isHigh = clamped >= midpoint
-    const ratio = isHigh ? (clamped - midpoint) / midpoint : (midpoint - clamped) / midpoint
-    const lightness = 95 - ratio * 60
-    if (lightness <= 55) return "text-white"
-    return "text-slate-900"
+    const linear = Math.abs(Math.max(0, Math.min(100, value)) - 50) / 50
+    const ratio = Math.pow(linear, 0.65)
+    return ratio > 0.35 ? "text-white" : "text-slate-900"
   }
 
   const handleDateChange = (date: string) => {
@@ -516,22 +514,30 @@ export default function MarketPage() {
           </div>
 
           <Card className="overflow-hidden">
-            <CardContent className="p-6">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-xl">
+                {t('breadth.marketSectorTitle')}
+                <span className="ml-2 text-sm font-normal text-muted-foreground">
+                  {t('breadth.marketSectorInlineNote')}
+                </span>
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-6 pt-0">
               {breadthLoading && (
                 <div className="text-sm text-muted-foreground">{t('breadth.loading')}</div>
               )}
               {!breadthLoading && breadthData && breadthData.dates.length > 0 && (
                 <div className="overflow-x-auto">
-                  <table className="w-full border-collapse text-sm">
+                  <table className="border-collapse text-sm">
                     <thead>
                       <tr>
-                        <th className="text-left py-2 px-3 text-muted-foreground whitespace-nowrap border border-border/30">
+                        <th className="text-left py-2 px-3 text-muted-foreground whitespace-nowrap border border-border/30 w-[90px]">
                           {t('breadth.date')}
                         </th>
                         {INDEX_OPTIONS.map((indexOption) => (
                           <th
                             key={indexOption.code}
-                            className="py-2 px-2 text-center text-muted-foreground whitespace-nowrap border border-border/30"
+                            className="py-2 px-2 text-center text-muted-foreground whitespace-nowrap border border-border/30 w-[60px]"
                           >
                             {indexOption.label}
                           </th>
@@ -539,7 +545,7 @@ export default function MarketPage() {
                         {SECTOR_ORDER.map((sector) => (
                           <th
                             key={sector}
-                            className="py-2 px-2 text-center text-muted-foreground whitespace-nowrap border border-border/30"
+                            className="py-2 px-2 text-center text-muted-foreground whitespace-nowrap border border-border/30 w-[60px]"
                           >
                             {sector}
                           </th>
@@ -590,8 +596,12 @@ export default function MarketPage() {
 
           <Card className="overflow-hidden">
             <CardHeader className="pb-3">
-              <CardTitle className="text-xl">{t('breadth.industryTitle')}</CardTitle>
-              <CardDescription>{t('breadth.industrySubtitle')}</CardDescription>
+              <CardTitle className="text-xl">
+                {t('breadth.industryTitle')}
+                <span className="ml-2 text-sm font-normal text-muted-foreground">
+                  {t('breadth.industryInlineNote')}
+                </span>
+              </CardTitle>
             </CardHeader>
             <CardContent className="p-6 pt-0">
               {breadthLoading && (
@@ -599,12 +609,12 @@ export default function MarketPage() {
               )}
               {!breadthLoading && breadthData && breadthData.dates.length > 0 && (
                 <div className="overflow-x-auto">
-                  <table className="w-full border-collapse text-sm">
+                  <table className="border-collapse text-sm">
                     <thead>
                       <tr>
                         <th
                           rowSpan={2}
-                          className="text-left py-2 px-3 text-muted-foreground whitespace-nowrap border border-border/30"
+                          className="text-left py-2 px-3 text-muted-foreground whitespace-nowrap border border-border/30 w-[90px]"
                         >
                           {t('breadth.date')}
                         </th>
@@ -623,7 +633,7 @@ export default function MarketPage() {
                           group.industries.map((industry) => (
                             <th
                               key={`${group.sector}-${industry}`}
-                              className="py-2 px-2 text-center text-muted-foreground whitespace-nowrap border border-border/30"
+                              className="py-2 px-2 text-center text-muted-foreground whitespace-nowrap border border-border/30 w-[52px]"
                             >
                               {industry}
                             </th>
