@@ -1,3 +1,5 @@
+import logging
+import threading
 import time
 
 from futu import *
@@ -5,6 +7,8 @@ from datetime import date
 import pandas as pd
 from typing import Dict, List
 import os
+
+logger = logging.getLogger(__name__)
 
 # 获取今天的日期并格式化
 formatted_date = date.today().strftime('%Y%m%d')
@@ -18,6 +22,47 @@ plate_code_name = {
     'HK.LIST1600': '港股',
     'SH.LIST0600': '大A'
 }
+
+
+# ============================================
+# 共享 FutuQuoteContext（单例复用，避免每次调用都建立 TCP 连接）
+# ============================================
+
+_quote_ctx = None
+_quote_ctx_lock = threading.Lock()
+
+
+def get_quote_context() -> OpenQuoteContext:
+    """
+    获取共享的富途行情上下文（惰性创建，全局复用）。
+    连接断开时自动重建。
+    """
+    global _quote_ctx
+    with _quote_ctx_lock:
+        if _quote_ctx is None:
+            futu_host = os.getenv('FUTU_HOST', '127.0.0.1')
+            futu_port = int(os.getenv('FUTU_PORT', '11111'))
+            _quote_ctx = OpenQuoteContext(host=futu_host, port=futu_port)
+            logger.info(f"FutuQuoteContext created: {futu_host}:{futu_port}")
+        return _quote_ctx
+
+
+def _reset_quote_context():
+    """连接异常时重置上下文，下次调用 get_quote_context 会重建"""
+    global _quote_ctx
+    with _quote_ctx_lock:
+        if _quote_ctx is not None:
+            try:
+                _quote_ctx.close()
+            except Exception:
+                pass
+            _quote_ctx = None
+            logger.info("FutuQuoteContext reset due to error")
+
+
+def close_quote_context():
+    """应用退出时调用，关闭共享的富途行情上下文"""
+    _reset_quote_context()
 
 
 def get_hot_top(quote_context, plate_code: str, sort_field: str, top: int = 50):
@@ -64,11 +109,7 @@ def get_stock_data(plate_code: str) -> Dict[str, List[Dict]]:
     :return: 包含涨幅和成交额排名的字典
     """
     try:
-        # 创建行情上下文
-        # mac Docker 容器内访问宿主机使用 host.docker.internal
-        futu_host = os.getenv('FUTU_HOST', '127.0.0.1')
-        futu_port = int(os.getenv('FUTU_PORT', '11111'))
-        quote_context = OpenQuoteContext(host=futu_host, port=futu_port)
+        quote_context = get_quote_context()
         
         # 获取涨幅前50
         change_rate_df = get_hot_top(quote_context, plate_code, 'CHANGE_RATE', 50)
@@ -83,9 +124,6 @@ def get_stock_data(plate_code: str) -> Dict[str, List[Dict]]:
         
         # 一次性获取所有股票的详细数据
         quote_data = get_stock_quote(quote_context, all_codes)
-        
-        # 关闭行情上下文
-        quote_context.close()
         
         # 处理数据
         def process_df(df):
@@ -247,62 +285,45 @@ def get_plate_stocks(plate_code: str) -> List[Dict]:
         ]
     """
     try:
-        # 创建行情上下文
-        futu_host = os.getenv('FUTU_HOST', '127.0.0.1')
-        futu_port = int(os.getenv('FUTU_PORT', '11111'))
-        quote_ctx = OpenQuoteContext(host=futu_host, port=futu_port)
+        quote_ctx = get_quote_context()
         
-        try:
-            # 获取板块内所有股票
-            ret, data = quote_ctx.get_plate_stock(plate_code)
+        ret, data = quote_ctx.get_plate_stock(plate_code)
+        
+        if ret != RET_OK:
+            raise Exception(f"获取板块股票失败: {data}")
+        
+        if data.empty:
+            return []
+        
+        market = 'HK' if plate_code.startswith('HK.') else 'A'
+        
+        stocks = []
+        for _, row in data.iterrows():
+            futu_code = str(row['code']) if pd.notna(row['code']) else ''
+            stock_name = str(row['stock_name']) if pd.notna(row['stock_name']) else ''
             
-            if ret != RET_OK:
-                quote_ctx.close()
-                raise Exception(f"获取板块股票失败: {data}")
-            
-            if data.empty:
-                quote_ctx.close()
-                return []
-            
-            # 确定市场类型
-            market = 'HK' if plate_code.startswith('HK.') else 'A'
-            
-            # 处理数据
-            stocks = []
-            for _, row in data.iterrows():
-                futu_code = str(row['code']) if pd.notna(row['code']) else ''
-                stock_name = str(row['stock_name']) if pd.notna(row['stock_name']) else ''
-                
-                # 从富途代码中提取股票代码和交易所
-                # 格式: SH.000001, SZ.000001, HK.00700
-                if '.' in futu_code:
-                    exchange = futu_code.split('.')[0]
-                    stock_code = futu_code.split('.')[1]
+            if '.' in futu_code:
+                exchange = futu_code.split('.')[0]
+                stock_code = futu_code.split('.')[1]
+            else:
+                if market == 'HK':
+                    exchange = 'HK'
                 else:
-                    # 如果没有点，尝试从市场推断交易所
-                    if market == 'HK':
-                        exchange = 'HK'
+                    if futu_code.startswith(('6', '5')):
+                        exchange = 'SH'
                     else:
-                        # A股：6开头或5开头是上海，其他是深圳
-                        if futu_code.startswith(('6', '5')):
-                            exchange = 'SH'
-                        else:
-                            exchange = 'SZ'
-                    stock_code = futu_code
-                
-                stocks.append({
-                    'code': stock_code,
-                    'name': stock_name,
-                    'exchange': exchange,
-                    'market': market
-                })
+                        exchange = 'SZ'
+                stock_code = futu_code
             
-            return stocks
-            
-        finally:
-            # 关闭连接
-            quote_ctx.close()
-            
+            stocks.append({
+                'code': stock_code,
+                'name': stock_name,
+                'exchange': exchange,
+                'market': market
+            })
+        
+        return stocks
+        
     except Exception as e:
         raise Exception(f"获取板块股票失败: {str(e)}")
 
@@ -337,56 +358,46 @@ def get_above_ma20_stock_codes() -> set:
     获取A股市场（沪深）收盘价高于MA20的股票代码集合
     :return: set(['000001', ...])
     """
-    quote_ctx = None
-    try:
-        futu_host = os.getenv('FUTU_HOST', '127.0.0.1')
-        futu_port = int(os.getenv('FUTU_PORT', '11111'))
-        quote_ctx = OpenQuoteContext(host=futu_host, port=futu_port)
+    quote_ctx = get_quote_context()
 
-        custom_filter = CustomIndicatorFilter()
-        custom_filter.ktype = KLType.K_DAY
-        custom_filter.stock_field1 = StockField.PRICE
-        custom_filter.stock_field2 = StockField.MA
-        custom_filter.stock_field2_para = [20]
-        custom_filter.relative_position = RelativePosition.MORE
-        custom_filter.is_no_filter = False
+    custom_filter = CustomIndicatorFilter()
+    custom_filter.ktype = KLType.K_DAY
+    custom_filter.stock_field1 = StockField.PRICE
+    custom_filter.stock_field2 = StockField.MA
+    custom_filter.stock_field2_para = [20]
+    custom_filter.relative_position = RelativePosition.MORE
+    custom_filter.is_no_filter = False
 
-        def fetch_market_codes(market) -> set:
-            codes = set()
-            begin = 0
-            while True:
-                ret, ls = quote_ctx.get_stock_filter(
-                    market=market,
-                    filter_list=[custom_filter],
-                    begin=begin
-                )
-                if ret != RET_OK:
-                    raise Exception(ls)
+    def fetch_market_codes(market) -> set:
+        codes = set()
+        begin = 0
+        while True:
+            ret, ls = quote_ctx.get_stock_filter(
+                market=market,
+                filter_list=[custom_filter],
+                begin=begin
+            )
+            if ret != RET_OK:
+                raise Exception(ls)
 
-                time.sleep(3)
-                last_page, _, ret_list = ls
-                if not ret_list:
-                    break
-                for item in ret_list:
-                    raw_code = getattr(item, 'stock_code', '')
-                    if '.' in raw_code:
-                        raw_code = raw_code.split('.')[1]
-                    if raw_code:
-                        codes.add(raw_code)
-                if last_page:
-                    break
-                begin += len(ret_list)
-            return codes
+            time.sleep(3)
+            last_page, _, ret_list = ls
+            if not ret_list:
+                break
+            for item in ret_list:
+                raw_code = getattr(item, 'stock_code', '')
+                if '.' in raw_code:
+                    raw_code = raw_code.split('.')[1]
+                if raw_code:
+                    codes.add(raw_code)
+            if last_page:
+                break
+            begin += len(ret_list)
+        return codes
 
-        sh_codes = fetch_market_codes(Market.SH)
-        sz_codes = fetch_market_codes(Market.SZ)
-        return sh_codes.union(sz_codes)
-    finally:
-        if quote_ctx is not None:
-            try:
-                quote_ctx.close()
-            except Exception:
-                pass
+    sh_codes = fetch_market_codes(Market.SH)
+    sz_codes = fetch_market_codes(Market.SZ)
+    return sh_codes.union(sz_codes)
 
 
 def get_stock_current_price(code: str, market: str) -> Dict:
@@ -395,77 +406,44 @@ def get_stock_current_price(code: str, market: str) -> Dict:
     
     :param code: 股票代码，如 '000001'
     :param market: 市场类型，'A' 或 'HK'
-    :return: 包含股票价格信息的字典，格式如下：
-        {
-            'code': '000001',
-            'name': '股票名称',
-            'current_price': 10.5,
-            'change_ratio': 2.5,
-            'volume': 1000000,
-            'amount': 10500000,
-            'open_price': 10.0,
-            'high_price': 10.8,
-            'low_price': 9.9,
-            'prev_close_price': 10.2
-        }
+    :return: 包含股票价格信息的字典
     """
     try:
-        # 转换为富途格式的股票代码
         futu_code = convert_to_futu_code(code, market)
+        quote_ctx = get_quote_context()
         
-        # 创建行情上下文
-        futu_host = os.getenv('FUTU_HOST', '127.0.0.1')
-        futu_port = int(os.getenv('FUTU_PORT', '11111'))
-        quote_ctx = OpenQuoteContext(host=futu_host, port=futu_port)
+        ret_sub, err_message = quote_ctx.subscribe([futu_code], [SubType.QUOTE], subscribe_push=False)
+        if ret_sub != RET_OK:
+            raise Exception(f"订阅股票失败: {err_message}")
         
-        try:
-            # 订阅股票报价
-            ret_sub, err_message = quote_ctx.subscribe([futu_code], [SubType.QUOTE], subscribe_push=False)
-            
-            if ret_sub != RET_OK:
-                quote_ctx.close()
-                raise Exception(f"订阅股票失败: {err_message}")
-            
-            # 获取股票报价
-            ret, data = quote_ctx.get_stock_quote([futu_code])
-            
-            if ret != RET_OK:
-                quote_ctx.close()
-                raise Exception(f"获取股票报价失败: {data}")
-            
-            if data.empty:
-                quote_ctx.close()
-                raise Exception(f"未找到股票 {futu_code} 的报价数据")
-            
-            # 提取数据
-            row = data.iloc[0]
-            last_price = float(row['last_price']) if pd.notna(row['last_price']) else None
-            prev_close_price = float(row['prev_close_price']) if pd.notna(row['prev_close_price']) else None
-            
-            # 计算涨跌幅
-            change_ratio = None
-            if last_price is not None and prev_close_price is not None and prev_close_price > 0:
-                change_ratio = (last_price - prev_close_price) / prev_close_price * 100
-            
-            result = {
-                'code': code,
-                'name': str(row['name']) if pd.notna(row['name']) else '',
-                'current_price': last_price,
-                'change_ratio': change_ratio,
-                'volume': int(row['volume']) if pd.notna(row['volume']) else 0,
-                'amount': float(row['turnover']) if pd.notna(row['turnover']) else 0,
-                'open_price': float(row['open_price']) if pd.notna(row['open_price']) else None,
-                'high_price': float(row['high_price']) if pd.notna(row['high_price']) else None,
-                'low_price': float(row['low_price']) if pd.notna(row['low_price']) else None,
-                'prev_close_price': prev_close_price
-            }
-            
-            return result
-            
-        finally:
-            # 关闭连接
-            quote_ctx.close()
-            
+        ret, data = quote_ctx.get_stock_quote([futu_code])
+        if ret != RET_OK:
+            raise Exception(f"获取股票报价失败: {data}")
+        
+        if data.empty:
+            raise Exception(f"未找到股票 {futu_code} 的报价数据")
+        
+        row = data.iloc[0]
+        last_price = float(row['last_price']) if pd.notna(row['last_price']) else None
+        prev_close_price = float(row['prev_close_price']) if pd.notna(row['prev_close_price']) else None
+        
+        change_ratio = None
+        if last_price is not None and prev_close_price is not None and prev_close_price > 0:
+            change_ratio = (last_price - prev_close_price) / prev_close_price * 100
+        
+        return {
+            'code': code,
+            'name': str(row['name']) if pd.notna(row['name']) else '',
+            'current_price': last_price,
+            'change_ratio': change_ratio,
+            'volume': int(row['volume']) if pd.notna(row['volume']) else 0,
+            'amount': float(row['turnover']) if pd.notna(row['turnover']) else 0,
+            'open_price': float(row['open_price']) if pd.notna(row['open_price']) else None,
+            'high_price': float(row['high_price']) if pd.notna(row['high_price']) else None,
+            'low_price': float(row['low_price']) if pd.notna(row['low_price']) else None,
+            'prev_close_price': prev_close_price
+        }
+        
     except Exception as e:
         raise Exception(f"获取股票价格失败: {str(e)}")
 
@@ -476,60 +454,44 @@ def get_stock_rt_data(code: str, market: str) -> List[Dict]:
     
     :param code: 股票代码，如 '000001'
     :param market: 市场类型，'A' 或 'HK'
-    :return: 分时数据列表，格式如下：
-        [
-            {
-                'date': '2024-01-01 09:30:00',
-                'open': 10.0,
-                'close': 10.0,
-                'high': 10.0,
-                'low': 10.0,
-                'volume': 100000
-            },
-            ...
-        ]
+    :return: 分时数据列表
     """
     try:
         futu_code = convert_to_futu_code(code, market)
-        futu_host = os.getenv('FUTU_HOST', '127.0.0.1')
-        futu_port = int(os.getenv('FUTU_PORT', '11111'))
-        quote_ctx = OpenQuoteContext(host=futu_host, port=futu_port)
+        quote_ctx = get_quote_context()
         
-        try:
-            ret_sub, err_message = quote_ctx.subscribe([futu_code], [SubType.RT_DATA], subscribe_push=False)
-            if ret_sub != RET_OK:
-                raise Exception(f"订阅分时数据失败: {err_message}")
+        ret_sub, err_message = quote_ctx.subscribe([futu_code], [SubType.RT_DATA], subscribe_push=False)
+        if ret_sub != RET_OK:
+            raise Exception(f"订阅分时数据失败: {err_message}")
 
-            ret, data = quote_ctx.get_rt_data(futu_code)
-            if ret != RET_OK:
-                raise Exception(f"获取分时数据失败: {data}")
-            
-            if data.empty:
-                return []
-            
-            result = []
-            for _, row in data.iterrows():
-                if bool(row.get('is_blank')):
-                    continue
-                time_value = str(row.get('time', '')).strip()
-                cur_price = float(row['cur_price']) if pd.notna(row.get('cur_price')) else None
-                volume = int(row['volume']) if pd.notna(row.get('volume')) else 0
-                last_close = float(row['last_close']) if pd.notna(row.get('last_close')) else None
-                turnover = float(row['turnover']) if pd.notna(row.get('turnover')) else None
-                result.append({
-                    'date': time_value,
-                    'open': cur_price,
-                    'close': cur_price,
-                    'high': cur_price,
-                    'low': cur_price,
-                    'volume': volume,
-                    'last_close': last_close,
-                    'turnover': turnover
-                })
-            
-            return result
-        finally:
-            quote_ctx.close()
+        ret, data = quote_ctx.get_rt_data(futu_code)
+        if ret != RET_OK:
+            raise Exception(f"获取分时数据失败: {data}")
+        
+        if data.empty:
+            return []
+        
+        result = []
+        for _, row in data.iterrows():
+            if bool(row.get('is_blank')):
+                continue
+            time_value = str(row.get('time', '')).strip()
+            cur_price = float(row['cur_price']) if pd.notna(row.get('cur_price')) else None
+            volume = int(row['volume']) if pd.notna(row.get('volume')) else 0
+            last_close = float(row['last_close']) if pd.notna(row.get('last_close')) else None
+            turnover = float(row['turnover']) if pd.notna(row.get('turnover')) else None
+            result.append({
+                'date': time_value,
+                'open': cur_price,
+                'close': cur_price,
+                'high': cur_price,
+                'low': cur_price,
+                'volume': volume,
+                'last_close': last_close,
+                'turnover': turnover
+            })
+        
+        return result
     except Exception as e:
         raise Exception(f"获取分时数据失败: {str(e)}")
 
@@ -560,58 +522,53 @@ def get_stock_history_kline(code: str, market: str, start: str, end: str, max_co
         if ktype == "K_RT":
             return get_stock_rt_data(code, market)
         futu_code = convert_to_futu_code(code, market)
-        futu_host = os.getenv('FUTU_HOST', '127.0.0.1')
-        futu_port = int(os.getenv('FUTU_PORT', '11111'))
-        quote_ctx = OpenQuoteContext(host=futu_host, port=futu_port)
+        quote_ctx = get_quote_context()
         
-        try:
-            result = []
-            page_req_key = None
-            remaining = max_count
+        result = []
+        page_req_key = None
+        remaining = max_count
+        
+        ktype_mapping = {
+            "K_DAY": KLType.K_DAY,
+            "K_WEEK": KLType.K_WEEK,
+            "K_MON": KLType.K_MON,
+            "K_QUARTER": KLType.K_QUARTER,
+            "K_YEAR": KLType.K_YEAR
+        }
+        ktype_value = ktype_mapping.get(ktype, KLType.K_DAY)
+        
+        while remaining > 0:
+            ret, data, page_req_key = quote_ctx.request_history_kline(
+                code=futu_code,
+                start=start,
+                end=end,
+                max_count=remaining,
+                ktype=ktype_value,
+                page_req_key=page_req_key
+            )
             
-            ktype_mapping = {
-                "K_DAY": KLType.K_DAY,
-                "K_WEEK": KLType.K_WEEK,
-                "K_MON": KLType.K_MON,
-                "K_QUARTER": KLType.K_QUARTER,
-                "K_YEAR": KLType.K_YEAR
-            }
-            ktype_value = ktype_mapping.get(ktype, KLType.K_DAY)
+            if ret != RET_OK:
+                raise Exception(f"获取K线数据失败: {data}")
             
-            while remaining > 0:
-                ret, data, page_req_key = quote_ctx.request_history_kline(
-                    code=futu_code,
-                    start=start,
-                    end=end,
-                    max_count=remaining,
-                    ktype=ktype_value,
-                    page_req_key=page_req_key
-                )
-                
-                if ret != RET_OK:
-                    raise Exception(f"获取K线数据失败: {data}")
-                
-                if data.empty:
-                    break
-                
-                for _, row in data.iterrows():
-                    time_key = str(row.get('time_key', '')).split(' ')[0]
-                    result.append({
-                        'date': time_key,
-                        'open': float(row['open']) if pd.notna(row['open']) else None,
-                        'close': float(row['close']) if pd.notna(row['close']) else None,
-                        'high': float(row['high']) if pd.notna(row['high']) else None,
-                        'low': float(row['low']) if pd.notna(row['low']) else None,
-                        'volume': int(row['volume']) if pd.notna(row['volume']) else 0
-                    })
-                
-                remaining = max_count - len(result)
-                if not page_req_key:
-                    break
+            if data.empty:
+                break
             
-            return result
-        finally:
-            quote_ctx.close()
+            for _, row in data.iterrows():
+                time_key = str(row.get('time_key', '')).split(' ')[0]
+                result.append({
+                    'date': time_key,
+                    'open': float(row['open']) if pd.notna(row['open']) else None,
+                    'close': float(row['close']) if pd.notna(row['close']) else None,
+                    'high': float(row['high']) if pd.notna(row['high']) else None,
+                    'low': float(row['low']) if pd.notna(row['low']) else None,
+                    'volume': int(row['volume']) if pd.notna(row['volume']) else 0
+                })
+            
+            remaining = max_count - len(result)
+            if not page_req_key:
+                break
+        
+        return result
     except Exception as e:
         raise Exception(f"获取K线历史数据失败: {str(e)}")
 

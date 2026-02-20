@@ -8,6 +8,7 @@ flask-cors
 gunicorn
 requests
 supabase
+PyJWT>=2.0.0
 python-dotenv
 wxpusher
 pydantic>=2.0.0

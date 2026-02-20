@@ -1,23 +1,51 @@
 # -*- coding: utf-8 -*-
 
-from flask import Flask, render_template, request, jsonify
-from flask_cors import CORS
+import logging
+import time
 from datetime import datetime, timedelta
-from db.database import StockDatabase
-from api.auth_middleware import token_required, optional_token
-from api.trading_api import trading_bp
+
+from flask import Flask, g, request, jsonify
+from flask_cors import CORS
+
+from api.auth_middleware import token_required, optional_token, add_httpx_timing_hooks
 from api.stock_analysis_api import register_stock_analysis_api, register_investment_opportunities_api
+from api.trading_api import trading_bp
+from db.database import StockDatabase
 from utils.date_utils import TradingDateUtils
-import json
+
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s [%(name)s] %(levelname)s: %(message)s'
+)
+# 用自定义的带耗时日志替代默认输出
+logging.getLogger('werkzeug').setLevel(logging.WARNING)
+logging.getLogger('httpx').setLevel(logging.WARNING)
+logging.getLogger('httpcore').setLevel(logging.WARNING)
+
+logger = logging.getLogger('api')
 
 app = Flask(__name__)
 # 配置 Flask JSON 输出中文字符不转义
 app.config['JSON_AS_ASCII'] = False
 # 配置上传文件大小限制（16MB）
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024
-CORS(app)  # 启用 CORS 支持
+CORS(app)
 db = StockDatabase()
+add_httpx_timing_hooks(db.client)
 trading_date_utils = TradingDateUtils()
+
+
+@app.before_request
+def _start_timer():
+    g.start_time = time.time()
+
+
+@app.after_request
+def _log_request(response):
+    elapsed = time.time() - g.start_time
+    logger.info(f"{request.method} {request.full_path.rstrip('?')} → {response.status_code} ({elapsed:.3f}s)")
+    return response
+
 
 # 注册交易API蓝图
 app.register_blueprint(trading_bp)

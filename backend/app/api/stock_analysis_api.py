@@ -12,6 +12,8 @@ from dotenv import load_dotenv
 from datetime import datetime
 import re
 
+logger = logging.getLogger(__name__)
+
 # Add the backend directory to Python path for imports
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -669,7 +671,6 @@ def get_investment_opportunities():
         limit = int(request.args.get('limit', 10))
         offset = (page - 1) * limit
 
-        # 获取数据库客户端
         supabase_client = get_user_supabase_client()
         if not supabase_client:
             return jsonify({
@@ -677,13 +678,9 @@ def get_investment_opportunities():
                 "error": "数据库连接失败"
             }), 500
 
-        # 统一查询逻辑：支持分页
         if user:
-            # 已登录用户：查询该用户的所有投资机会
             query = supabase_client.table('investment_opportunities').select('*', count='exact')
         else:
-            # 未登录用户：查询所有用户的投资机会（不限制 user_id）
-            # 不返回 user_id 字段，避免暴露用户信息
             query = supabase_client.table('investment_opportunities').select(
                 'id, core_idea, source_url, summary, trigger_words, recorded_at, created_at, updated_at',
                 count='exact'
@@ -692,15 +689,10 @@ def get_investment_opportunities():
         response = query.order('created_at', desc=True).range(offset, offset + limit - 1).execute()
         opportunities = response.data if response.data else []
 
-        # 处理未登录用户的数据隐藏逻辑
         if not user:
-            # 未登录用户：除了第一条（最新的）记录外，其他记录进行信息隐藏
             opportunity_ids = [opp['id'] for opp in opportunities]
-            
-            # 初始化 stocks_by_opportunity 字典
             stocks_by_opportunity = {}
             
-            # 查询所有机会的股票信息（未登录用户也需要第一条的股票信息）
             if opportunity_ids:
                 try:
                     stocks_response = supabase_client.table('investment_opportunity_stocks').select('*').in_('opportunity_id', opportunity_ids).execute()
@@ -711,26 +703,19 @@ def get_investment_opportunities():
                                 stocks_by_opportunity[opp_id] = []
                             stocks_by_opportunity[opp_id].append(stock)
                 except Exception as e:
-                    print(f"查询股票信息失败: {str(e)}")
-                    # 如果查询失败，stocks_by_opportunity 保持为空字典
+                    logger.warning(f"查询股票信息失败: {str(e)}")
             
             for index, opp in enumerate(opportunities):
-                # 第一条记录（index=0）显示完整信息，其他记录隐藏敏感信息
                 if index > 0:
                     opportunities[index] = hide_opportunity_info(opp)
-                    # 非第一条记录不返回股票信息
                     opportunities[index]['stocks'] = []
                 else:
-                    # 第一条记录返回股票信息（但前端会模糊显示）
                     opp_id = opp.get('id')
                     stocks = stocks_by_opportunity.get(opp_id, []) if opp_id else []
-                    # 为每个股票获取最新股价并计算涨幅
                     for stock in stocks:
                         enrich_stock_with_price_change(stock)
-                    # 确保 stocks 字段被设置（即使为空列表）
                     opportunities[index]['stocks'] = stocks
         else:
-            # 已登录用户：查询关联的股票信息
             opportunity_ids = [opp['id'] for opp in opportunities]
             
             if opportunity_ids:
@@ -742,22 +727,17 @@ def get_investment_opportunities():
                         stocks_by_opportunity[opp_id] = []
                     stocks_by_opportunity[opp_id].append(stock)
                 
-                # 将股票数据添加到对应的投资机会中，并计算距今涨幅
                 for opp in opportunities:
                     stocks = stocks_by_opportunity.get(opp['id'], [])
-                    # 为每个股票获取最新股价并计算涨幅
                     for stock in stocks:
                         enrich_stock_with_price_change(stock)
-                    
                     opp['stocks'] = stocks
             else:
                 for opp in opportunities:
                     opp['stocks'] = []
 
-        # 获取总数（Supabase 返回的 count 在 response.count 中）
         total_count = getattr(response, 'count', None)
         if total_count is None:
-            # 如果没有 count，使用当前返回的数据长度（仅作为估算）
             total_count = len(opportunities) if page == 1 else None
 
         return jsonify({
