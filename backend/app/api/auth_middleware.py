@@ -35,10 +35,10 @@ def _on_httpx_response(resp):
     logger.info(f"HTTP {resp.request.method} {resp.request.url} → {resp.status_code} ({elapsed_str})")
 
 
-def add_httpx_timing_hooks(supabase_client):
-    """为 Supabase 客户端的 httpx session 添加请求耗时日志"""
+def add_httpx_timing_hooks(client):
+    """为 Supabase 客户端或 PostgREST 客户端的 httpx session 添加请求耗时日志"""
     try:
-        session = supabase_client.postgrest.session
+        session = getattr(client, 'session', None) or client.postgrest.session
         hooks = session.event_hooks
         hooks.setdefault('request', []).append(_on_httpx_request)
         hooks.setdefault('response', []).append(_on_httpx_response)
@@ -206,36 +206,113 @@ def optional_token(f):
 
 
 # ============================================
-# 复用 Supabase 客户端（避免每次请求都 create_client）
+# 连接韧性：自动重试 HTTP/2 瞬时断连
 # ============================================
 
-_cached_client = None
+import httpx
+import threading
+from postgrest import SyncPostgrestClient
+from postgrest.utils import SyncClient
+
+
+class _RetryTransport(httpx.HTTPTransport):
+    """自动重试 HTTP/2 瞬时协议错误（如 Server disconnected / GOAWAY）。
+
+    httpx 内置的 retries 参数仅覆盖 ConnectError，不覆盖 RemoteProtocolError。
+    此 Transport 在遇到连接被服务端关闭时，自动在新连接上重试一次。
+    """
+
+    _RETRYABLE = (httpx.RemoteProtocolError, httpx.ReadError)
+
+    def handle_request(self, request):
+        try:
+            return super().handle_request(request)
+        except self._RETRYABLE as exc:
+            logger.warning(f"Transient connection error, retrying: {exc}")
+            return super().handle_request(request)
+
+
+class _RobustPostgrestClient(SyncPostgrestClient):
+    """带连接重试能力的 PostgREST 客户端。"""
+
+    def create_session(self, base_url, headers, timeout, verify=True, proxy=None):
+        transport = _RetryTransport(http2=True, verify=verify)
+        return SyncClient(
+            base_url=base_url,
+            headers=headers,
+            timeout=timeout,
+            follow_redirects=True,
+            transport=transport,
+        )
+
+
+def make_session_robust(supabase_client):
+    """为已有的 Supabase 客户端替换 httpx 传输层，添加断连自动重试。
+
+    适用于 database.py 中通过 create_client() 创建的全局客户端。
+    """
+    try:
+        session = supabase_client.postgrest.session
+        old_transport = session._transport
+        session._transport = _RetryTransport(http2=True)
+        old_transport.close()
+        logger.info("Supabase client transport upgraded with retry support")
+    except Exception as e:
+        logger.warning(f"Failed to configure robust session: {e}")
+
+
+# ============================================
+# 请求级别隔离的用户 PostgREST 客户端
+# ============================================
+
+_local = threading.local()
+_base_headers = None
+
+
+def _get_base_headers():
+    """懒初始化：获取 Supabase 基础 headers（apiKey 等），只计算一次。"""
+    global _base_headers
+    if _base_headers is None:
+        supabase_key = os.environ.get('SUPABASE_KEY', '')
+        _base_headers = {
+            "apiKey": supabase_key,
+            "Authorization": f"Bearer {supabase_key}",
+        }
+    return _base_headers
 
 
 def get_user_supabase_client():
     """
-    获取带有用户认证信息的 Supabase 客户端。
-    复用同一个客户端实例，仅更新 Authorization header。
-    """
-    global _cached_client
+    获取带有用户认证信息的 PostgREST 客户端。
 
+    线程安全：每个线程维护自己的 _RobustPostgrestClient（独立的 httpx 连接池），
+    不同请求之间不会互相覆盖 Authorization header。
+    同一线程内复用连接池，避免每次请求都重建 httpx Client。
+    """
     supabase_url = os.environ.get('SUPABASE_URL')
     supabase_key = os.environ.get('SUPABASE_KEY')
 
     if not supabase_url or not supabase_key:
         return None
 
-    if _cached_client is None:
-        _cached_client = create_client(supabase_url, supabase_key)
-        add_httpx_timing_hooks(_cached_client)
-        logger.info("Supabase user client initialized (cached)")
-
     auth_header = request.headers.get('Authorization', '')
     user_token = auth_header.replace('Bearer ', '') if auth_header else None
-
     token_for_header = user_token if user_token else supabase_key
-    _cached_client.postgrest.session.headers.update({
-        "Authorization": f"Bearer {token_for_header}",
-    })
+    auth_value = f"Bearer {token_for_header}"
 
-    return _cached_client
+    postgrest = getattr(_local, 'postgrest', None)
+
+    if postgrest is None:
+        headers = {**_get_base_headers(), "Authorization": auth_value}
+        postgrest = _RobustPostgrestClient(
+            f"{supabase_url}/rest/v1",
+            headers=headers,
+            schema="public",
+        )
+        add_httpx_timing_hooks(postgrest)
+        _local.postgrest = postgrest
+        logger.info("Supabase postgrest client initialized (thread-local)")
+    else:
+        postgrest.session.headers["Authorization"] = auth_value
+
+    return postgrest

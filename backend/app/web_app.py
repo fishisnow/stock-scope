@@ -7,7 +7,7 @@ from datetime import datetime, timedelta
 from flask import Flask, g, request, jsonify
 from flask_cors import CORS
 
-from api.auth_middleware import token_required, optional_token, add_httpx_timing_hooks
+from api.auth_middleware import token_required, optional_token, add_httpx_timing_hooks, make_session_robust
 from api.stock_analysis_api import register_stock_analysis_api, register_investment_opportunities_api
 from api.trading_api import trading_bp
 from db.database import StockDatabase
@@ -31,6 +31,7 @@ app.config['JSON_AS_ASCII'] = False
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024
 CORS(app)
 db = StockDatabase()
+make_session_robust(db.client)
 add_httpx_timing_hooks(db.client)
 trading_date_utils = TradingDateUtils()
 
