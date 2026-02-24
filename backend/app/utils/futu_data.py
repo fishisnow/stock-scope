@@ -39,6 +39,63 @@ def _sub_key(code: str, sub_type: SubType) -> Tuple[str, SubType]:
     return code, sub_type
 
 
+def _get_subscription_limit() -> int:
+    """
+    读取订阅上限。富途订阅额度默认 300，可通过环境变量覆盖。
+    """
+    try:
+        value = int(os.getenv('FUTU_SUBSCRIPTION_LIMIT', '300'))
+        return max(1, value)
+    except Exception:
+        return 300
+
+
+def _evict_old_subscriptions_if_needed(quote_context, sub_type: SubType, incoming_count: int):
+    """
+    在订阅新标的前，按最久未使用优先释放旧订阅，避免超过额度。
+    """
+    if incoming_count <= 0:
+        return
+
+    limit = _get_subscription_limit()
+    with _subscription_lock:
+        used = len(_active_subscriptions)
+        available = max(0, limit - used)
+        need_release = incoming_count - available
+        if need_release <= 0:
+            return
+
+        # 先从同类型订阅中释放，仍不足时再从其他类型补齐
+        same_type = sorted(
+            [(key, ts) for key, ts in _active_subscriptions.items() if key[1] == sub_type],
+            key=lambda x: x[1]
+        )
+        candidates = same_type[:need_release]
+        if len(candidates) < need_release:
+            others = sorted(
+                [(key, ts) for key, ts in _active_subscriptions.items() if key[1] != sub_type],
+                key=lambda x: x[1]
+            )
+            candidates.extend(others[:need_release - len(candidates)])
+
+    grouped_codes: Dict[SubType, List[str]] = {}
+    for (code, old_type), _ in candidates:
+        grouped_codes.setdefault(old_type, []).append(code)
+
+    for old_type, code_list in grouped_codes.items():
+        if not code_list:
+            continue
+        try:
+            quote_context.unsubscribe(code_list, [old_type], unsubscribe_all=False)
+        except Exception as exc:
+            logger.warning(f"释放订阅失败，类型={old_type}, 数量={len(code_list)}: {exc}")
+            continue
+        with _subscription_lock:
+            for code in code_list:
+                _active_subscriptions.pop(_sub_key(code, old_type), None)
+        logger.info(f"已释放订阅 {len(code_list)} 个，类型={old_type}")
+
+
 def _subscribe_if_needed(quote_context, code_list: List[str], sub_type: SubType):
     """
     仅对未订阅的 code 发起订阅，减少重复订阅和额度占用。
@@ -46,19 +103,24 @@ def _subscribe_if_needed(quote_context, code_list: List[str], sub_type: SubType)
     if not code_list:
         return RET_OK, ''
 
+    now = time.time()
     with _subscription_lock:
         need_subscribe = []
         for code in code_list:
             key = _sub_key(code, sub_type)
             if key not in _active_subscriptions:
                 need_subscribe.append(code)
+            else:
+                # 已订阅也刷新最近使用时间，便于后续按 LRU 释放
+                _active_subscriptions[key] = now
 
     if not need_subscribe:
         return RET_OK, ''
 
+    _evict_old_subscriptions_if_needed(quote_context, sub_type, len(need_subscribe))
+
     ret_sub, err_message = quote_context.subscribe(need_subscribe, [sub_type], subscribe_push=False)
     if ret_sub == RET_OK:
-        now = time.time()
         with _subscription_lock:
             for code in need_subscribe:
                 _active_subscriptions[_sub_key(code, sub_type)] = now
@@ -154,6 +216,41 @@ def get_stock_quote(quote_context, code_list:list[str]):
     else:
         print('error:', data)
         return pd.DataFrame()
+
+
+def get_realtime_quotes_by_futu_codes(code_list: List[str]) -> pd.DataFrame:
+    """
+    按富途代码批量获取实时快照。
+    :param code_list: 如 ['SH.600519', 'SZ.000001']
+    """
+    quote_context = get_quote_context()
+    return get_stock_quote(quote_context, code_list)
+
+
+def get_market_snapshots_by_futu_codes(code_list: List[str], batch_size: int = 400) -> pd.DataFrame:
+    """
+    按富途代码批量获取快照（无需订阅）。
+    :param code_list: 如 ['SH.600519', 'SZ.000001']
+    :param batch_size: 单次请求数量上限，富途接口限制为 400
+    """
+    if not code_list:
+        return pd.DataFrame()
+
+    quote_context = get_quote_context()
+    safe_batch_size = max(1, min(int(batch_size), 400))
+
+    chunks: List[pd.DataFrame] = []
+    for start in range(0, len(code_list), safe_batch_size):
+        batch_codes = code_list[start:start + safe_batch_size]
+        ret, data = quote_context.get_market_snapshot(batch_codes)
+        if ret != RET_OK:
+            raise Exception(f"获取市场快照失败: {data}")
+        if not data.empty:
+            chunks.append(data)
+
+    if not chunks:
+        return pd.DataFrame()
+    return pd.concat(chunks, ignore_index=True)
 
 
 def get_stock_data(plate_code: str) -> Dict[str, List[Dict]]:

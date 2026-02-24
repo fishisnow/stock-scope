@@ -338,6 +338,31 @@ class StockDatabase:
             print(f"❌ 按代码查询股票基础信息失败: {e}")
             raise
 
+    def get_stock_basic_info_by_industry(
+        self,
+        industry: str,
+        market: str = 'A',
+        columns: str = 'stock_code,stock_name,exchange,market,sector,industry'
+    ) -> List[Dict]:
+        """
+        按行业查询股票基础信息
+        :param industry: 二级行业名称
+        :param market: 市场，默认 A 股
+        :param columns: 查询字段
+        :return: 股票基础信息列表
+        """
+        try:
+            if not industry:
+                return []
+            query = self.client.table('stock_basic_info').select(columns).eq('industry', industry)
+            if market:
+                query = query.eq('market', market)
+            response = query.execute()
+            return response.data or []
+        except Exception as e:
+            print(f"❌ 按行业查询股票基础信息失败: {e}")
+            raise
+
     def upsert_stock_basic_metadata(self, records: List[Dict], batch_size: int = 500):
         """
         按主键批量更新股票行业分类等扩展字段（仅更新，不插入）

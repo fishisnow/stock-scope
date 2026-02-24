@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 
 import logging
+import math
 import time
 from datetime import datetime, timedelta
 
@@ -12,6 +13,7 @@ from api.stock_analysis_api import register_stock_analysis_api, register_investm
 from api.trading_api import trading_bp
 from db.database import StockDatabase
 from utils.date_utils import TradingDateUtils
+from utils.futu_data import get_market_snapshots_by_futu_codes
 
 logging.basicConfig(
     level=logging.INFO,
@@ -34,6 +36,16 @@ db = StockDatabase()
 make_session_robust(db.client)
 add_httpx_timing_hooks(db.client)
 trading_date_utils = TradingDateUtils()
+
+
+def _safe_float(value, default=0.0):
+    try:
+        number = float(value)
+        if math.isnan(number):
+            return default
+        return number
+    except Exception:
+        return default
 
 
 @app.before_request
@@ -119,6 +131,112 @@ def get_market_breadth():
             'success': True,
             'data': data,
             'breadth_type': breadth_type or 'all'
+        })
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
+@app.route('/api/market_breadth/industry_stocks')
+def get_industry_stocks():
+    """获取指定行业的A股当前详情（用于行业宽度点击联动）"""
+    try:
+        industry = request.args.get('industry', '').strip()
+
+        if not industry:
+            return jsonify({
+                'success': False,
+                'error': '缺少参数: industry'
+            }), 400
+
+        stocks = db.get_stock_basic_info_by_industry(industry=industry, market='A')
+        if not stocks:
+            return jsonify({
+                'success': True,
+                'data': {
+                    'industry': industry,
+                    'stocks': [],
+                    'total_candidates': 0,
+                    'selected_count': 0
+                }
+            })
+
+        futu_codes = []
+        stock_meta = {}
+        for item in stocks:
+            exchange = str(item.get('exchange', '')).strip()
+            stock_code = str(item.get('stock_code', '')).strip()
+            if not exchange or not stock_code:
+                continue
+            futu_code = f"{exchange}.{stock_code}"
+            futu_codes.append(futu_code)
+            stock_meta[futu_code] = item
+
+        if not futu_codes:
+            return jsonify({
+                'success': True,
+                'data': {
+                    'industry': industry,
+                    'stocks': [],
+                    'total_candidates': len(stocks),
+                    'selected_count': 0
+                }
+            })
+
+        quote_df = get_market_snapshots_by_futu_codes(futu_codes, batch_size=400)
+        if quote_df.empty:
+            return jsonify({
+                'success': True,
+                'data': {
+                    'industry': industry,
+                    'stocks': [],
+                    'total_candidates': len(stocks),
+                    'selected_count': len(futu_codes)
+                }
+            })
+
+        snapshot_by_code = {}
+        for _, row in quote_df.iterrows():
+            code = str(row.get('code', '')).strip()
+            if code:
+                snapshot_by_code[code] = row
+
+        result_stocks = []
+        for futu_code in futu_codes:
+            row = snapshot_by_code.get(futu_code)
+            if row is None:
+                continue
+            meta = stock_meta.get(futu_code, {})
+            last_price = _safe_float(row.get('last_price'), 0.0)
+            prev_close = _safe_float(row.get('prev_close_price'), 0.0)
+            if prev_close > 0:
+                change_ratio = (last_price - prev_close) / prev_close * 100
+            else:
+                change_ratio = 0.0
+
+            result_stocks.append({
+                'code': str(meta.get('stock_code', '')),
+                'name': str(meta.get('stock_name', '') or row.get('name', '')),
+                'changeRatio': round(change_ratio, 2),
+                'volume': _safe_float(row.get('volume'), 0.0),
+                'amount': _safe_float(row.get('turnover'), 0.0),
+                'pe': _safe_float(row.get('pe_ratio'), 0.0),
+                'volumeRatio': _safe_float(row.get('volume_ratio'), 0.0),
+                'turnoverRate': _safe_float(row.get('turnover_rate'), 0.0),
+            })
+
+        result_stocks.sort(key=lambda item: item.get('amount', 0), reverse=True)
+
+        return jsonify({
+            'success': True,
+            'data': {
+                'industry': industry,
+                'stocks': result_stocks,
+                'total_candidates': len(stocks),
+                'selected_count': len(futu_codes)
+            }
         })
     except Exception as e:
         return jsonify({

@@ -7,8 +7,9 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Calendar, TrendingUp, TrendingDown, ChevronLeft, ChevronRight, Sparkles } from "lucide-react"
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectSeparator, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { useTranslations } from 'next-intl'
+import { useLocale, useTranslations } from 'next-intl'
 import { Link } from "@/i18n/routing"
+import { getLocalizedIndustryName, getLocalizedSectorName } from "@/lib/industry-labels"
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5001"
 
@@ -121,12 +122,14 @@ function StockTable({
   data,
   dataType,
   marketKey,
+  enableStockLink = true,
   t,
 }: {
   title: string
   data: Stock[]
   dataType: string
   marketKey: string
+  enableStockLink?: boolean
   t: any
 }) {
   const [showAll, setShowAll] = useState(false)
@@ -193,7 +196,7 @@ function StockTable({
                 const isNegative = changeRatio < 0
                 const isTopThree = index < 3
 
-                const stockHref = getStockHref(stock)
+                const stockHref = enableStockLink ? getStockHref(stock) : ""
                 return (
                   <tr
                     key={index}
@@ -290,6 +293,7 @@ function StockTable({
 
 export default function MarketPage() {
   const t = useTranslations('market')
+  const locale = useLocale()
   const [availableDates, setAvailableDates] = useState<string[]>([])
   const [selectedDate, setSelectedDate] = useState<string>("")
   const [futuData, setFutuData] = useState<FutuData | null>(null)
@@ -547,7 +551,7 @@ export default function MarketPage() {
                             key={sector}
                             className="py-2 px-2 text-center text-muted-foreground whitespace-nowrap border border-border/30 w-[60px]"
                           >
-                            {sector}
+                            {getLocalizedSectorName(sector, locale)}
                           </th>
                         ))}
                       </tr>
@@ -635,7 +639,13 @@ export default function MarketPage() {
                               key={`${group.sector}-${industry}`}
                               className="py-2 px-2 text-center text-muted-foreground whitespace-nowrap border border-border/30 w-[52px]"
                             >
-                              {industry}
+                              <Link
+                                href={`/market/industry/${encodeURIComponent(industry)}`}
+                                className="hover:underline underline-offset-2 text-primary"
+                                title={t('breadth.industryClickHint')}
+                              >
+                                {getLocalizedIndustryName(industry, locale)}
+                              </Link>
                             </th>
                           ))
                         )}
@@ -670,6 +680,7 @@ export default function MarketPage() {
               )}
             </CardContent>
           </Card>
+
         </div>
 
         {/* Date Navigation */}
