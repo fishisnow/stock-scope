@@ -165,6 +165,7 @@
       "industrySimpleTitle": "Sector - {industry}",
       "industryRealtimeTableTitle": "Realtime Constituents",
       "industryCountInline": "{count} stocks",
+      "currentIndustryBreadth": "Current Breadth",
       "industryStocksLoading": "Loading industry stock details...",
       "industryStocksNoData": "No realtime stock details available for this industry",
       "industryStocksTableTitle": "{industry} (showing {selected} / {total})",

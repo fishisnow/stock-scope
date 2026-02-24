@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
-import { useParams } from "next/navigation"
+import { useParams, useSearchParams } from "next/navigation"
 import { ArrowDown, ArrowLeft, ArrowUp, TrendingDown, TrendingUp } from "lucide-react"
 import { useLocale, useTranslations } from "next-intl"
 
@@ -206,9 +206,35 @@ export default function IndustryStocksPage() {
   const t = useTranslations("market")
   const locale = useLocale()
   const params = useParams()
+  const searchParams = useSearchParams()
   const industryParam = (params?.industry as string) || ""
   const industry = useMemo(() => decodeURIComponent(industryParam), [industryParam])
   const industryLabel = useMemo(() => getLocalizedIndustryName(industry, locale), [industry, locale])
+  const breadthValue = useMemo(() => {
+    const raw = searchParams.get("breadth")
+    if (!raw) return null
+    const parsed = parseFloat(raw)
+    return Number.isFinite(parsed) ? parsed : null
+  }, [searchParams])
+  const breadthDate = searchParams.get("breadthDate") || ""
+
+  const getBreadthColor = (value: number | null) => {
+    if (value === null) return "transparent"
+    const clamped = Math.max(0, Math.min(100, value))
+    const linear = Math.abs(clamped - 50) / 50
+    const ratio = Math.pow(linear, 0.65)
+    const r = clamped >= 50 ? Math.round(255 - ratio * (255 - 207)) : Math.round(255 - ratio * (255 - 0))
+    const g = clamped >= 50 ? Math.round(255 - ratio * (255 - 42)) : Math.round(255 - ratio * (255 - 135))
+    const b = clamped >= 50 ? Math.round(255 - ratio * (255 - 42)) : Math.round(255 - ratio * (255 - 58))
+    return `rgb(${r}, ${g}, ${b})`
+  }
+
+  const getBreadthTextColor = (value: number | null) => {
+    if (value === null) return "text-muted-foreground"
+    const linear = Math.abs(Math.max(0, Math.min(100, value)) - 50) / 50
+    const ratio = Math.pow(linear, 0.65)
+    return ratio > 0.35 ? "text-white" : "text-slate-900"
+  }
 
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -258,6 +284,18 @@ export default function IndustryStocksPage() {
                 </span>
               )}
             </div>
+            {breadthValue !== null && (
+              <div className="mt-3 inline-flex items-center gap-2">
+                <span className="text-sm text-muted-foreground">{t("breadth.currentIndustryBreadth")}</span>
+                <span
+                  className={`px-2 py-0.5 rounded text-sm font-mono ${getBreadthTextColor(breadthValue)}`}
+                  style={{ backgroundColor: getBreadthColor(breadthValue) }}
+                >
+                  {breadthValue.toFixed(0)}
+                </span>
+                {breadthDate && <span className="text-xs text-muted-foreground font-mono">{breadthDate}</span>}
+              </div>
+            )}
           </div>
           <Button asChild variant="outline" className="gap-2 shrink-0 self-start sm:self-auto">
             <Link href="/market">

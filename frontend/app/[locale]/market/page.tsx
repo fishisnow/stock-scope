@@ -399,6 +399,19 @@ export default function MarketPage() {
     return ratio > 0.35 ? "text-white" : "text-slate-900"
   }
 
+  const getIndustryDetailHref = (industry: string) => {
+    const base = `/market/industry/${encodeURIComponent(industry)}`
+    if (!breadthData || breadthData.dates.length === 0) return base
+    const latestDate = breadthData.dates[0]
+    const latestBreadth = getBreadthValue(latestDate, industry, "industry")
+    if (latestBreadth === null) return base
+    const params = new URLSearchParams({
+      breadth: latestBreadth.toFixed(2),
+      breadthDate: latestDate,
+    })
+    return `${base}?${params.toString()}`
+  }
+
   const handleDateChange = (date: string) => {
     setSelectedDate(date)
     loadData(date)
@@ -640,7 +653,7 @@ export default function MarketPage() {
                               className="py-2 px-2 text-center text-muted-foreground whitespace-nowrap border border-border/30 w-[52px]"
                             >
                               <Link
-                                href={`/market/industry/${encodeURIComponent(industry)}`}
+                                href={getIndustryDetailHref(industry)}
                                 className="hover:underline underline-offset-2 text-primary"
                                 title={t('breadth.industryClickHint')}
                               >

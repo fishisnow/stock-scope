@@ -236,12 +236,34 @@ def get_market_snapshots_by_futu_codes(code_list: List[str], batch_size: int = 4
     if not code_list:
         return pd.DataFrame()
 
+    # 富途 get_market_snapshot 当前不支持北交所，按证券代码前缀过滤：
+    # 82 / 83 / 87 / 92
+    filtered_codes: List[str] = []
+    skipped_bj_count = 0
+    bj_prefixes = ('82', '83', '87', '92')
+    for code in code_list:
+        normalized = str(code).strip()
+        if not normalized:
+            continue
+        # 兼容 SH.830001 / SZ.920001 / 830001
+        code_part = normalized.split('.', 1)[1] if '.' in normalized else normalized
+        if code_part.startswith(bj_prefixes):
+            skipped_bj_count += 1
+            continue
+        filtered_codes.append(normalized)
+
+    if skipped_bj_count > 0:
+        logger.info(f"get_market_snapshot 过滤北交所标的: {skipped_bj_count} 个")
+
+    if not filtered_codes:
+        return pd.DataFrame()
+
     quote_context = get_quote_context()
     safe_batch_size = max(1, min(int(batch_size), 400))
 
     chunks: List[pd.DataFrame] = []
-    for start in range(0, len(code_list), safe_batch_size):
-        batch_codes = code_list[start:start + safe_batch_size]
+    for start in range(0, len(filtered_codes), safe_batch_size):
+        batch_codes = filtered_codes[start:start + safe_batch_size]
         ret, data = quote_context.get_market_snapshot(batch_codes)
         if ret != RET_OK:
             raise Exception(f"获取市场快照失败: {data}")

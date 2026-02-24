@@ -220,13 +220,43 @@ class StockDatabase:
     def save_stocks_basic_info(self, stocks_data: Dict[str, List[Dict]]):
         """
         保存股票基础信息到数据库（使用 upsert 方式，如果已存在则更新）
+        并清理接口中已不存在（如摘牌）的股票
         :param stocks_data: 股票基础信息字典，格式为 {'A': [...], 'HK': [...]}
         """
         try:
             current_time = datetime.now().isoformat()
             records_to_upsert = []
+            deleted_total = 0
             
             for market, stocks in stocks_data.items():
+                incoming_codes = {
+                    str(stock.get('code', '')).strip()
+                    for stock in stocks
+                    if str(stock.get('code', '')).strip()
+                }
+
+                # 某市场返回为空时，跳过删除以避免上游异常导致误删全量数据
+                if incoming_codes:
+                    existing_resp = self.get_stock_basic_info_paginated(
+                        market=market,
+                        columns='stock_code'
+                    )
+                    existing_codes = {
+                        str(row.get('stock_code', '')).strip()
+                        for row in existing_resp
+                        if str(row.get('stock_code', '')).strip()
+                    }
+
+                    codes_to_delete = list(existing_codes - incoming_codes)
+                    if codes_to_delete:
+                        batch_size = 500
+                        for i in range(0, len(codes_to_delete), batch_size):
+                            batch = codes_to_delete[i:i + batch_size]
+                            self.client.table('stock_basic_info').delete().eq('market', market).in_(
+                                'stock_code', batch
+                            ).execute()
+                        deleted_total += len(codes_to_delete)
+
                 for stock in stocks:
                     record = {
                         'stock_code': str(stock.get('code', '')),
@@ -250,6 +280,8 @@ class StockDatabase:
                 a_count = len(stocks_data.get('A', []))
                 hk_count = len(stocks_data.get('HK', []))
                 print(f"✅ 已同步股票基础信息: 总计 {total_count} 条（A股 {a_count} 条，港股 {hk_count} 条）")
+                if deleted_total:
+                    print(f"🧹 已清理摘牌/无效股票: {deleted_total} 条")
             
         except Exception as e:
             print(f"❌ 保存股票基础信息失败: {e}")

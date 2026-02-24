@@ -119,7 +119,6 @@ def sync_stock_basic_info_job(manual: bool = False):
     
     try:
         now = datetime.now()
-        current_date = now.date()
         current_day = now.day
         current_month = now.strftime('%Y-%m')  # 格式：2024-01
         

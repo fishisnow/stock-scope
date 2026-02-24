@@ -168,7 +168,8 @@ def get_industry_stocks():
         for item in stocks:
             exchange = str(item.get('exchange', '')).strip()
             stock_code = str(item.get('stock_code', '')).strip()
-            if not exchange or not stock_code:
+            stock_name = str(item.get('stock_name', '')).strip()
+            if not exchange or not stock_code or stock_name.endswith("退"):
                 continue
             futu_code = f"{exchange}.{stock_code}"
             futu_codes.append(futu_code)

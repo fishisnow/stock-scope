@@ -166,6 +166,7 @@
       "industrySimpleTitle": "板块——{industry}",
       "industryRealtimeTableTitle": "实时成分股",
       "industryCountInline": "{count}只",
+      "currentIndustryBreadth": "当前行业宽度",
       "industryStocksLoading": "加载行业股票详情中...",
       "industryStocksNoData": "该行业暂无可展示的实时股票详情",
       "industryStocksTableTitle": "{industry}（展示 {selected} / {total} 只）",
