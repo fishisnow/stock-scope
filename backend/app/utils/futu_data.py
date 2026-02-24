@@ -5,7 +5,7 @@ import time
 from futu import *
 from datetime import date
 import pandas as pd
-from typing import Dict, List
+from typing import Dict, List, Tuple
 import os
 
 logger = logging.getLogger(__name__)
@@ -30,26 +30,74 @@ plate_code_name = {
 
 _quote_ctx = None
 _quote_ctx_lock = threading.Lock()
+_quote_ctx_created_at = 0.0
+_subscription_lock = threading.Lock()
+_active_subscriptions: Dict[Tuple[str, SubType], float] = {}
+
+
+def _sub_key(code: str, sub_type: SubType) -> Tuple[str, SubType]:
+    return code, sub_type
+
+
+def _subscribe_if_needed(quote_context, code_list: List[str], sub_type: SubType):
+    """
+    仅对未订阅的 code 发起订阅，减少重复订阅和额度占用。
+    """
+    if not code_list:
+        return RET_OK, ''
+
+    with _subscription_lock:
+        need_subscribe = []
+        for code in code_list:
+            key = _sub_key(code, sub_type)
+            if key not in _active_subscriptions:
+                need_subscribe.append(code)
+
+    if not need_subscribe:
+        return RET_OK, ''
+
+    ret_sub, err_message = quote_context.subscribe(need_subscribe, [sub_type], subscribe_push=False)
+    if ret_sub == RET_OK:
+        now = time.time()
+        with _subscription_lock:
+            for code in need_subscribe:
+                _active_subscriptions[_sub_key(code, sub_type)] = now
+    return ret_sub, err_message
 
 
 def get_quote_context() -> OpenQuoteContext:
     """
     获取共享的富途行情上下文（惰性创建，全局复用）。
-    连接断开时自动重建。
+    连接断开时自动重建；连接存活过久时轮换重建，避免状态长期累积。
     """
-    global _quote_ctx
+    global _quote_ctx, _quote_ctx_created_at
     with _quote_ctx_lock:
+        max_age_sec = int(os.getenv('FUTU_QUOTE_CTX_MAX_AGE_SEC', '1800'))
+        if _quote_ctx is not None and max_age_sec > 0:
+            alive_sec = time.time() - _quote_ctx_created_at
+            if alive_sec >= max_age_sec:
+                try:
+                    _quote_ctx.close()
+                except Exception:
+                    pass
+                _quote_ctx = None
+                _quote_ctx_created_at = 0.0
+                with _subscription_lock:
+                    _active_subscriptions.clear()
+                logger.info(f"FutuQuoteContext recycled after {alive_sec:.0f}s")
+
         if _quote_ctx is None:
             futu_host = os.getenv('FUTU_HOST', '127.0.0.1')
             futu_port = int(os.getenv('FUTU_PORT', '11111'))
             _quote_ctx = OpenQuoteContext(host=futu_host, port=futu_port)
+            _quote_ctx_created_at = time.time()
             logger.info(f"FutuQuoteContext created: {futu_host}:{futu_port}")
         return _quote_ctx
 
 
 def _reset_quote_context():
     """连接异常时重置上下文，下次调用 get_quote_context 会重建"""
-    global _quote_ctx
+    global _quote_ctx, _quote_ctx_created_at, _active_subscriptions
     with _quote_ctx_lock:
         if _quote_ctx is not None:
             try:
@@ -57,7 +105,10 @@ def _reset_quote_context():
             except Exception:
                 pass
             _quote_ctx = None
+            _quote_ctx_created_at = 0.0
             logger.info("FutuQuoteContext reset due to error")
+    with _subscription_lock:
+        _active_subscriptions = {}
 
 
 def close_quote_context():
@@ -89,16 +140,19 @@ def get_stock_quote(quote_context, code_list:list[str]):
     :param code_list: 股票代码列表
     :return: DataFrame 包含股票报价数据
     """
-    ret_sub, err_message = quote_context.subscribe(code_list, [SubType.QUOTE], subscribe_push=False)
-    if ret_sub == RET_OK:
-        ret, data = quote_context.get_market_snapshot(code_list)
-        if ret == RET_OK:
-            return data
-        else:
-            print('error:', data)
-            return pd.DataFrame()
-    else:
+    if not code_list:
+        return pd.DataFrame()
+
+    ret_sub, err_message = _subscribe_if_needed(quote_context, code_list, SubType.QUOTE)
+    if ret_sub != RET_OK:
         print('subscription failed', err_message)
+        return pd.DataFrame()
+
+    ret, data = quote_context.get_market_snapshot(code_list)
+    if ret == RET_OK:
+        return data
+    else:
+        print('error:', data)
         return pd.DataFrame()
 
 
@@ -412,10 +466,9 @@ def get_stock_current_price(code: str, market: str) -> Dict:
         futu_code = convert_to_futu_code(code, market)
         quote_ctx = get_quote_context()
         
-        ret_sub, err_message = quote_ctx.subscribe([futu_code], [SubType.QUOTE], subscribe_push=False)
+        ret_sub, err_message = _subscribe_if_needed(quote_ctx, [futu_code], SubType.QUOTE)
         if ret_sub != RET_OK:
             raise Exception(f"订阅股票失败: {err_message}")
-        
         ret, data = quote_ctx.get_stock_quote([futu_code])
         if ret != RET_OK:
             raise Exception(f"获取股票报价失败: {data}")
@@ -460,10 +513,9 @@ def get_stock_rt_data(code: str, market: str) -> List[Dict]:
         futu_code = convert_to_futu_code(code, market)
         quote_ctx = get_quote_context()
         
-        ret_sub, err_message = quote_ctx.subscribe([futu_code], [SubType.RT_DATA], subscribe_push=False)
+        ret_sub, err_message = _subscribe_if_needed(quote_ctx, [futu_code], SubType.RT_DATA)
         if ret_sub != RET_OK:
             raise Exception(f"订阅分时数据失败: {err_message}")
-
         ret, data = quote_ctx.get_rt_data(futu_code)
         if ret != RET_OK:
             raise Exception(f"获取分时数据失败: {data}")

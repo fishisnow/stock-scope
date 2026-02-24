@@ -87,6 +87,9 @@ export function Header({ onRecordOpportunity }: HeaderProps = {}) {
               <Link href="/" className="text-sm font-medium hover:text-primary transition-colors">
                 {t('home')}
               </Link>
+              <Link href="/home" className="text-sm font-medium hover:text-primary transition-colors">
+                {t('opportunity')}
+              </Link>
               <Link href="/market" className="text-sm font-medium hover:text-primary transition-colors">
                 {t('market')}
               </Link>
