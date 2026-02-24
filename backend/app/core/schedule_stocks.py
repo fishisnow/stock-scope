@@ -184,8 +184,10 @@ def main():
     schedule.every().day.at("02:00").do(sync_stock_basic_info_job)
     # 每天凌晨2点10分检查是否需要补齐板块/指数（每月1号执行）
     schedule.every().day.at("02:10").do(enrich_stock_metadata_job)
-    # 每天收盘后计算市场宽度
-    schedule.every().day.at("16:30").do(compute_market_breadth_daily)
+    # 每天盘中/尾盘分三次计算市场宽度（同日数据会被 upsert 覆盖）
+    schedule.every().day.at("10:30").do(compute_market_breadth_daily)
+    schedule.every().day.at("13:30").do(compute_market_breadth_daily)
+    schedule.every().day.at("15:30").do(compute_market_breadth_daily)
 
     while True:
         schedule.run_pending()
