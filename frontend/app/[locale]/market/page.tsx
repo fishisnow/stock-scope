@@ -5,7 +5,7 @@ import { Header } from "@/components/header"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Calendar, TrendingUp, TrendingDown, ChevronLeft, ChevronRight, Sparkles } from "lucide-react"
+import { Calendar, TrendingUp, TrendingDown, ChevronLeft, ChevronRight, Sparkles, Maximize2 } from "lucide-react"
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectSeparator, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useLocale, useTranslations } from 'next-intl'
 import { Link } from "@/i18n/routing"
@@ -108,6 +108,9 @@ const INDUSTRY_GROUPS: Array<{ sector: string; industries: string[] }> = [
   { sector: "交运物流", industries: ["港口航运", "公路铁路运输", "机场航运", "物流"] },
 ]
 const INDUSTRY_ORDER = INDUSTRY_GROUPS.flatMap((group) => group.industries)
+const SORTED_INDUSTRY_GROUPS = [...INDUSTRY_GROUPS].sort(
+  (a, b) => b.industries.length - a.industries.length
+)
 
 const INDEX_OPTIONS = [
   { code: "SH.000906", label: "中证800" },
@@ -379,6 +382,7 @@ export default function MarketPage() {
     return record ? Number(record.breadth_pct) : null
   }
 
+
   const getBreadthColor = (value: number | null) => {
     if (value === null) return "transparent"
     const clamped = Math.max(0, Math.min(100, value))
@@ -411,7 +415,6 @@ export default function MarketPage() {
     })
     return `${base}?${params.toString()}`
   }
-
   const handleDateChange = (date: string) => {
     setSelectedDate(date)
     loadData(date)
@@ -545,7 +548,7 @@ export default function MarketPage() {
               )}
               {!breadthLoading && breadthData && breadthData.dates.length > 0 && (
                 <div className="overflow-x-auto">
-                  <table className="border-collapse text-sm">
+                  <table className="min-w-full border-collapse text-sm">
                     <thead>
                       <tr>
                         <th className="text-left py-2 px-3 text-muted-foreground whitespace-nowrap border border-border/30 w-[90px]">
@@ -613,12 +616,25 @@ export default function MarketPage() {
 
           <Card className="overflow-hidden">
             <CardHeader className="pb-3">
-              <CardTitle className="text-xl">
-                {t('breadth.industryTitle')}
-                <span className="ml-2 text-sm font-normal text-muted-foreground">
-                  {t('breadth.industryInlineNote')}
-                </span>
-              </CardTitle>
+              <div className="flex items-start justify-between gap-4">
+                <CardTitle className="text-xl">
+                  {t('breadth.industryTitle')}
+                  <span className="ml-2 text-sm font-normal text-muted-foreground">
+                    {t('breadth.industryInlineNote')}
+                  </span>
+                </CardTitle>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-2 shrink-0"
+                  asChild
+                >
+                  <Link href="/market/industry-panorama">
+                    <Maximize2 className="h-4 w-4" />
+                    {t('breadth.fullscreen')}
+                  </Link>
+                </Button>
+              </div>
             </CardHeader>
             <CardContent className="p-6 pt-0">
               {breadthLoading && (
@@ -626,7 +642,7 @@ export default function MarketPage() {
               )}
               {!breadthLoading && breadthData && breadthData.dates.length > 0 && (
                 <div className="overflow-x-auto">
-                  <table className="border-collapse text-sm">
+                  <table className="min-w-full border-collapse text-sm">
                     <thead>
                       <tr>
                         <th

@@ -1,7 +1,10 @@
 import json
 import os
+import re
+import zipfile
 from datetime import datetime
-from typing import Dict, List, Tuple
+from typing import Dict, List, Optional, Tuple
+from xml.etree import ElementTree as ET
 
 import requests
 
@@ -36,10 +39,26 @@ INDEX_CODES = [
     'SH.000688',  # 科创50指数
     'SH.000016'   # 上证50指数
 ]
+SECTOR_INDUSTRY_EXCEL_ENV = "SECTOR_INDUSTRY_EXCEL_PATH"
+_XLSX_NS = {'a': 'http://schemas.openxmlformats.org/spreadsheetml/2006/main'}
 
 
 class DeepSeekContentRiskError(Exception):
     pass
+
+
+def _normalize_stock_code(stock_code: Optional[str]) -> str:
+    if stock_code is None:
+        return ""
+    raw = str(stock_code).strip().upper()
+    if not raw:
+        return ""
+    # 兼容 000001、000001.SZ、SZ000001、600000.0 等格式
+    digit_match = re.search(r'(\d{6})', raw)
+    if digit_match:
+        return digit_match.group(1)
+    raw = raw.replace(".0", "")
+    return raw.zfill(6) if raw.isdigit() and len(raw) <= 6 else ""
 
 
 def _sanitize_stock_name(name: str) -> str:
@@ -166,6 +185,119 @@ def _classify_stock_items(stock_items: List[Dict]) -> List[Dict]:
         return _classify_stock_items(stock_items[:mid]) + _classify_stock_items(stock_items[mid:])
 
 
+def _parse_xlsx_shared_strings(zf: zipfile.ZipFile) -> List[str]:
+    if 'xl/sharedStrings.xml' not in zf.namelist():
+        return []
+    root = ET.fromstring(zf.read('xl/sharedStrings.xml'))
+    shared_strings: List[str] = []
+    for item in root.findall('a:si', _XLSX_NS):
+        parts = [t.text for t in item.findall('.//a:t', _XLSX_NS) if t.text]
+        shared_strings.append("".join(parts).strip())
+    return shared_strings
+
+
+def _parse_cell_ref_col_index(cell_ref: str) -> int:
+    col_ref = ""
+    for ch in cell_ref:
+        if ch.isalpha():
+            col_ref += ch
+        else:
+            break
+    if not col_ref:
+        return 1
+    index = 0
+    for ch in col_ref:
+        index = index * 26 + ord(ch.upper()) - ord('A') + 1
+    return index
+
+
+def _extract_cell_text(cell: ET.Element, shared_strings: List[str]) -> str:
+    cell_type = cell.attrib.get('t')
+    if cell_type == 'inlineStr':
+        node = cell.find('a:is', _XLSX_NS)
+        if node is not None:
+            parts = [t.text for t in node.findall('.//a:t', _XLSX_NS) if t.text]
+            return "".join(parts).strip()
+    value_node = cell.find('a:v', _XLSX_NS)
+    if value_node is None or value_node.text is None:
+        return ""
+    value = value_node.text.strip()
+    if cell_type == 's' and value.isdigit():
+        idx = int(value)
+        if 0 <= idx < len(shared_strings):
+            return shared_strings[idx].strip()
+    return value
+
+
+def _load_sector_industry_map_from_excel(excel_path: str) -> Dict[str, Tuple[str, str]]:
+    """
+    从 Excel 读取 股票代码 -> (sector, industry) 映射。
+    约定：sheet 名称即 industry，表头包含“代码”和“名称”列。
+    """
+    code_mapping: Dict[str, Tuple[str, str]] = {}
+
+    with zipfile.ZipFile(excel_path) as zf:
+        workbook_root = ET.fromstring(zf.read('xl/workbook.xml'))
+        rels_root = ET.fromstring(zf.read('xl/_rels/workbook.xml.rels'))
+        shared_strings = _parse_xlsx_shared_strings(zf)
+        rel_map = {
+            rel.attrib['Id']: rel.attrib['Target'].lstrip('/')
+            for rel in rels_root
+        }
+        sheets = [
+            (
+                sheet.attrib.get('name', '').strip(),
+                sheet.attrib.get('{http://schemas.openxmlformats.org/officeDocument/2006/relationships}id')
+            )
+            for sheet in workbook_root.findall('a:sheets/a:sheet', _XLSX_NS)
+        ]
+
+        for industry_name, rel_id in sheets:
+            if not industry_name or not rel_id:
+                continue
+            target = rel_map.get(rel_id, '')
+            if not target:
+                continue
+            if not target.startswith('xl/'):
+                target = f'xl/{target}'
+            if target not in zf.namelist():
+                continue
+
+            sector_name = INDUSTRY_TO_SECTOR.get(industry_name, "未分类")
+            sheet_root = ET.fromstring(zf.read(target))
+            rows = sheet_root.findall('a:sheetData/a:row', _XLSX_NS)
+            if not rows:
+                continue
+
+            header_map: Dict[str, int] = {}
+            for cell in rows[0].findall('a:c', _XLSX_NS):
+                col_idx = _parse_cell_ref_col_index(cell.attrib.get('r', 'A1'))
+                col_name = _extract_cell_text(cell, shared_strings)
+                if not col_name:
+                    continue
+                col_name = col_name.strip()
+                if "代码" in col_name:
+                    header_map["code"] = col_idx
+                elif "名称" in col_name:
+                    header_map["name"] = col_idx
+            code_col = header_map.get("code")
+            if not code_col:
+                continue
+
+            for row in rows[1:]:
+                row_values: Dict[int, str] = {}
+                for cell in row.findall('a:c', _XLSX_NS):
+                    col_idx = _parse_cell_ref_col_index(cell.attrib.get('r', 'A1'))
+                    row_values[col_idx] = _extract_cell_text(cell, shared_strings)
+                raw_code = row_values.get(code_col, "")
+                stock_code = _normalize_stock_code(raw_code)
+                if not stock_code:
+                    continue
+                code_mapping[stock_code] = (sector_name, industry_name)
+
+    return code_mapping
+
+
 def _merge_sector_metadata(
     a_stocks: List[Dict],
     sector_map: Dict[str, Tuple[str, str, float]]
@@ -186,6 +318,54 @@ def _merge_sector_metadata(
             "updated_at": current_time
         })
     return records
+
+
+def clean_sector_industry_by_excel(excel_path: str, full_refresh: bool = True) -> Dict:
+    """
+    根据同花顺行业 Excel 清洗 stock_basic_info 的 sector/industry 字段。
+    """
+    if not excel_path:
+        raise ValueError("excel_path 不能为空")
+    if not os.path.exists(excel_path):
+        raise FileNotFoundError(f"Excel 文件不存在: {excel_path}")
+
+    code_mapping = _load_sector_industry_map_from_excel(excel_path)
+    if not code_mapping:
+        return {"total": 0, "updated": 0, "matched": 0, "unmatched": 0}
+
+    a_stocks = _get_a_stock_basic_info(full_refresh=full_refresh)
+    if not a_stocks:
+        return {"total": 0, "updated": 0, "matched": 0, "unmatched": 0}
+
+    current_time = datetime.now().isoformat()
+    records: List[Dict] = []
+    matched_count = 0
+    unmatched_count = 0
+    for stock in a_stocks:
+        stock_id = stock.get("id")
+        if not stock_id:
+            continue
+        stock_code = _normalize_stock_code(stock.get("stock_code"))
+        sector, industry = code_mapping.get(stock_code, ("未分类", "未分类"))
+        if stock_code in code_mapping:
+            matched_count += 1
+        else:
+            unmatched_count += 1
+        records.append({
+            "id": stock_id,
+            "sector": sector,
+            "industry": industry,
+            "sector_confidence": 100 if stock_code in code_mapping else 0,
+            "updated_at": current_time
+        })
+
+    db.upsert_stock_basic_metadata(records)
+    return {
+        "total": len(a_stocks),
+        "updated": len(records),
+        "matched": matched_count,
+        "unmatched": unmatched_count
+    }
 
 
 def _get_a_stock_basic_info(full_refresh: bool = False) -> List[Dict]:
@@ -259,6 +439,14 @@ def classify_and_tag_a_stocks(batch_size: int = 50, full_refresh: bool = False) 
     使用 DeepSeek 为A股股票打一级分类/二级行业标签
     :param full_refresh: 是否全量分类（默认仅分类未补齐或旧分类股票）
     """
+    excel_path = os.getenv(SECTOR_INDUSTRY_EXCEL_ENV, "").strip()
+    if excel_path:
+        try:
+            print(f"📘 使用 Excel 清洗行业分类: {excel_path}")
+            return clean_sector_industry_by_excel(excel_path=excel_path, full_refresh=True)
+        except Exception as exc:
+            print(f"⚠️ Excel 清洗失败，回退 DeepSeek 分类: {exc}")
+
     a_stocks = _get_a_stock_basic_info(full_refresh=full_refresh)
     if not a_stocks:
         return {"total": 0, "updated": 0}
@@ -325,4 +513,8 @@ def update_index_membership_for_a_stocks() -> Dict:
     return {"total": len(a_stocks), "updated": len(records)}
 
 
-__all__ = ["classify_and_tag_a_stocks", "update_index_membership_for_a_stocks"]
+__all__ = [
+    "classify_and_tag_a_stocks",
+    "clean_sector_industry_by_excel",
+    "update_index_membership_for_a_stocks"
+]

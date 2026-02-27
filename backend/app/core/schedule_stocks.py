@@ -8,8 +8,8 @@ import schedule
 from app.db.database import save_futu_data, save_stock_basic_info
 from app.utils import futu_data
 from app.utils.sector_classifier import (
-    classify_and_tag_a_stocks,
-    update_index_membership_for_a_stocks
+    update_index_membership_for_a_stocks,
+    clean_sector_industry_by_excel
 )
 from app.utils.market_breadth import compute_market_breadth_daily
 from app.utils.wx_push import send_md_message
@@ -164,12 +164,10 @@ def enrich_stock_metadata_job(manual: bool = False):
             return
 
         print(f"开始板块/指数归属补齐: {now.strftime('%Y-%m-%d %H:%M')}")
-        sector_result = classify_and_tag_a_stocks()
         index_result = update_index_membership_for_a_stocks()
         _last_enrich_month = current_month
         print(
             "板块/指数归属补齐完成: "
-            f"板块 {sector_result.get('total', 0)} 条, "
             f"指数 {index_result.get('total', 0)} 条"
         )
     except Exception as e:
@@ -194,4 +192,5 @@ def main():
 
 
 if __name__ == "__main__":
-    classify_and_tag_a_stocks()
+    compute_market_breadth_daily()
+    # clean_sector_industry_by_excel(excel_path="/Users/huangyusong/Desktop/10jqka.xlsx", full_refresh=True)
