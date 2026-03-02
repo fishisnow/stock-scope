@@ -216,6 +216,8 @@ function StockTable({
                       {stockHref ? (
                         <Link
                           href={stockHref}
+                          target="_blank"
+                          rel="noopener noreferrer"
                           className="text-xs sm:text-sm font-semibold truncate block max-w-[120px] text-primary hover:underline"
                           title={stock.name || ""}
                         >
