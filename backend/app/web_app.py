@@ -210,6 +210,9 @@ def get_industry_stocks():
             if row is None:
                 continue
             meta = stock_meta.get(futu_code, {})
+            exchange = str(meta.get('exchange', '')).strip()
+            if not exchange and '.' in futu_code:
+                exchange = futu_code.split('.', 1)[0].strip()
             last_price = _safe_float(row.get('last_price'), 0.0)
             prev_close = _safe_float(row.get('prev_close_price'), 0.0)
             if prev_close > 0:
@@ -219,6 +222,7 @@ def get_industry_stocks():
 
             result_stocks.append({
                 'code': str(meta.get('stock_code', '')),
+                'exchange': exchange,
                 'name': str(meta.get('stock_name', '') or row.get('name', '')),
                 'changeRatio': round(change_ratio, 2),
                 'volume': _safe_float(row.get('volume'), 0.0),

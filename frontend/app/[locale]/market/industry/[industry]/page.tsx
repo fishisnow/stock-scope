@@ -17,6 +17,7 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5001"
 interface Stock {
   name: string
   code?: string
+  exchange?: string
   changeRatio: string | number
   volume: string | number
   volumeRatio: string | number
@@ -34,6 +35,24 @@ interface IndustryStocksData {
 
 type SortKey = "amount" | "changeRatio" | "volume" | "volumeRatio" | "turnoverRate" | "pe"
 type SortDirection = "asc" | "desc"
+
+function buildFutuStockUrl(code?: string, exchange?: string) {
+  const normalizedCode = String(code || "").trim()
+  if (!normalizedCode) return null
+
+  const normalizedExchange = String(exchange || "").trim().toUpperCase()
+  const market = normalizedExchange || (
+    normalizedCode.startsWith("6")
+      ? "SH"
+      : normalizedCode.startsWith("0") || normalizedCode.startsWith("2") || normalizedCode.startsWith("3")
+        ? "SZ"
+        : normalizedCode.startsWith("4") || normalizedCode.startsWith("8")
+          ? "BJ"
+          : "SH"
+  )
+
+  return `https://www.futunn.com/stock/${normalizedCode}-${market}`
+}
 
 function StockTable({
   data,
@@ -136,6 +155,7 @@ function StockTable({
                 const isPositive = changeRatio > 0
                 const isNegative = changeRatio < 0
                 const isTopThree = index < 3
+                const stockLink = buildFutuStockUrl(stock.code, stock.exchange)
 
                 return (
                   <tr
@@ -150,7 +170,18 @@ function StockTable({
                       </span>
                     </td>
                     <td className="py-3 px-2">
-                      <span className="text-xs sm:text-sm font-semibold truncate block max-w-[120px]">{stock.name || "-"}</span>
+                      {stockLink ? (
+                        <a
+                          href={stockLink}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-xs sm:text-sm font-semibold truncate block max-w-[120px] text-primary hover:underline"
+                        >
+                          {stock.name || "-"}
+                        </a>
+                      ) : (
+                        <span className="text-xs sm:text-sm font-semibold truncate block max-w-[120px]">{stock.name || "-"}</span>
+                      )}
                     </td>
                     <td className="py-3 px-2 text-right hidden sm:table-cell">
                       <span className="text-xs sm:text-sm font-mono font-medium">
