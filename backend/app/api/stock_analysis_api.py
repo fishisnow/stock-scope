@@ -645,7 +645,7 @@ def get_investment_opportunities():
     """
     获取投资机会记录列表
     
-    对于已登录用户：返回该用户的所有投资机会记录（包含股票信息）
+    对于已登录用户：返回所有投资机会记录（包含股票信息）
     对于未登录用户：返回所有用户的投资机会记录（支持分页），但：
         - 最新的一条记录显示完整信息（不包含股票信息）
         - 其他记录进行信息隐藏处理（隐藏 core_idea, summary, source_url, trigger_words）
@@ -762,7 +762,7 @@ def get_investment_opportunity(opportunity_id):
     """
     获取单条投资机会记录详情
 
-    对于已登录用户：只能访问自己的记录（包含股票信息）
+    对于已登录用户：可访问任意记录（包含股票信息）
     对于未登录用户：
         - 如果是最新记录，返回完整信息（包含股票信息）
         - 其他记录进行信息隐藏处理（隐藏 summary, source_url，stocks 为空）
@@ -777,12 +777,12 @@ def get_investment_opportunity(opportunity_id):
             }), 500
 
         if user:
-            # 已登录用户：只能访问自己的记录
-            response = supabase_client.table('investment_opportunities').select('*').eq('id', opportunity_id).eq('user_id', user['id']).execute()
+            # 已登录用户：可查看任意记录详情（编辑/删除权限由对应接口单独控制）
+            response = supabase_client.table('investment_opportunities').select('*').eq('id', opportunity_id).execute()
             if not response.data:
                 return jsonify({
                     "success": False,
-                    "error": "记录不存在或无权限访问"
+                    "error": "记录不存在"
                 }), 404
             opportunity = response.data[0]
         else:

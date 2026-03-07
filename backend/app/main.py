@@ -4,7 +4,7 @@ import threading
 import time
 
 import core.schedule_stocks as schedule_stocks
-import web_app
+import api.api_app as api_app
 
 
 def run_scheduler():
@@ -13,10 +13,10 @@ def run_scheduler():
     schedule_stocks.main()
 
 
-def run_web_app():
-    """运行Web应用"""
-    print("🌐 Web服务启动在 http://localhost:5001")
-    web_app.app.run(debug=False, host='0.0.0.0', port=5001, use_reloader=False)
+def run_api_app():
+    """运行 API 应用"""
+    print("🌐 API 服务启动在 http://localhost:5001")
+    api_app.app.run(debug=False, host='0.0.0.0', port=5001, use_reloader=False)
 
 
 def main():
@@ -31,8 +31,8 @@ def main():
     # 给定时任务一点启动时间
     time.sleep(2)
 
-    # 启动Web应用（在主线程中运行）
-    run_web_app()
+    # 启动 API 应用（在主线程中运行）
+    run_api_app()
 
 
 if __name__ == "__main__":

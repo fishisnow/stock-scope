@@ -63,10 +63,6 @@ COPY backend/ ./backend/
 # 从构建阶段复制前端构建产物
 COPY --from=frontend-builder /app/frontend ./frontend
 
-# 复制启动脚本
-COPY start.sh /app/start.sh
-RUN chmod +x /app/start.sh
-
 # 设置文件权限（确保非 root 用户可以访问）
 RUN chown -R appuser:appuser /app
 
@@ -82,6 +78,6 @@ ENV HOME=/home/appuser
 # 切换到非 root 用户（安全最佳实践）
 USER appuser
 
-# 启动应用
-CMD ["/app/start.sh"]
+# 启动应用（定时任务 + 后端 API + 前端）
+CMD ["sh", "-c", "cd /app/backend/app && python -c \"import core.schedule_stocks as schedule_stocks; schedule_stocks.main()\" & cd /app/backend/app && gunicorn -w 4 -b 0.0.0.0:5001 api.api_app:app & cd /app/frontend && npm start & wait -n"]
 
