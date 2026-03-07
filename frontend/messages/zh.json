@@ -33,6 +33,9 @@
     "signupLink": "立即注册",
     "loginFailed": "登录失败，请重试",
     "signupFailed": "注册失败，请重试",
+    "emailAlreadyRegistered": "该邮箱已注册，请直接登录或使用找回密码。",
+    "verificationEmailSent": "注册成功！我们已向 {email} 发送验证邮件，请先完成邮箱验证后再登录。",
+    "goToLoginAfterVerify": "我已完成验证，去登录",
     "passwordMismatch": "两次输入的密码不一致",
     "welcome": "欢迎回来，"
   },

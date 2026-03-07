@@ -33,6 +33,9 @@
     "signupLink": "Sign up now",
     "loginFailed": "Login failed, please try again",
     "signupFailed": "Signup failed, please try again",
+    "emailAlreadyRegistered": "This email is already registered. Please log in or reset your password.",
+    "verificationEmailSent": "Signup succeeded! We sent a verification email to {email}. Please verify your email before logging in.",
+    "goToLoginAfterVerify": "I have verified, go to login",
     "passwordMismatch": "Passwords do not match",
     "welcome": "Welcome back,"
   },

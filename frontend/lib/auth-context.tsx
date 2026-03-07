@@ -18,7 +18,7 @@ interface AuthContextType {
   session: Session | null
   isLoading: boolean
   login: (email: string, password: string) => Promise<void>
-  signup: (email: string, password: string) => Promise<void>
+  signup: (email: string, password: string) => Promise<{ needsEmailVerification: boolean }>
   logout: () => Promise<void>
 }
 
@@ -89,12 +89,30 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     })
 
     if (error) {
+      const message = (error.message || '').toLowerCase()
+      if (message.includes('already registered') || message.includes('already been registered') || message.includes('email exists')) {
+        throw new Error('EMAIL_ALREADY_REGISTERED')
+      }
       throw new Error(error.message || '注册失败')
     }
 
-    if (data.user) {
-      setUser(mapSupabaseUser(data.user))
+    // Supabase 在开启防邮箱枚举时，已注册邮箱可能返回 error=null，
+    // 但 session 为空且 identities 为空数组。
+    const identities = data.user?.identities
+    if (!data.session && Array.isArray(identities) && identities.length === 0) {
+      throw new Error('EMAIL_ALREADY_REGISTERED')
     }
+
+    // Supabase 在开启邮箱验证时通常返回 user 但 session 为空，此时不应视为已登录
+    if (data.session?.user) {
+      setSession(data.session)
+      setUser(mapSupabaseUser(data.session.user))
+      return { needsEmailVerification: false }
+    }
+
+    setSession(null)
+    setUser(null)
+    return { needsEmailVerification: true }
   }
 
   const logout = async () => {

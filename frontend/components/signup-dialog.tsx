@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useTranslations } from 'next-intl'
 import {
   Dialog,
@@ -27,11 +27,21 @@ export function SignupDialog({ open, onOpenChange, onSwitchToLogin }: SignupDial
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [error, setError] = useState('')
+  const [successMessage, setSuccessMessage] = useState('')
   const [isLoading, setIsLoading] = useState(false)
+
+  useEffect(() => {
+    if (!open) {
+      setError('')
+      setSuccessMessage('')
+      setIsLoading(false)
+    }
+  }, [open])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
+    setSuccessMessage('')
 
     // 验证密码匹配
     if (password !== confirmPassword) {
@@ -42,13 +52,24 @@ export function SignupDialog({ open, onOpenChange, onSwitchToLogin }: SignupDial
     setIsLoading(true)
 
     try {
-      await signup(email, password)
+      const result = await signup(email, password)
+      if (result.needsEmailVerification) {
+        setSuccessMessage(t('verificationEmailSent', { email }))
+        setPassword('')
+        setConfirmPassword('')
+        return
+      }
+
       onOpenChange(false)
       setEmail('')
       setPassword('')
       setConfirmPassword('')
     } catch (err) {
-      setError(err instanceof Error ? err.message : t('signupFailed'))
+      if (err instanceof Error && err.message === 'EMAIL_ALREADY_REGISTERED') {
+        setError(t('emailAlreadyRegistered'))
+      } else {
+        setError(err instanceof Error ? err.message : t('signupFailed'))
+      }
     } finally {
       setIsLoading(false)
     }
@@ -107,6 +128,11 @@ export function SignupDialog({ open, onOpenChange, onSwitchToLogin }: SignupDial
               {error}
             </div>
           )}
+          {successMessage && (
+            <div className="text-sm text-emerald-700 bg-emerald-50 p-3 rounded-md">
+              {successMessage}
+            </div>
+          )}
           <Button 
             type="submit" 
             className="w-full bg-primary hover:bg-primary/90"
@@ -115,6 +141,19 @@ export function SignupDialog({ open, onOpenChange, onSwitchToLogin }: SignupDial
             {isLoading ? t('signingUp') : t('signupButton')}
           </Button>
         </form>
+        {successMessage && (
+          <Button
+            type="button"
+            variant="outline"
+            className="w-full mt-3"
+            onClick={() => {
+              onOpenChange(false)
+              onSwitchToLogin()
+            }}
+          >
+            {t('goToLoginAfterVerify')}
+          </Button>
+        )}
         <div className="mt-4 text-center text-sm">
           <span className="text-muted-foreground">{t('hasAccount')} </span>
           <button
