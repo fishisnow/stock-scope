@@ -79,5 +79,6 @@ ENV HOME=/home/appuser
 USER appuser
 
 # 启动应用（定时任务 + 后端 API + 前端）
-CMD ["sh", "-c", "cd /app/backend/app && python -c \"import core.schedule_stocks as schedule_stocks; schedule_stocks.main()\" & cd /app/backend/app && gunicorn -w 4 -b 0.0.0.0:5001 api.api_app:app & cd /app/frontend && npm start & wait -n"]
+# 使用 POSIX sh 兼容的进程等待逻辑（避免 wait -n 报错）
+CMD ["sh", "-c", "cd /app/backend && python -c \"from app.core import schedule_stocks; schedule_stocks.main()\" & p1=$!; cd /app/backend && gunicorn -w 4 -b 0.0.0.0:5001 app.api.api_app:app & p2=$!; cd /app/frontend && npm start & p3=$!; while true; do for p in $p1 $p2 $p3; do if ! kill -0 \"$p\" 2>/dev/null; then wait \"$p\"; exit $?; fi; done; sleep 1; done"]
 

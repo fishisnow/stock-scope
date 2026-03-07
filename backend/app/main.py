@@ -4,7 +4,7 @@ import threading
 import time
 
 import core.schedule_stocks as schedule_stocks
-import api.api_app as api_app
+import app.api.api_app as api_app
 
 
 def run_scheduler():
