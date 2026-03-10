@@ -231,7 +231,7 @@ export default function IndustryPanoramaPage() {
                       }}
                       title={t("breadth.industryClickHint")}
                     >
-                      <div className="absolute top-1 right-1 text-[8px] sm:text-[9px] font-mono opacity-90">
+                      <div className="absolute top-1 right-1 text-[7px] sm:text-[8px] font-mono opacity-90">
                         {tile.breadthValue === null ? "-" : tile.breadthValue.toFixed(0)}
                       </div>
                       <div className="text-[11px] sm:text-sm font-semibold leading-tight line-clamp-2">

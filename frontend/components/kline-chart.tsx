@@ -412,8 +412,11 @@ export function KLineChart({
     }
 
     const hasVolume = showVolume && chartData.volumes.length > 0
+    const controlTop = isMobile ? 96 : 88
     const zoomStart = isIntraday ? 0 : chartData.dates.length > 80 ? 70 : 0
-    const volumeHeight = Math.max(190, Math.round(height * 0.36))
+    const volumeHeight = isMobile
+      ? Math.max(130, Math.round(height * 0.28))
+      : Math.max(190, Math.round(height * 0.36))
     const zoomHeight = 16
     const zoomBottom = 4
     const volumeBottom = zoomBottom + zoomHeight + 8
@@ -546,7 +549,7 @@ export function KLineChart({
             {
               left: "0px",
               right: "40px",
-              top: "88px",
+              top: `${controlTop}px`,
               bottom: mainBottom,
               containLabel: false,
             },
@@ -562,7 +565,7 @@ export function KLineChart({
             {
               left: "0px",
               right: "40px",
-              top: "88px",
+              top: `${controlTop}px`,
               bottom: "40px",
             },
           ],
@@ -573,7 +576,7 @@ export function KLineChart({
               data: chartData.dates,
               boundaryGap: false,
               axisLine: { lineStyle: { color: colors.border } },
-              axisLabel: { color: colors.textMuted, fontSize: 11, margin: 10, hideOverlap: true },
+              axisLabel: { color: colors.textMuted, fontSize: isMobile ? 10 : 11, margin: 10, hideOverlap: true },
               splitLine: { show: false },
             },
             {
@@ -582,7 +585,7 @@ export function KLineChart({
               data: chartData.dates,
               boundaryGap: false,
               axisLine: { lineStyle: { color: colors.border } },
-              axisLabel: { color: colors.textMuted, fontSize: 11, margin: 10, hideOverlap: true },
+              axisLabel: { color: colors.textMuted, fontSize: isMobile ? 10 : 11, margin: 10, hideOverlap: true },
               splitLine: { show: false },
             },
           ]
@@ -592,7 +595,7 @@ export function KLineChart({
               data: chartData.dates,
               boundaryGap: false,
               axisLine: { lineStyle: { color: colors.border } },
-              axisLabel: { color: colors.textMuted, fontSize: 11 },
+              axisLabel: { color: colors.textMuted, fontSize: isMobile ? 10 : 11 },
               splitLine: { show: false },
             },
           ],
@@ -951,7 +954,9 @@ export function KLineChart({
             ]
           : []),
       ] as echarts.SeriesOption[],
-      legend: !isIntraday && showMA
+      legend: isMobile
+        ? undefined
+        : !isIntraday && showMA
         ? {
             data: ["MA5", "MA10", "MA20"],
             top: 60,
@@ -988,7 +993,7 @@ export function KLineChart({
             {
               left: "10px",
               right: "10px",
-              top: "88px",
+              top: `${controlTop}px`,
               bottom: mainBottom,
               containLabel: true,
             },
@@ -1004,7 +1009,7 @@ export function KLineChart({
             {
               left: "10px",
               right: "10px",
-              top: "88px",
+              top: `${controlTop}px`,
               bottom: "40px",
               containLabel: true,
             },
@@ -1025,7 +1030,7 @@ export function KLineChart({
               axisTick: { show: false },
               axisLabel: {
                 color: colors.textMuted,
-                fontSize: 11,
+                fontSize: isMobile ? 10 : 11,
                 margin: 8,
                 align: "right",
                 formatter: (value: number) => value.toFixed(2),
@@ -1041,7 +1046,7 @@ export function KLineChart({
               axisTick: { show: false },
               axisLabel: {
                 color: colors.textMuted,
-                fontSize: 11,
+                fontSize: isMobile ? 10 : 11,
                 margin: 8,
                 align: "right",
                 formatter: (value: number) => (value / 10000).toFixed(0) + "w",
@@ -1058,7 +1063,7 @@ export function KLineChart({
               axisTick: { show: false },
               axisLabel: {
                 color: colors.textMuted,
-                fontSize: 11,
+                fontSize: isMobile ? 10 : 11,
                 margin: 8,
                 align: "right",
                 formatter: (value: number) => value.toFixed(2),
@@ -1082,12 +1087,12 @@ export function KLineChart({
     return () => {
       window.removeEventListener("resize", handleResize)
     }
-  }, [chartData, data.length, showMA, showVolume, showTrendBands, symbol, height])
+  }, [chartData, data.length, showMA, showVolume, showTrendBands, symbol, height, isMobile])
 
   return (
     <div className="relative flex w-full flex-col" style={{ height }}>
-      <div className="absolute left-2 right-2 top-2 z-10 flex flex-col gap-2 sm:left-3 sm:right-3 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
-        <div className="flex flex-wrap items-center gap-1.5 rounded-full border bg-background/90 px-2 py-1 shadow-sm">
+      <div className="absolute left-2 right-2 top-2 z-10 flex items-center gap-1.5 overflow-x-auto whitespace-nowrap rounded-full border bg-background/90 px-1.5 py-0.5 shadow-sm [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:left-3 sm:right-3 sm:gap-2 sm:px-2 sm:py-1">
+        <div className="flex items-center gap-1 shrink-0">
           {[
             { label: "分时", value: "K_RT" },
             { label: "日K", value: "K_DAY" },
@@ -1100,7 +1105,7 @@ export function KLineChart({
               key={item.value}
               type="button"
               onClick={() => onKlineTypeChange(item.value)}
-              className={`rounded-full px-2 py-1 text-[11px] sm:text-xs transition ${
+              className={`shrink-0 rounded-full px-1 py-0.5 text-[9px] sm:px-2 sm:py-1 sm:text-xs transition ${
                 klineType === item.value
                   ? "bg-primary text-primary-foreground shadow-sm"
                   : "text-muted-foreground hover:text-foreground"
@@ -1109,23 +1114,15 @@ export function KLineChart({
               {item.label}
             </button>
           ))}
-          <span className="mx-1 h-4 w-px bg-border" />
-          <button
-            type="button"
-            onClick={onRefresh}
-            className="flex h-7 w-7 items-center justify-center rounded-full text-muted-foreground transition hover:text-foreground"
-            aria-label="刷新"
-          >
-            ↻
-          </button>
         </div>
-        <div className="flex items-center justify-end gap-2">
+        <span className="mx-0.5 h-3.5 w-px shrink-0 bg-border sm:mx-1 sm:h-4" />
+        <div className="flex items-center gap-1 shrink-0 sm:gap-2">
           {!isIntraday ? (
             <>
               <button
                 type="button"
                 onClick={() => setShowMA((prev) => !prev)}
-                className={`rounded-md border px-2 py-1 text-[11px] sm:text-xs transition ${
+                className={`rounded-md border px-1 py-0.5 text-[9px] sm:px-2 sm:py-1 sm:text-xs transition ${
                   showMA ? "border-primary bg-primary text-primary-foreground" : "border-border bg-background text-muted-foreground"
                 }`}
               >
@@ -1134,7 +1131,7 @@ export function KLineChart({
               <button
                 type="button"
                 onClick={() => setShowTrendBands((prev) => !prev)}
-                className={`rounded-md border px-2 py-1 text-[11px] sm:text-xs transition ${
+                className={`rounded-md border px-1 py-0.5 text-[9px] sm:px-2 sm:py-1 sm:text-xs transition ${
                   showTrendBands ? "border-primary bg-primary text-primary-foreground" : "border-border bg-background text-muted-foreground"
                 }`}
               >
@@ -1145,15 +1142,23 @@ export function KLineChart({
           <button
             type="button"
             onClick={() => setShowVolume((prev) => !prev)}
-            className={`rounded-md border px-2 py-1 text-[11px] sm:text-xs transition ${
+            className={`rounded-md border px-1 py-0.5 text-[9px] sm:px-2 sm:py-1 sm:text-xs transition ${
               showVolume ? "border-primary bg-primary text-primary-foreground" : "border-border bg-background text-muted-foreground"
             }`}
           >
             成交量
           </button>
+          <button
+            type="button"
+            onClick={onRefresh}
+            className="flex h-5 w-5 sm:h-7 sm:w-7 items-center justify-center rounded-full text-muted-foreground transition hover:text-foreground"
+            aria-label="刷新"
+          >
+            ↻
+          </button>
         </div>
       </div>
-      <div className={`grid h-full w-full ${isMobile ? "grid-cols-[64px_1fr]" : "grid-cols-[84px_1fr]"}`}>
+      <div className={`grid h-full w-full ${isMobile ? "grid-cols-[56px_1fr]" : "grid-cols-[84px_1fr]"}`}>
         <div ref={axisRef} className="h-full w-full pointer-events-none" />
         <div ref={chartRef} className="h-full w-full" />
       </div>

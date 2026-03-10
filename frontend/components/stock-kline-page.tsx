@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useTranslations } from "next-intl"
 import { ArrowLeft, Loader2 } from "lucide-react"
-import { useRouter } from "@/i18n/routing"
+import { Link } from "@/i18n/routing"
 import { Button } from "@/components/ui/button"
 import { KLineChart, CandleData } from "@/components/kline-chart"
 
@@ -19,7 +19,6 @@ interface StockKLinePageProps {
 
 export function StockKLinePage({ code, market, name }: StockKLinePageProps) {
   const t = useTranslations("stock")
-  const router = useRouter()
   const normalizedMarket = market.toUpperCase() === "HK" ? "HK" : "A"
 
   const today = useMemo(() => new Date(), [])
@@ -139,16 +138,18 @@ export function StockKLinePage({ code, market, name }: StockKLinePageProps) {
 
   return (
     <section className="section-shell">
-      <div className="container mx-auto max-w-6xl space-y-6">
-        <div className="flex flex-wrap items-center justify-between gap-4">
-          <div>
-            <h1 className="text-2xl sm:text-3xl font-semibold">
+      <div className="container mx-auto max-w-6xl space-y-4 sm:space-y-6">
+        <div className="flex flex-wrap items-start sm:items-center justify-between gap-3 sm:gap-4">
+          <div className="min-w-0">
+            <h1 className="text-lg sm:text-3xl font-semibold leading-tight break-words">
               {normalizedMarket === "HK" ? "🇭🇰" : "🇨🇳"} {code} {name ?? ""}
             </h1>
           </div>
-          <Button variant="outline" onClick={() => router.back()} className="gap-2">
-            <ArrowLeft className="h-4 w-4" />
-            {t("back")}
+          <Button variant="outline" size="sm" className="gap-2 shrink-0" asChild>
+            <Link href="/market">
+              <ArrowLeft className="h-4 w-4" />
+              {t("back")}
+            </Link>
           </Button>
         </div>
 

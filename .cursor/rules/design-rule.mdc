@@ -1,14 +1,38 @@
 ---
+description: Design system and mobile adaptation standards
+globs: frontend/**/*.{tsx,ts,css}
 alwaysApply: false
 ---
-**Design Elements:**
+# Design Rule
 
-- Elegant Playfair Display serif typography for headings in royal blue
-- Clean white background with subtle secondary sections
-- Card-based layouts with hover effects
-- Professional editorial aesthetic with generous white space
+## Visual Design Elements
 
-**Internationalization:**
+- Keep headings in elegant Playfair Display style with royal blue emphasis.
+- Prefer clean white backgrounds, subtle secondary sections, and card-based layouts.
+- Preserve a professional editorial aesthetic with generous but controlled spacing.
+
+## Mobile Adaptation Standards (Solidified)
+
+- Keep page structure consistent with web/desktop; mobile should be a denser presentation, not a different information architecture.
+- Prefer scale-down and compact typography over removing important modules.
+- Header on mobile must keep brand title readable in a single line when possible; avoid forced wrapping and crowded controls.
+- Mobile nav should remain horizontally scrollable if needed instead of truncating core navigation items.
+
+## Table and Data-Dense Content
+
+- For key data tables, keep desktop-equivalent columns visible on mobile whenever possible.
+- Do not hide critical columns solely for mobile breakpoints (`hidden sm/md/lg`) in core market/review tables.
+- Use touch-friendly horizontal panning (`touch-action: pan-x`, momentum scrolling) for overflow areas.
+- If width is insufficient, apply compact density/scale classes (like `mobile-fit-table`) before dropping data columns.
+
+## Mobile K-Line/Chart UI
+
+- Keep top controls in a single row on mobile (horizontal scroll allowed), with compact button sizes.
+- Reduce mobile chart control visual weight (smaller paddings/fonts) to maximize chart viewport.
+- Avoid overlapping legends and controls; hide non-essential legend text on mobile when controls already communicate state.
+- Reserve sufficient top spacing for chart controls and keep axis labels compact on small screens.
+
+## Internationalization
 
 - This is a multilingual website.
-- When generating frontend UI, add i18n message keys/constants for all user-facing strings and use the translation helper to render them (avoid hardcoded text).
+- For all user-facing text, use i18n message keys and translation helpers; avoid hardcoded strings.
