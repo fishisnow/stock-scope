@@ -14,27 +14,27 @@ export default function LandingPage() {
     <div className="min-h-screen bg-background">
       <Header />
       <main>
-        <section className="py-20 px-4 sm:px-6 lg:px-8">
+        <section className="section-shell-lg">
           <div className="container mx-auto max-w-6xl">
             <div className="text-center">
               <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-secondary text-sm text-muted-foreground mb-6">
                 <Sparkles className="h-4 w-4 text-primary" />
                 <span>{t("hero.badge")}</span>
               </div>
-              <h1 className="font-serif text-5xl sm:text-6xl lg:text-7xl text-primary mb-6 text-balance">
+              <h1 className="font-serif text-3xl sm:text-6xl lg:text-7xl text-primary mb-6 text-balance">
                 {t("hero.title")}
               </h1>
-              <p className="text-lg sm:text-xl text-muted-foreground max-w-3xl mx-auto mb-10">
+              <p className="text-base sm:text-xl text-muted-foreground max-w-3xl mx-auto mb-8 sm:mb-10">
                 {t("hero.subtitle")}
               </p>
               <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-                <Button size="lg" className="gap-2" asChild>
+                <Button size="lg" className="gap-2 w-full sm:w-auto" asChild>
                   <Link href="/home">
                     {t("hero.primaryCta")}
                     <ArrowRight className="h-4 w-4" />
                   </Link>
                 </Button>
-                <Button size="lg" variant="outline" asChild>
+                <Button size="lg" variant="outline" className="w-full sm:w-auto" asChild>
                   <Link href="/market">{t("hero.secondaryCta")}</Link>
                 </Button>
               </div>
@@ -45,7 +45,7 @@ export default function LandingPage() {
           </div>
         </section>
 
-        <section id="value" className="py-16 px-4 sm:px-6 lg:px-8 bg-secondary/30">
+        <section id="value" className="section-shell bg-secondary/30">
           <div className="container mx-auto max-w-6xl">
             <div className="text-center mb-12">
               <h2 className="font-serif text-3xl sm:text-4xl text-primary mb-3">
@@ -87,7 +87,7 @@ export default function LandingPage() {
           </div>
         </section>
 
-        <section id="workflow" className="py-16 px-4 sm:px-6 lg:px-8">
+        <section id="workflow" className="section-shell">
           <div className="container mx-auto max-w-6xl">
             <div className="grid grid-cols-1 lg:grid-cols-[1.1fr_0.9fr] gap-10 items-center">
               <div>
@@ -115,7 +115,7 @@ export default function LandingPage() {
                   ))}
                 </div>
               </div>
-              <div className="bg-card border rounded-2xl p-8 shadow-sm">
+              <div className="bg-card border rounded-2xl p-5 sm:p-8 shadow-sm">
                 <div className="flex items-center gap-3 mb-4">
                   <ShieldCheck className="h-5 w-5 text-primary" />
                   <span className="text-sm text-muted-foreground">{t("workflow.note")}</span>
@@ -133,7 +133,7 @@ export default function LandingPage() {
           </div>
         </section>
 
-        <section id="modules" className="py-16 px-4 sm:px-6 lg:px-8 bg-secondary/30">
+        <section id="modules" className="section-shell bg-secondary/30">
           <div className="container mx-auto max-w-6xl">
             <div className="text-center mb-12">
               <h2 className="font-serif text-3xl sm:text-4xl text-primary mb-3">
@@ -166,7 +166,7 @@ export default function LandingPage() {
           </div>
         </section>
 
-        <section className="py-20 px-4 sm:px-6 lg:px-8">
+        <section className="section-shell-lg">
           <div className="container mx-auto max-w-4xl text-center">
             <h2 className="font-serif text-3xl sm:text-4xl text-primary mb-4">
               {t("cta.title")}

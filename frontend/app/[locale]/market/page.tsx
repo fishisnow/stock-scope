@@ -160,8 +160,8 @@ function StockTable({
         </div>
       </CardHeader>
       <CardContent>
-        <div className="overflow-x-auto">
-          <table className="w-full">
+        <div className="overflow-x-auto [touch-action:pan-x] [-webkit-overflow-scrolling:touch] mobile-fit-table-wrapper">
+          <table className="w-full mobile-fit-table">
             <thead>
               <tr className="border-b-2 border-border">
                 <th className="py-3 px-2 text-left text-[10px] sm:text-xs font-bold uppercase tracking-wide text-muted-foreground whitespace-nowrap">
@@ -171,23 +171,23 @@ function StockTable({
                   {t('table.stock')}
                 </th>
                 {(dataType === "top_turnover" || dataType === "intersection") && (
-                  <th className="py-3 px-2 text-right text-[10px] sm:text-xs font-bold uppercase tracking-wide text-muted-foreground whitespace-nowrap hidden sm:table-cell">
+                  <th className="py-3 px-2 text-right text-[10px] sm:text-xs font-bold uppercase tracking-wide text-muted-foreground whitespace-nowrap">
                     {t('table.amount')}
                   </th>
                 )}
                 <th className="py-3 px-2 text-right text-[10px] sm:text-xs font-bold uppercase tracking-wide text-muted-foreground whitespace-nowrap">
                   {t('table.change')}
                 </th>
-                <th className="py-3 px-2 text-right text-[10px] sm:text-xs font-bold uppercase tracking-wide text-muted-foreground whitespace-nowrap hidden lg:table-cell">
+                <th className="py-3 px-2 text-right text-[10px] sm:text-xs font-bold uppercase tracking-wide text-muted-foreground whitespace-nowrap">
                   {t('table.volume')}
                 </th>
-                <th className="py-3 px-2 text-right text-[10px] sm:text-xs font-bold uppercase tracking-wide text-muted-foreground whitespace-nowrap hidden xl:table-cell">
+                <th className="py-3 px-2 text-right text-[10px] sm:text-xs font-bold uppercase tracking-wide text-muted-foreground whitespace-nowrap">
                   {t('table.volumeRatio')}
                 </th>
-                <th className="py-3 px-2 text-right text-[10px] sm:text-xs font-bold uppercase tracking-wide text-muted-foreground whitespace-nowrap hidden md:table-cell">
+                <th className="py-3 px-2 text-right text-[10px] sm:text-xs font-bold uppercase tracking-wide text-muted-foreground whitespace-nowrap">
                   {t('table.turnover')}
                 </th>
-                <th className="py-3 px-2 text-right text-[10px] sm:text-xs font-bold uppercase tracking-wide text-muted-foreground whitespace-nowrap hidden lg:table-cell">
+                <th className="py-3 px-2 text-right text-[10px] sm:text-xs font-bold uppercase tracking-wide text-muted-foreground whitespace-nowrap">
                   {t('table.pe')}
                 </th>
               </tr>
@@ -230,7 +230,7 @@ function StockTable({
                       )}
                     </td>
                     {(dataType === "top_turnover" || dataType === "intersection") && (
-                      <td className="py-3 px-2 text-right hidden sm:table-cell">
+                      <td className="py-3 px-2 text-right">
                         <span className="text-xs sm:text-sm font-mono font-medium">
                           {(parseFloat(String(stock.amount || 0)) / 100000000).toFixed(1)}
                         </span>
@@ -238,8 +238,8 @@ function StockTable({
                     )}
                     <td className="py-3 px-2 text-right">
                       <div className="flex items-center justify-end gap-1">
-                        {isPositive && <TrendingUp className="h-3 w-3 text-red-600 hidden sm:inline" />}
-                        {isNegative && <TrendingDown className="h-3 w-3 text-green-600 hidden sm:inline" />}
+                        {isPositive && <TrendingUp className="h-3 w-3 text-red-600" />}
+                        {isNegative && <TrendingDown className="h-3 w-3 text-green-600" />}
                         <span
                           className={`text-xs sm:text-sm font-mono font-bold whitespace-nowrap ${
                             isPositive ? "text-red-600" : isNegative ? "text-green-600" : "text-muted-foreground"
@@ -250,16 +250,16 @@ function StockTable({
                         </span>
                       </div>
                     </td>
-                    <td className="py-3 px-2 text-right hidden lg:table-cell">
+                    <td className="py-3 px-2 text-right">
                       <span className="text-xs sm:text-sm font-mono">{(parseFloat(String(stock.volume || 0)) / 10000).toFixed(1)}</span>
                     </td>
-                    <td className="py-3 px-2 text-right hidden xl:table-cell">
+                    <td className="py-3 px-2 text-right">
                       <span className="text-xs sm:text-sm font-mono">{parseFloat(String(stock.volumeRatio || 0)).toFixed(1)}</span>
                     </td>
-                    <td className="py-3 px-2 text-right hidden md:table-cell">
+                    <td className="py-3 px-2 text-right">
                       <span className="text-xs sm:text-sm font-mono">{parseFloat(String(stock.turnoverRate || 0)).toFixed(1)}%</span>
                     </td>
-                    <td className="py-3 px-2 text-right hidden lg:table-cell">
+                    <td className="py-3 px-2 text-right">
                       <span className="text-xs sm:text-sm font-mono">{parseFloat(String(stock.pe || 0)).toFixed(1)}</span>
                     </td>
                     </tr>
@@ -510,15 +510,15 @@ export default function MarketPage() {
     <div className="min-h-screen bg-background">
       <Header />
 
-      <main className="container mx-auto px-4 sm:px-6 lg:px-8 py-16 max-w-7xl">
+      <main className="page-shell page-main-spacing">
         {/* Page Header */}
         <div className="text-center mb-12">
           <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-secondary mb-6">
             <Sparkles className="h-4 w-4 text-primary" />
             <span className="text-sm font-medium">{t('realtimeIntelligence')}</span>
           </div>
-          <h1 className="font-serif text-5xl sm:text-6xl lg:text-7xl text-primary mb-6">{t('pageTitle')}</h1>
-          <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
+          <h1 className="hero-title mb-6">{t('pageTitle')}</h1>
+          <p className="section-subtitle">
             {t('pageSubtitle')}
           </p>
         </div>
@@ -544,13 +544,13 @@ export default function MarketPage() {
                 </span>
               </CardTitle>
             </CardHeader>
-            <CardContent className="p-6 pt-0">
+            <CardContent className="p-4 sm:p-6 pt-0">
               {breadthLoading && (
                 <div className="text-sm text-muted-foreground">{t('breadth.loading')}</div>
               )}
               {!breadthLoading && breadthData && breadthData.dates.length > 0 && (
-                <div className="overflow-x-auto">
-                  <table className="min-w-full border-collapse text-sm">
+                <div className="overflow-x-auto [touch-action:pan-x] [-webkit-overflow-scrolling:touch] mobile-fit-table-wrapper">
+                  <table className="min-w-full border-collapse text-sm mobile-fit-table">
                     <thead>
                       <tr>
                         <th className="text-left py-2 px-3 text-muted-foreground whitespace-nowrap border border-border/30 w-[90px]">
@@ -638,13 +638,13 @@ export default function MarketPage() {
                 </Button>
               </div>
             </CardHeader>
-            <CardContent className="p-6 pt-0">
+            <CardContent className="p-4 sm:p-6 pt-0">
               {breadthLoading && (
                 <div className="text-sm text-muted-foreground">{t('breadth.loading')}</div>
               )}
               {!breadthLoading && breadthData && breadthData.dates.length > 0 && (
-                <div className="overflow-x-auto">
-                  <table className="min-w-full border-collapse text-sm">
+                <div className="overflow-x-auto [touch-action:pan-x] [-webkit-overflow-scrolling:touch] mobile-fit-table-wrapper">
+                  <table className="min-w-full border-collapse text-sm mobile-fit-table">
                     <thead>
                       <tr>
                         <th
@@ -716,7 +716,7 @@ export default function MarketPage() {
 
         {/* Date Navigation */}
         <div className="flex flex-col items-center gap-6 mb-12">
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2 sm:gap-4 w-full justify-center">
             <Button
               variant="outline"
               size="icon"
@@ -732,7 +732,7 @@ export default function MarketPage() {
               onValueChange={handleDateChange}
               disabled={loading || availableDates.length === 0}
             >
-              <SelectTrigger className="min-w-[200px] h-10 gap-2 font-medium">
+              <SelectTrigger className="w-[170px] sm:w-[220px] h-10 gap-2 font-medium">
                 <Calendar className="h-4 w-4 text-muted-foreground shrink-0" />
                 <SelectValue placeholder={availableDates.length === 0 ? t('date.loadingDates') : t('date.selectDate')} />
               </SelectTrigger>
@@ -795,14 +795,14 @@ export default function MarketPage() {
             <div className="space-y-16">
               {/* A Market Section */}
               {futuData.A && (
-                <section className="py-12 px-6 sm:px-8 lg:px-10 bg-secondary/30 rounded-2xl">
+                <section className="py-8 sm:py-12 px-4 sm:px-8 lg:px-10 bg-secondary/30 rounded-2xl">
                   {renderMarketSection("A", futuData.A, t('markets.chinaA'))}
                 </section>
               )}
 
               {/* HK Market Section */}
               {futuData.HK && (
-                <section className="py-12 px-6 sm:px-8 lg:px-10">
+                <section className="py-8 sm:py-12 px-4 sm:px-8 lg:px-10">
                   {renderMarketSection("HK", futuData.HK, t('markets.hongKongStock'))}
                 </section>
               )}

@@ -71,10 +71,10 @@ const trends = [
 
 export function TrendsSection() {
   return (
-    <section id="trends" className="py-16 px-4 sm:px-6 lg:px-8 bg-secondary/30">
+    <section id="trends" className="section-shell bg-secondary/30">
       <div className="container mx-auto max-w-7xl">
         <div className="text-center mb-12">
-          <h2 className="font-serif text-5xl sm:text-6xl text-primary mb-4">Trends</h2>
+          <h2 className="font-serif text-3xl sm:text-6xl text-primary mb-4">Trends</h2>
           <p className="text-lg text-muted-foreground">Discover emerging investment trends and opportunities</p>
         </div>
 

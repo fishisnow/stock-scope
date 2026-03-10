@@ -166,7 +166,7 @@ export function OpportunityOfTheDay({ selectedOpportunity, onOpportunityChange, 
 
   if (loading) {
     return (
-      <section className="py-16 px-4 sm:px-6 lg:px-8">
+      <section className="section-shell">
         <div className="container mx-auto max-w-4xl">
           <div className="text-center">
             <div className="animate-pulse">{t('loading')}</div>
@@ -178,11 +178,11 @@ export function OpportunityOfTheDay({ selectedOpportunity, onOpportunityChange, 
 
   if (!opportunity) {
     return (
-      <section className="py-16 px-4 sm:px-6 lg:px-8">
+      <section className="section-shell">
         <div className="container mx-auto max-w-4xl">
           <div className="text-center">
             <Lightbulb className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
-            <h1 className="font-serif text-5xl sm:text-6xl lg:text-7xl text-primary mb-4 text-balance">
+            <h1 className="hero-title mb-4 text-balance">
               {t('title')}
             </h1>
             <p className="text-lg text-muted-foreground">
@@ -195,7 +195,7 @@ export function OpportunityOfTheDay({ selectedOpportunity, onOpportunityChange, 
   }
 
   return (
-    <section className="py-16 px-4 sm:px-6 lg:px-8">
+    <section className="section-shell">
       <div className="container mx-auto max-w-4xl">
         <div className="text-center mb-12">
           <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-secondary mb-6">
@@ -203,11 +203,11 @@ export function OpportunityOfTheDay({ selectedOpportunity, onOpportunityChange, 
             <span className="text-sm font-medium">{t('subtitle')}</span>
           </div>
 
-          <h1 className="font-serif text-5xl sm:text-6xl lg:text-7xl text-primary mb-8 text-balance">
+          <h1 className="hero-title mb-8 text-balance">
             {t('title')}
           </h1>
 
-          <div className="flex items-center justify-center gap-3 text-sm text-muted-foreground mb-8">
+          <div className="flex flex-wrap items-center justify-center gap-3 text-sm text-muted-foreground mb-8">
             {opportunityId !== undefined && opportunityId !== null && (
               <Button
                 variant="outline"
@@ -219,7 +219,7 @@ export function OpportunityOfTheDay({ selectedOpportunity, onOpportunityChange, 
                 <ChevronLeft className="h-4 w-4" />
               </Button>
             )}
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 min-w-0">
               <Calendar className="h-4 w-4" />
               <span>{new Date(opportunity.recorded_at).toLocaleDateString(undefined, { 
                 year: 'numeric', 
@@ -253,9 +253,9 @@ export function OpportunityOfTheDay({ selectedOpportunity, onOpportunityChange, 
                 href={opportunity.source_url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-primary hover:underline inline-flex items-center gap-1"
+                className="text-primary hover:underline inline-flex items-center gap-1 min-w-0"
               >
-                <span className="truncate max-w-md">{opportunity.source_url}</span>
+                <span className="truncate max-w-[70vw] sm:max-w-md">{opportunity.source_url}</span>
                 <ExternalLink className="h-3 w-3 flex-shrink-0" />
               </a>
             </div>

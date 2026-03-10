@@ -115,10 +115,79 @@
 }
 
 @layer base {
+  html,
+  body {
+    width: 100%;
+    overflow-x: hidden;
+  }
+
   * {
     @apply border-border outline-ring/50;
   }
+
   body {
     @apply bg-background text-foreground;
+  }
+
+  img,
+  svg,
+  canvas,
+  video {
+    max-width: 100%;
+  }
+
+  /* Prevent long urls/markdown text from breaking mobile layout */
+  .prose {
+    overflow-wrap: anywhere;
+    word-break: break-word;
+  }
+}
+
+@layer components {
+  .page-shell {
+    @apply container mx-auto max-w-7xl px-4 sm:px-6 lg:px-8;
+  }
+
+  .page-main-spacing {
+    @apply py-10 sm:py-16;
+  }
+
+  .section-shell {
+    @apply px-4 sm:px-6 lg:px-8 py-10 sm:py-16;
+  }
+
+  .section-shell-lg {
+    @apply px-4 sm:px-6 lg:px-8 py-12 sm:py-20;
+  }
+
+  .hero-title {
+    @apply font-serif text-3xl sm:text-5xl lg:text-7xl text-primary;
+  }
+
+  .section-title {
+    @apply font-serif text-2xl sm:text-4xl text-primary;
+  }
+
+  .section-subtitle {
+    @apply text-base sm:text-lg text-muted-foreground max-w-2xl mx-auto;
+  }
+}
+
+@media (max-width: 768px) {
+  /* Keep desktop layout structure; only shrink content density on mobile */
+  .mobile-fit-table {
+    zoom: 0.62;
+  }
+
+  table th,
+  table td {
+    padding-top: 0.375rem !important;
+    padding-bottom: 0.375rem !important;
+  }
+}
+
+@media (max-width: 390px) {
+  .mobile-fit-table {
+    zoom: 0.56;
   }
 }

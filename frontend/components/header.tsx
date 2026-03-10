@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { Link } from "@/i18n/routing"
+import { usePathname } from '@/i18n/routing'
 import { useSearchParams } from 'next/navigation'
 import { Button } from "@/components/ui/button"
 import { LogOut, User, Plus } from "lucide-react"
@@ -30,9 +31,16 @@ export function Header({ onRecordOpportunity }: HeaderProps = {}) {
   const tOpp = useTranslations('opportunity.recorder')
   const { user, logout } = useAuth()
   const searchParams = useSearchParams()
+  const pathname = usePathname()
   const [showLoginDialog, setShowLoginDialog] = useState(false)
   const [showSignupDialog, setShowSignupDialog] = useState(false)
   const [mounted, setMounted] = useState(false)
+  const navItems = [
+    { href: "/", label: t('home') },
+    { href: "/home", label: t('opportunity') },
+    { href: "/market", label: t('market') },
+    { href: "/review", label: t('review') },
+  ]
   
   // 修复 Hydration 错误：等待客户端挂载
   useEffect(() => {
@@ -71,31 +79,24 @@ export function Header({ onRecordOpportunity }: HeaderProps = {}) {
     <>
       <header className="border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 sticky top-0 z-50">
         <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid h-16 grid-cols-[1fr_auto_1fr] items-center">
-            <div className="flex items-center gap-2 justify-self-start">
+          <div className="grid h-16 grid-cols-[auto_1fr] md:grid-cols-[1fr_auto_1fr] items-center">
+            <div className="flex items-center gap-1.5 sm:gap-2 justify-self-start min-w-0">
               <Logo
-                className="h-6 w-6 text-primary"
+                className="h-5 w-5 sm:h-6 sm:w-6 text-primary shrink-0"
                 aria-hidden="true"
                 focusable="false"
               />
-              <Link href="/" className="text-xl font-semibold">
+              <Link href="/" className="text-base sm:text-xl font-semibold whitespace-nowrap leading-none">
                 {t('title')}
               </Link>
             </div>
 
             <nav className="hidden md:flex items-center gap-8 justify-self-center">
-              <Link href="/" className="text-sm font-medium hover:text-primary transition-colors">
-                {t('home')}
-              </Link>
-              <Link href="/home" className="text-sm font-medium hover:text-primary transition-colors">
-                {t('opportunity')}
-              </Link>
-              <Link href="/market" className="text-sm font-medium hover:text-primary transition-colors">
-                {t('market')}
-              </Link>
-              <Link href="/review" className="text-sm font-medium hover:text-primary transition-colors">
-                {t('review')}
-              </Link>
+              {navItems.map((item) => (
+                <Link key={item.href} href={item.href} className="text-sm font-medium hover:text-primary transition-colors">
+                  {item.label}
+                </Link>
+              ))}
             </nav>
 
             <div className="flex items-center gap-2 justify-self-end">
@@ -147,13 +148,14 @@ export function Header({ onRecordOpportunity }: HeaderProps = {}) {
                   <Button 
                     variant="ghost" 
                     size="sm"
+                    className="px-2 sm:px-3"
                     onClick={() => setShowLoginDialog(true)}
                   >
                     {t('login')}
                   </Button>
                   <Button 
                     size="sm" 
-                    className="bg-primary hover:bg-primary/90"
+                    className="bg-primary hover:bg-primary/90 px-2 sm:px-3"
                     onClick={() => setShowSignupDialog(true)}
                   >
                     {t('signup')}
@@ -172,6 +174,30 @@ export function Header({ onRecordOpportunity }: HeaderProps = {}) {
               )}
             </div>
           </div>
+
+          <nav className="md:hidden pb-3 overflow-x-auto">
+            <div className="flex min-w-max items-center gap-2">
+              {navItems.map((item) => {
+                const isActive =
+                  item.href === "/"
+                    ? pathname === "/"
+                    : pathname === item.href || pathname.startsWith(`${item.href}/`)
+                return (
+                  <Link
+                    key={`mobile-${item.href}`}
+                    href={item.href}
+                    className={`rounded-full px-3 py-1.5 text-xs font-medium transition-colors ${
+                      isActive
+                        ? "bg-primary text-primary-foreground"
+                        : "bg-secondary text-secondary-foreground hover:bg-secondary/80"
+                    }`}
+                  >
+                    {item.label}
+                  </Link>
+                )
+              })}
+            </div>
+          </nav>
         </div>
       </header>
 

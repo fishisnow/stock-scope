@@ -363,7 +363,7 @@ export function InvestmentOpportunityRecorder({
             <div style={{ display: 'none' }} />
           </DialogTrigger>
 
-            <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+            <DialogContent className="w-[95vw] max-w-2xl max-h-[90vh] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle>
                   {editingOpportunity ? t('editTitle') : t('createTitle')}
@@ -418,14 +418,14 @@ export function InvestmentOpportunityRecorder({
                   {/* 触发词 */}
                   <div className="space-y-2">
                     <Label>{t('triggerWordsLabel')}</Label>
-                    <div className="flex gap-2">
+                    <div className="flex flex-col sm:flex-row gap-2">
                       <Input
                         placeholder={t('triggerWordPlaceholder')}
                         value={currentTriggerWord}
                         onChange={(e) => setCurrentTriggerWord(e.target.value)}
                         onKeyPress={(e) => e.key === 'Enter' && addTriggerWord()}
                       />
-                      <Button type="button" onClick={addTriggerWord} variant="outline">
+                      <Button type="button" onClick={addTriggerWord} variant="outline" className="w-full sm:w-auto">
                         {t('add')}
                       </Button>
                     </div>
@@ -515,7 +515,7 @@ export function InvestmentOpportunityRecorder({
                       <div className="space-y-2">
                         {formData.stocks.map((stock, index) => (
                           <div key={index} className="p-3 bg-muted rounded-md flex items-start justify-between">
-                            <div className="flex-1 grid grid-cols-2 gap-2 text-sm">
+                            <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm">
                               <div>
                                 <span className="text-muted-foreground">{t('stockName')}：</span>
                                 {stock.stock_name}

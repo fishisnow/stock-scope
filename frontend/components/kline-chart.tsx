@@ -261,7 +261,17 @@ export function KLineChart({
   const [showVolume, setShowVolume] = useState(true)
   const [showMA, setShowMA] = useState(true)
   const [showTrendBands, setShowTrendBands] = useState(true)
+  const [isMobile, setIsMobile] = useState(false)
   const isIntraday = klineType === "K_RT"
+
+  useEffect(() => {
+    if (typeof window === "undefined") return
+    const media = window.matchMedia("(max-width: 640px)")
+    const sync = () => setIsMobile(media.matches)
+    sync()
+    media.addEventListener("change", sync)
+    return () => media.removeEventListener("change", sync)
+  }, [])
 
   const chartData = useMemo(() => {
     const dates = data.map((item) => item.date)
@@ -1076,8 +1086,8 @@ export function KLineChart({
 
   return (
     <div className="relative flex w-full flex-col" style={{ height }}>
-      <div className="absolute left-3 right-3 top-2 z-10 flex items-center justify-between gap-3">
-        <div className="flex flex-wrap items-center gap-2 rounded-full border bg-background/90 px-2 py-1 shadow-sm">
+      <div className="absolute left-2 right-2 top-2 z-10 flex flex-col gap-2 sm:left-3 sm:right-3 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
+        <div className="flex flex-wrap items-center gap-1.5 rounded-full border bg-background/90 px-2 py-1 shadow-sm">
           {[
             { label: "分时", value: "K_RT" },
             { label: "日K", value: "K_DAY" },
@@ -1090,7 +1100,7 @@ export function KLineChart({
               key={item.value}
               type="button"
               onClick={() => onKlineTypeChange(item.value)}
-              className={`rounded-full px-2.5 py-1 text-xs transition ${
+              className={`rounded-full px-2 py-1 text-[11px] sm:text-xs transition ${
                 klineType === item.value
                   ? "bg-primary text-primary-foreground shadow-sm"
                   : "text-muted-foreground hover:text-foreground"
@@ -1109,13 +1119,13 @@ export function KLineChart({
             ↻
           </button>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center justify-end gap-2">
           {!isIntraday ? (
             <>
               <button
                 type="button"
                 onClick={() => setShowMA((prev) => !prev)}
-                className={`rounded-md border px-2 py-1 text-xs transition ${
+                className={`rounded-md border px-2 py-1 text-[11px] sm:text-xs transition ${
                   showMA ? "border-primary bg-primary text-primary-foreground" : "border-border bg-background text-muted-foreground"
                 }`}
               >
@@ -1124,7 +1134,7 @@ export function KLineChart({
               <button
                 type="button"
                 onClick={() => setShowTrendBands((prev) => !prev)}
-                className={`rounded-md border px-2 py-1 text-xs transition ${
+                className={`rounded-md border px-2 py-1 text-[11px] sm:text-xs transition ${
                   showTrendBands ? "border-primary bg-primary text-primary-foreground" : "border-border bg-background text-muted-foreground"
                 }`}
               >
@@ -1135,7 +1145,7 @@ export function KLineChart({
           <button
             type="button"
             onClick={() => setShowVolume((prev) => !prev)}
-            className={`rounded-md border px-2 py-1 text-xs transition ${
+            className={`rounded-md border px-2 py-1 text-[11px] sm:text-xs transition ${
               showVolume ? "border-primary bg-primary text-primary-foreground" : "border-border bg-background text-muted-foreground"
             }`}
           >
@@ -1143,7 +1153,7 @@ export function KLineChart({
           </button>
         </div>
       </div>
-      <div className="grid h-full w-full grid-cols-[84px_1fr]">
+      <div className={`grid h-full w-full ${isMobile ? "grid-cols-[64px_1fr]" : "grid-cols-[84px_1fr]"}`}>
         <div ref={axisRef} className="h-full w-full pointer-events-none" />
         <div ref={chartRef} className="h-full w-full" />
       </div>

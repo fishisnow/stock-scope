@@ -101,8 +101,8 @@ function StockTable({
             {data.length} {t("table.stocks")}
           </Badge>
         </div>
-        <div className="overflow-x-auto">
-          <table className="w-full">
+        <div className="overflow-x-auto [touch-action:pan-x] [-webkit-overflow-scrolling:touch] mobile-fit-table-wrapper">
+          <table className="w-full mobile-fit-table">
             <thead>
               <tr className="border-b-2 border-border">
                 <th className="py-3 px-2 text-left text-[10px] sm:text-xs font-bold uppercase tracking-wide text-muted-foreground whitespace-nowrap">
@@ -111,7 +111,7 @@ function StockTable({
                 <th className="py-3 px-2 text-left text-[10px] sm:text-xs font-bold uppercase tracking-wide text-muted-foreground min-w-[80px]">
                   {t("table.stock")}
                 </th>
-                <th className="py-3 px-2 text-right text-[10px] sm:text-xs font-bold uppercase tracking-wide text-muted-foreground whitespace-nowrap hidden sm:table-cell">
+                <th className="py-3 px-2 text-right text-[10px] sm:text-xs font-bold uppercase tracking-wide text-muted-foreground whitespace-nowrap">
                   <button type="button" onClick={() => handleSort("amount")} className="inline-flex items-center gap-1 hover:text-primary">
                     {t("table.amount")}
                     {renderSortIcon("amount")}
@@ -123,25 +123,25 @@ function StockTable({
                     {renderSortIcon("changeRatio")}
                   </button>
                 </th>
-                <th className="py-3 px-2 text-right text-[10px] sm:text-xs font-bold uppercase tracking-wide text-muted-foreground whitespace-nowrap hidden lg:table-cell">
+                <th className="py-3 px-2 text-right text-[10px] sm:text-xs font-bold uppercase tracking-wide text-muted-foreground whitespace-nowrap">
                   <button type="button" onClick={() => handleSort("volume")} className="inline-flex items-center gap-1 hover:text-primary">
                     {t("table.volume")}
                     {renderSortIcon("volume")}
                   </button>
                 </th>
-                <th className="py-3 px-2 text-right text-[10px] sm:text-xs font-bold uppercase tracking-wide text-muted-foreground whitespace-nowrap hidden xl:table-cell">
+                <th className="py-3 px-2 text-right text-[10px] sm:text-xs font-bold uppercase tracking-wide text-muted-foreground whitespace-nowrap">
                   <button type="button" onClick={() => handleSort("volumeRatio")} className="inline-flex items-center gap-1 hover:text-primary">
                     {t("table.volumeRatio")}
                     {renderSortIcon("volumeRatio")}
                   </button>
                 </th>
-                <th className="py-3 px-2 text-right text-[10px] sm:text-xs font-bold uppercase tracking-wide text-muted-foreground whitespace-nowrap hidden md:table-cell">
+                <th className="py-3 px-2 text-right text-[10px] sm:text-xs font-bold uppercase tracking-wide text-muted-foreground whitespace-nowrap">
                   <button type="button" onClick={() => handleSort("turnoverRate")} className="inline-flex items-center gap-1 hover:text-primary">
                     {t("table.turnover")}
                     {renderSortIcon("turnoverRate")}
                   </button>
                 </th>
-                <th className="py-3 px-2 text-right text-[10px] sm:text-xs font-bold uppercase tracking-wide text-muted-foreground whitespace-nowrap hidden lg:table-cell">
+                <th className="py-3 px-2 text-right text-[10px] sm:text-xs font-bold uppercase tracking-wide text-muted-foreground whitespace-nowrap">
                   <button type="button" onClick={() => handleSort("pe")} className="inline-flex items-center gap-1 hover:text-primary">
                     {t("table.pe")}
                     {renderSortIcon("pe")}
@@ -183,15 +183,15 @@ function StockTable({
                         <span className="text-xs sm:text-sm font-semibold truncate block max-w-[120px]">{stock.name || "-"}</span>
                       )}
                     </td>
-                    <td className="py-3 px-2 text-right hidden sm:table-cell">
+                    <td className="py-3 px-2 text-right">
                       <span className="text-xs sm:text-sm font-mono font-medium">
                         {(parseFloat(String(stock.amount || 0)) / 100000000).toFixed(1)}
                       </span>
                     </td>
                     <td className="py-3 px-2 text-right">
                       <div className="flex items-center justify-end gap-1">
-                        {isPositive && <TrendingUp className="h-3 w-3 text-red-600 hidden sm:inline" />}
-                        {isNegative && <TrendingDown className="h-3 w-3 text-green-600 hidden sm:inline" />}
+                        {isPositive && <TrendingUp className="h-3 w-3 text-red-600" />}
+                        {isNegative && <TrendingDown className="h-3 w-3 text-green-600" />}
                         <span
                           className={`text-xs sm:text-sm font-mono font-bold whitespace-nowrap ${
                             isPositive ? "text-red-600" : isNegative ? "text-green-600" : "text-muted-foreground"
@@ -202,16 +202,16 @@ function StockTable({
                         </span>
                       </div>
                     </td>
-                    <td className="py-3 px-2 text-right hidden lg:table-cell">
+                    <td className="py-3 px-2 text-right">
                       <span className="text-xs sm:text-sm font-mono">{(parseFloat(String(stock.volume || 0)) / 10000).toFixed(1)}</span>
                     </td>
-                    <td className="py-3 px-2 text-right hidden xl:table-cell">
+                    <td className="py-3 px-2 text-right">
                       <span className="text-xs sm:text-sm font-mono">{parseFloat(String(stock.volumeRatio || 0)).toFixed(1)}</span>
                     </td>
-                    <td className="py-3 px-2 text-right hidden md:table-cell">
+                    <td className="py-3 px-2 text-right">
                       <span className="text-xs sm:text-sm font-mono">{parseFloat(String(stock.turnoverRate || 0)).toFixed(1)}%</span>
                     </td>
-                    <td className="py-3 px-2 text-right hidden lg:table-cell">
+                    <td className="py-3 px-2 text-right">
                       <span className="text-xs sm:text-sm font-mono">{parseFloat(String(stock.pe || 0)).toFixed(1)}</span>
                     </td>
                   </tr>
@@ -302,11 +302,11 @@ export default function IndustryStocksPage() {
   return (
     <div className="min-h-screen bg-background">
       <Header />
-      <main className="container mx-auto px-4 sm:px-6 lg:px-8 py-16 max-w-7xl">
+      <main className="page-shell page-main-spacing">
         <div className="mb-10 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="min-w-0">
             <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-              <h1 className="font-serif text-4xl sm:text-5xl tracking-tight text-primary">
+              <h1 className="font-serif text-3xl sm:text-5xl lg:text-6xl tracking-tight text-primary">
                 {industryLabel || "-"}
               </h1>
               {!loading && !error && data && (

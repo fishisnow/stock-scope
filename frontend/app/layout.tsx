@@ -1,4 +1,5 @@
 import type { ReactNode } from "react"
+import type { Viewport } from "next"
 import { GeistSans } from "geist/font/sans"
 import { GeistMono } from "geist/font/mono"
 import { Playfair_Display } from "next/font/google"
@@ -13,6 +14,12 @@ const playfair = Playfair_Display({
   variable: "--font-playfair",
   display: "swap",
 })
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
+}
 
 export default async function RootLayout({ children }: { children: ReactNode }) {
   const appEnv = process.env.NEXT_PUBLIC_APP_ENV ?? process.env.NODE_ENV

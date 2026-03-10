@@ -192,9 +192,9 @@ export default function IndustryPanoramaPage() {
   return (
     <div className="min-h-screen bg-background overflow-hidden">
       <Header />
-      <main className="h-[calc(100vh-76px)] px-2 sm:px-3 lg:px-4 py-2 sm:py-3 overflow-hidden">
+      <main className="h-[calc(100vh-7.5rem)] md:h-[calc(100vh-76px)] px-2 sm:px-3 lg:px-4 py-2 sm:py-3 overflow-hidden">
         <div className="mb-2 flex items-center justify-between gap-2">
-          <h1 className="text-sm sm:text-lg font-semibold text-primary truncate">{title}</h1>
+          <h1 className="text-xs sm:text-lg font-semibold text-primary truncate">{title}</h1>
           <Button variant="outline" size="sm" asChild>
             <Link href="/market">
               <ArrowLeft className="h-4 w-4" />
@@ -223,7 +223,7 @@ export default function IndustryPanoramaPage() {
                     <Link
                       key={tile.key}
                       href={`/market/industry/${encodeURIComponent(tile.industry)}`}
-                      className={`relative rounded border border-border/30 p-2 ${getBreadthTextColor(tile.breadthValue)}`}
+                      className={`relative flex items-center justify-center rounded border border-border/30 p-2 text-center ${getBreadthTextColor(tile.breadthValue)}`}
                       style={{
                         backgroundColor: getBreadthColor(tile.breadthValue),
                         gridColumn: `span ${tile.span} / span ${tile.span}`,
@@ -231,10 +231,10 @@ export default function IndustryPanoramaPage() {
                       }}
                       title={t("breadth.industryClickHint")}
                     >
-                      <div className="absolute top-1 right-1 text-[9px] font-mono opacity-90">
+                      <div className="absolute top-1 right-1 text-[8px] sm:text-[9px] font-mono opacity-90">
                         {tile.breadthValue === null ? "-" : tile.breadthValue.toFixed(0)}
                       </div>
-                      <div className="text-sm font-semibold leading-tight pr-6 line-clamp-2">
+                      <div className="text-[11px] sm:text-sm font-semibold leading-tight line-clamp-2">
                         {getLocalizedIndustryName(tile.industry, locale)}
                       </div>
                     </Link>

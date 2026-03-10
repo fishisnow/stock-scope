@@ -36,6 +36,7 @@ export function StockKLinePage({ code, market, name }: StockKLinePageProps) {
   const [data, setData] = useState<CandleData[]>([])
   const [klineType, setKlineType] = useState("K_DAY")
   const [chartHeight, setChartHeight] = useState(520)
+  const [isMobile, setIsMobile] = useState(false)
   const lastRequestKeyRef = useRef<string | null>(null)
   const chartContainerRef = useRef<HTMLDivElement>(null)
 
@@ -116,23 +117,32 @@ export function StockKLinePage({ code, market, name }: StockKLinePageProps) {
   }, [getRangeByType, klineType, fetchKline])
 
   useEffect(() => {
+    if (typeof window === "undefined") return
+    const media = window.matchMedia("(max-width: 640px)")
+    const sync = () => setIsMobile(media.matches)
+    sync()
+    media.addEventListener("change", sync)
+    return () => media.removeEventListener("change", sync)
+  }, [])
+
+  useEffect(() => {
     if (!chartContainerRef.current) return
     const element = chartContainerRef.current
     const observer = new ResizeObserver((entries) => {
       const entry = entries[0]
-      const nextHeight = Math.max(700, Math.floor(entry.contentRect.height))
+      const nextHeight = Math.max(isMobile ? 520 : 700, Math.floor(entry.contentRect.height))
       setChartHeight(nextHeight)
     })
     observer.observe(element)
     return () => observer.disconnect()
-  }, [])
+  }, [isMobile])
 
   return (
-    <section className="py-10 px-4 sm:px-6 lg:px-8">
+    <section className="section-shell">
       <div className="container mx-auto max-w-6xl space-y-6">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div>
-            <h1 className="text-3xl font-semibold">
+            <h1 className="text-2xl sm:text-3xl font-semibold">
               {normalizedMarket === "HK" ? "🇭🇰" : "🇨🇳"} {code} {name ?? ""}
             </h1>
           </div>
@@ -144,13 +154,13 @@ export function StockKLinePage({ code, market, name }: StockKLinePageProps) {
 
         <div
           ref={chartContainerRef}
-          className="rounded-lg border bg-card p-3"
-          style={{ height: "calc(100vh - 220px)", minHeight: 720 }}
+          className="rounded-lg border bg-card p-2 sm:p-3"
+          style={{ height: isMobile ? "calc(100vh - 190px)" : "calc(100vh - 220px)", minHeight: isMobile ? 520 : 720 }}
         >
           <KLineChart
             data={data}
             symbol={`${normalizedMarket}.${code}`}
-            height={Math.max(680, chartHeight - 12)}
+            height={Math.max(isMobile ? 500 : 680, chartHeight - (isMobile ? 8 : 12))}
             klineType={klineType}
             onKlineTypeChange={setKlineType}
             onRefresh={() => fetchKline({ force: true })}

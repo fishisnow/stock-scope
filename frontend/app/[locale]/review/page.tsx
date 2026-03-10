@@ -404,7 +404,7 @@ export default function ReviewPage() {
     return (
       <div className="min-h-screen bg-background">
         <Header />
-        <main className="container mx-auto px-4 sm:px-6 lg:px-8 py-16 max-w-7xl">
+        <main className="page-shell page-main-spacing">
           <div className="text-center py-24">
             <Loader2 className="h-8 w-8 animate-spin mx-auto text-primary" />
           </div>
@@ -418,7 +418,7 @@ export default function ReviewPage() {
     return (
       <div className="min-h-screen bg-background">
         <Header />
-        <main className="container mx-auto px-4 sm:px-6 lg:px-8 py-16 max-w-7xl">
+        <main className="page-shell page-main-spacing">
           <div className="text-center py-24">
             <AlertCircle className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
             <h2 className="text-2xl font-semibold mb-2">{t('loginRequired')}</h2>
@@ -433,15 +433,15 @@ export default function ReviewPage() {
     <div className="min-h-screen bg-background">
       <Header />
       
-      <main className="container mx-auto px-4 sm:px-6 lg:px-8 py-16 max-w-7xl">
+      <main className="page-shell page-main-spacing">
         {/* 页面标题 */}
         <div className="text-center mb-12">
           <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-secondary mb-6">
             <BarChart3 className="h-4 w-4 text-primary" />
             <span className="text-sm font-medium">{t('investmentAnalysis')}</span>
           </div>
-          <h1 className="font-serif text-5xl sm:text-6xl lg:text-7xl text-primary mb-6">{t('pageTitle')}</h1>
-          <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
+          <h1 className="hero-title mb-6">{t('pageTitle')}</h1>
+          <p className="section-subtitle">
             {t('pageSubtitle')}
           </p>
         </div>
@@ -951,7 +951,7 @@ export default function ReviewPage() {
         
         {/* 交易明细弹窗 */}
         <Dialog open={!!selectedStock} onOpenChange={(open) => !open && setSelectedStock(null)}>
-          <DialogContent className="max-w-4xl max-h-[80vh]">
+          <DialogContent className="w-[95vw] max-w-4xl max-h-[80vh]">
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
                 <Clock className="h-5 w-5" />

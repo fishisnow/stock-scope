@@ -195,7 +195,7 @@ export function OpportunitiesDatabase({
   }
 
   return (
-    <section id="database" className="py-16 px-4 sm:px-6 lg:px-8">
+    <section id="database" className="section-shell">
       <div className="container mx-auto max-w-6xl">
         {/* 顶部操作按钮（补充） */}
         {mounted && session?.access_token && (
@@ -215,7 +215,7 @@ export function OpportunitiesDatabase({
         {/* 投资机会列表 */}
         {opportunities.length > 0 ? (
           <>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 mb-8">
               {pagedOpportunities.map((opportunity, index) => {
                 const displayIndex = startIndex + index
                 return (
@@ -284,7 +284,7 @@ export function OpportunitiesDatabase({
                             title={opportunity.source_url}
                             onClick={(e) => e.stopPropagation()}
                           >
-                            <span className="truncate max-w-[200px]">{truncateUrl(opportunity.source_url, 40)}</span>
+                            <span className="truncate max-w-[60vw] sm:max-w-[200px]">{truncateUrl(opportunity.source_url, 40)}</span>
                             <ExternalLink className="h-3 w-3 flex-shrink-0" />
                           </a>
                         </div>
