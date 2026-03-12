@@ -274,15 +274,32 @@ export function KLineChart({
   }, [])
 
   const chartData = useMemo(() => {
-    const dates = data.map((item) => item.date)
-    const values = data.map((item) => [item.open, item.close, item.low, item.high])
-    const lineValues = data.map((item) => item.close)
-    const volumes = data.map((item) => item.volume)
-    const turnovers = data.map((item) => item.turnover)
+    // Some upstream payloads may contain trailing placeholder rows (date exists but
+    // no valid OHLC/volume). Trim tail placeholders so the plot can fully use width.
+    let lastValidIndex = data.length - 1
+    while (lastValidIndex >= 0) {
+      const item = data[lastValidIndex]
+      const hasPrice =
+        (typeof item.open === "number" && item.open > 0) ||
+        (typeof item.close === "number" && item.close > 0) ||
+        (typeof item.high === "number" && item.high > 0) ||
+        (typeof item.low === "number" && item.low > 0)
+      const hasVolume = typeof item.volume === "number" && item.volume > 0
+      const hasTurnover = typeof item.turnover === "number" && item.turnover > 0
+      if (hasPrice || hasVolume || hasTurnover) break
+      lastValidIndex -= 1
+    }
+    const visibleData = lastValidIndex >= 0 ? data.slice(0, lastValidIndex + 1) : data
+
+    const dates = visibleData.map((item) => item.date)
+    const values = visibleData.map((item) => [item.open, item.close, item.low, item.high])
+    const lineValues = visibleData.map((item) => item.close)
+    const volumes = visibleData.map((item) => item.volume)
+    const turnovers = visibleData.map((item) => item.turnover)
     const vwapValues: (number | null)[] = []
     let cumulativeTurnover = 0
     let cumulativeVolume = 0
-    for (let i = 0; i < data.length; i += 1) {
+    for (let i = 0; i < visibleData.length; i += 1) {
       const turnover = turnovers[i]
       const volume = volumes[i]
       if (typeof turnover === "number" && typeof volume === "number") {
@@ -291,7 +308,7 @@ export function KLineChart({
       }
       vwapValues.push(cumulativeVolume > 0 ? cumulativeTurnover / cumulativeVolume : null)
     }
-    const trendBands = calculateTrendBands(data)
+    const trendBands = calculateTrendBands(visibleData)
     const trendBandSeries = {
       shortAUp: maskValues(trendBands.shortA, trendBands.shortCond1),
       shortADown: maskValues(trendBands.shortA, trendBands.shortCond2),
@@ -350,9 +367,9 @@ export function KLineChart({
       lineValues,
       volumes,
       vwapValues,
-      ma5: calculateMA(data, 5),
-      ma10: calculateMA(data, 10),
-      ma20: calculateMA(data, 20),
+      ma5: calculateMA(visibleData, 5),
+      ma10: calculateMA(visibleData, 10),
+      ma20: calculateMA(visibleData, 20),
       trendBands,
       trendBandSeries,
     }
@@ -412,15 +429,24 @@ export function KLineChart({
     }
 
     const hasVolume = showVolume && chartData.volumes.length > 0
-    const controlTop = isMobile ? 96 : 88
+    const controlTop = isMobile ? 92 : 88
+    const showSliderZoom = !isMobile
     const zoomStart = isIntraday ? 0 : chartData.dates.length > 80 ? 70 : 0
-    const volumeHeight = isMobile
-      ? Math.max(130, Math.round(height * 0.28))
+    const desiredVolumeHeight = isMobile
+      ? Math.max(150, Math.round(height * 0.3))
       : Math.max(190, Math.round(height * 0.36))
-    const zoomHeight = 16
-    const zoomBottom = 4
-    const volumeBottom = zoomBottom + zoomHeight + 8
-    const mainBottom = volumeBottom + volumeHeight + 16
+    // Prevent volume panel from overflowing when viewport is short.
+    const maxVolumeHeight = Math.max(90, height - controlTop - 170)
+    const volumeHeight = Math.min(desiredVolumeHeight, maxVolumeHeight)
+    const zoomHeight = showSliderZoom ? 16 : 0
+    const zoomBottom = showSliderZoom ? 4 : 0
+    const volumeBottom = showSliderZoom ? zoomBottom + zoomHeight + 8 : 8
+    const mainBottom = volumeBottom + volumeHeight + (isMobile ? 12 : 16)
+    const chartRightPadding = isMobile ? "8px" : "40px"
+    const xAxisLabelMargin = isMobile ? 6 : 10
+    const trendLineWidth = isMobile ? 1.1 : 1.5
+    const maLineWidth = isMobile ? 0.8 : 1
+    const stickLineWidth = isMobile ? 1.4 : 2
 
     const priceValues = (isIntraday ? chartData.lineValues : chartData.values.flatMap((item) => item))
       .filter((value) => typeof value === "number") as number[]
@@ -447,7 +473,7 @@ export function KLineChart({
         },
         style: {
           stroke: color,
-          lineWidth: 2,
+          lineWidth: stickLineWidth,
           opacity: 0.8,
         },
       }
@@ -548,23 +574,23 @@ export function KLineChart({
         ? [
             {
               left: "0px",
-              right: "40px",
+              right: chartRightPadding,
               top: `${controlTop}px`,
               bottom: mainBottom,
               containLabel: false,
             },
             {
               left: "0px",
-              right: "40px",
+              right: chartRightPadding,
               height: volumeHeight,
               bottom: volumeBottom,
-              containLabel: false,
+              containLabel: true,
             },
           ]
         : [
             {
               left: "0px",
-              right: "40px",
+              right: chartRightPadding,
               top: `${controlTop}px`,
               bottom: "40px",
             },
@@ -575,8 +601,16 @@ export function KLineChart({
               type: "category",
               data: chartData.dates,
               boundaryGap: false,
+              min: "dataMin",
+              max: "dataMax",
               axisLine: { lineStyle: { color: colors.border } },
-              axisLabel: { color: colors.textMuted, fontSize: isMobile ? 10 : 11, margin: 10, hideOverlap: true },
+              axisLabel: {
+                color: colors.textMuted,
+                fontSize: isMobile ? 10 : 11,
+                margin: xAxisLabelMargin,
+                hideOverlap: true,
+                showMinLabel: true,
+              },
               splitLine: { show: false },
             },
             {
@@ -584,8 +618,16 @@ export function KLineChart({
               gridIndex: 1,
               data: chartData.dates,
               boundaryGap: false,
+              min: "dataMin",
+              max: "dataMax",
               axisLine: { lineStyle: { color: colors.border } },
-              axisLabel: { color: colors.textMuted, fontSize: isMobile ? 10 : 11, margin: 10, hideOverlap: true },
+              axisLabel: {
+                color: colors.textMuted,
+                fontSize: isMobile ? 10 : 11,
+                margin: xAxisLabelMargin,
+                hideOverlap: true,
+                showMinLabel: true,
+              },
               splitLine: { show: false },
             },
           ]
@@ -594,6 +636,8 @@ export function KLineChart({
               type: "category",
               data: chartData.dates,
               boundaryGap: false,
+              min: "dataMin",
+              max: "dataMax",
               axisLine: { lineStyle: { color: colors.border } },
               axisLabel: { color: colors.textMuted, fontSize: isMobile ? 10 : 11 },
               splitLine: { show: false },
@@ -644,28 +688,30 @@ export function KLineChart({
           zoomOnMouseWheel: true,
           moveOnMouseMove: true,
         },
-        {
-          type: "slider",
-          xAxisIndex: hasVolume ? [0, 1] : [0],
-          start: zoomStart,
-          end: 100,
-          height: zoomHeight,
-          bottom: zoomBottom,
-          borderColor: colors.border,
-          fillerColor: "rgba(99, 102, 241, 0.15)",
-          handleStyle: {
-            color: colors.ma5,
-            borderColor: colors.border,
-          },
-          dataBackground: {
-            lineStyle: { color: colors.border },
-            areaStyle: { color: "rgba(99, 102, 241, 0.1)" },
-          },
-          textStyle: {
-            color: colors.textMuted,
-            fontSize: 10,
-          },
-        },
+        ...(showSliderZoom
+          ? [{
+              type: "slider" as const,
+              xAxisIndex: hasVolume ? [0, 1] : [0],
+              start: zoomStart,
+              end: 100,
+              height: zoomHeight,
+              bottom: zoomBottom,
+              borderColor: colors.border,
+              fillerColor: "rgba(99, 102, 241, 0.15)",
+              handleStyle: {
+                color: colors.ma5,
+                borderColor: colors.border,
+              },
+              dataBackground: {
+                lineStyle: { color: colors.border },
+                areaStyle: { color: "rgba(99, 102, 241, 0.1)" },
+              },
+              textStyle: {
+                color: colors.textMuted,
+                fontSize: 10,
+              },
+            }]
+          : []),
       ],
       series: [
         ...(isIntraday
@@ -675,7 +721,7 @@ export function KLineChart({
                 type: "line",
                 data: chartData.lineValues,
                 smooth: true,
-                lineStyle: { width: 1.5, color: colors.up },
+                lineStyle: { width: trendLineWidth, color: colors.up },
                 areaStyle: { color: "rgba(239, 68, 68, 0.2)" },
                 showSymbol: false,
                 emphasis: { disabled: true },
@@ -688,7 +734,7 @@ export function KLineChart({
                       type: "line",
                       data: chartData.vwapValues,
                       smooth: true,
-                      lineStyle: { width: 1.5, color: "#E3C46A" },
+                      lineStyle: { width: trendLineWidth, color: "#E3C46A" },
                       showSymbol: false,
                       emphasis: { disabled: true },
                       z: 3,
@@ -705,8 +751,9 @@ export function KLineChart({
                   color0: colors.down,
                   borderColor: colors.up,
                   borderColor0: colors.down,
-                  borderWidth: 1,
+                  borderWidth: isMobile ? 0.8 : 1,
                 },
+                barMaxWidth: isMobile ? 8 : 14,
               },
             ]),
         ...(!isIntraday && showTrendBands
@@ -717,7 +764,7 @@ export function KLineChart({
                 type: "line",
                 data: chartData.trendBands.shortA,
                 smooth: true,
-                lineStyle: { width: 1.5, color: colors.shortTrendSide },
+                lineStyle: { width: trendLineWidth, color: colors.shortTrendSide },
                 showSymbol: false,
                 emphasis: { disabled: true },
                 blur: { lineStyle: { opacity: 1 } },
@@ -728,7 +775,7 @@ export function KLineChart({
                 type: "line",
                 data: chartData.trendBands.shortB,
                 smooth: true,
-                lineStyle: { width: 1.5, color: colors.shortTrendSide },
+                lineStyle: { width: trendLineWidth, color: colors.shortTrendSide },
                 showSymbol: false,
                 emphasis: { disabled: true },
                 blur: { lineStyle: { opacity: 1 } },
@@ -739,7 +786,7 @@ export function KLineChart({
                 type: "line",
                 data: chartData.trendBandSeries.shortAUp,
                 smooth: true,
-                lineStyle: { width: 1.5, color: colors.shortTrendUp },
+                lineStyle: { width: trendLineWidth, color: colors.shortTrendUp },
                 showSymbol: false,
                 emphasis: { disabled: true },
                 blur: { lineStyle: { opacity: 1 } },
@@ -750,7 +797,7 @@ export function KLineChart({
                 type: "line",
                 data: chartData.trendBandSeries.shortADown,
                 smooth: true,
-                lineStyle: { width: 1.5, color: colors.shortTrendDown },
+                lineStyle: { width: trendLineWidth, color: colors.shortTrendDown },
                 showSymbol: false,
                 emphasis: { disabled: true },
                 blur: { lineStyle: { opacity: 1 } },
@@ -761,7 +808,7 @@ export function KLineChart({
                 type: "line",
                 data: chartData.trendBandSeries.shortBUp,
                 smooth: true,
-                lineStyle: { width: 1.5, color: colors.shortTrendUp },
+                lineStyle: { width: trendLineWidth, color: colors.shortTrendUp },
                 showSymbol: false,
                 emphasis: { disabled: true },
                 blur: { lineStyle: { opacity: 1 } },
@@ -772,7 +819,7 @@ export function KLineChart({
                 type: "line",
                 data: chartData.trendBandSeries.shortBDown,
                 smooth: true,
-                lineStyle: { width: 1.5, color: colors.shortTrendDown },
+                lineStyle: { width: trendLineWidth, color: colors.shortTrendDown },
                 showSymbol: false,
                 emphasis: { disabled: true },
                 blur: { lineStyle: { opacity: 1 } },
@@ -785,7 +832,7 @@ export function KLineChart({
                 type: "line",
                 data: chartData.trendBands.longA,
                 smooth: true,
-                lineStyle: { width: 1.5, color: colors.longTrendSide },
+                lineStyle: { width: trendLineWidth, color: colors.longTrendSide },
                 showSymbol: false,
                 emphasis: { disabled: true },
                 blur: { lineStyle: { opacity: 1 } },
@@ -796,7 +843,7 @@ export function KLineChart({
                 type: "line",
                 data: chartData.trendBands.longB,
                 smooth: true,
-                lineStyle: { width: 1.5, color: colors.longTrendSide },
+                lineStyle: { width: trendLineWidth, color: colors.longTrendSide },
                 showSymbol: false,
                 emphasis: { disabled: true },
                 blur: { lineStyle: { opacity: 1 } },
@@ -807,7 +854,7 @@ export function KLineChart({
                 type: "line",
                 data: chartData.trendBandSeries.longAUp,
                 smooth: true,
-                lineStyle: { width: 1.5, color: colors.longTrendUp },
+                lineStyle: { width: trendLineWidth, color: colors.longTrendUp },
                 showSymbol: false,
                 emphasis: { disabled: true },
                 blur: { lineStyle: { opacity: 1 } },
@@ -818,7 +865,7 @@ export function KLineChart({
                 type: "line",
                 data: chartData.trendBandSeries.longADown,
                 smooth: true,
-                lineStyle: { width: 1.5, color: colors.longTrendDown },
+                lineStyle: { width: trendLineWidth, color: colors.longTrendDown },
                 showSymbol: false,
                 emphasis: { disabled: true },
                 blur: { lineStyle: { opacity: 1 } },
@@ -829,7 +876,7 @@ export function KLineChart({
                 type: "line",
                 data: chartData.trendBandSeries.longBUp,
                 smooth: true,
-                lineStyle: { width: 1.5, color: colors.longTrendUp },
+                lineStyle: { width: trendLineWidth, color: colors.longTrendUp },
                 showSymbol: false,
                 emphasis: { disabled: true },
                 blur: { lineStyle: { opacity: 1 } },
@@ -840,7 +887,7 @@ export function KLineChart({
                 type: "line",
                 data: chartData.trendBandSeries.longBDown,
                 smooth: true,
-                lineStyle: { width: 1.5, color: colors.longTrendDown },
+                lineStyle: { width: trendLineWidth, color: colors.longTrendDown },
                 showSymbol: false,
                 emphasis: { disabled: true },
                 blur: { lineStyle: { opacity: 1 } },
@@ -900,7 +947,7 @@ export function KLineChart({
                 type: "line",
                 data: chartData.ma5,
                 smooth: true,
-                lineStyle: { width: 1, color: colors.ma5 },
+                lineStyle: { width: maLineWidth, color: colors.ma5 },
                 showSymbol: false,
                 emphasis: { disabled: true },
                 blur: { lineStyle: { opacity: 1 } },
@@ -910,7 +957,7 @@ export function KLineChart({
                 type: "line",
                 data: chartData.ma10,
                 smooth: true,
-                lineStyle: { width: 1, color: colors.ma10 },
+                lineStyle: { width: maLineWidth, color: colors.ma10 },
                 showSymbol: false,
                 emphasis: { disabled: true },
                 blur: { lineStyle: { opacity: 1 } },
@@ -920,7 +967,7 @@ export function KLineChart({
                 type: "line",
                 data: chartData.ma20,
                 smooth: true,
-                lineStyle: { width: 1, color: colors.ma20 },
+                lineStyle: { width: maLineWidth, color: colors.ma20 },
                 showSymbol: false,
                 emphasis: { disabled: true },
                 blur: { lineStyle: { opacity: 1 } },
@@ -1091,7 +1138,7 @@ export function KLineChart({
 
   return (
     <div className="relative flex w-full flex-col" style={{ height }}>
-      <div className="absolute left-2 right-2 top-2 z-10 flex items-center gap-1.5 overflow-x-auto whitespace-nowrap rounded-full border bg-background/90 px-1.5 py-0.5 shadow-sm [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:left-3 sm:right-3 sm:gap-2 sm:px-2 sm:py-1">
+      <div className="absolute left-2 right-2 top-2 z-10 flex items-center justify-between gap-1.5 whitespace-nowrap rounded-full border bg-background/90 px-1.5 py-0.5 shadow-sm sm:left-3 sm:right-3 sm:gap-2 sm:px-2 sm:py-1">
         <div className="flex items-center gap-1 shrink-0">
           {[
             { label: "分时", value: "K_RT" },
@@ -1115,7 +1162,7 @@ export function KLineChart({
             </button>
           ))}
         </div>
-        <span className="mx-0.5 h-3.5 w-px shrink-0 bg-border sm:mx-1 sm:h-4" />
+        <span className="ml-auto mx-0.5 h-3.5 w-px shrink-0 bg-border sm:mx-1 sm:h-4" />
         <div className="flex items-center gap-1 shrink-0 sm:gap-2">
           {!isIntraday ? (
             <>

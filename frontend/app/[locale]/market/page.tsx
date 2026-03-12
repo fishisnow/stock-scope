@@ -160,7 +160,7 @@ function StockTable({
         </div>
       </CardHeader>
       <CardContent>
-        <div className="overflow-x-auto [touch-action:pan-x] [-webkit-overflow-scrolling:touch] mobile-fit-table-wrapper">
+        <div className="overflow-x-auto [touch-action:auto] [-webkit-overflow-scrolling:touch] mobile-fit-table-wrapper">
           <table className="w-full mobile-fit-table">
             <thead>
               <tr className="border-b-2 border-border">
@@ -549,7 +549,7 @@ export default function MarketPage() {
                 <div className="text-sm text-muted-foreground">{t('breadth.loading')}</div>
               )}
               {!breadthLoading && breadthData && breadthData.dates.length > 0 && (
-                <div className="overflow-x-auto [touch-action:pan-x] [-webkit-overflow-scrolling:touch] mobile-fit-table-wrapper">
+                <div className="overflow-x-auto [touch-action:auto] [-webkit-overflow-scrolling:touch] mobile-fit-table-wrapper">
                   <table className="min-w-full border-collapse text-sm mobile-fit-table">
                     <thead>
                       <tr>
@@ -643,7 +643,7 @@ export default function MarketPage() {
                 <div className="text-sm text-muted-foreground">{t('breadth.loading')}</div>
               )}
               {!breadthLoading && breadthData && breadthData.dates.length > 0 && (
-                <div className="overflow-x-auto [touch-action:pan-x] [-webkit-overflow-scrolling:touch] mobile-fit-table-wrapper">
+                <div className="overflow-x-auto [touch-action:auto] [-webkit-overflow-scrolling:touch] mobile-fit-table-wrapper">
                   <table className="min-w-full border-collapse text-sm mobile-fit-table">
                     <thead>
                       <tr>

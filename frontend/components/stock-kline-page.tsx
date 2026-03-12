@@ -156,12 +156,12 @@ export function StockKLinePage({ code, market, name }: StockKLinePageProps) {
         <div
           ref={chartContainerRef}
           className="rounded-lg border bg-card p-2 sm:p-3"
-          style={{ height: isMobile ? "calc(100vh - 190px)" : "calc(100vh - 220px)", minHeight: isMobile ? 520 : 720 }}
+          style={{ height: isMobile ? "calc(100vh - 150px)" : "calc(100vh - 220px)", minHeight: isMobile ? 620 : 720 }}
         >
           <KLineChart
             data={data}
             symbol={`${normalizedMarket}.${code}`}
-            height={Math.max(isMobile ? 500 : 680, chartHeight - (isMobile ? 8 : 12))}
+            height={Math.max(isMobile ? 600 : 680, chartHeight - (isMobile ? 8 : 12))}
             klineType={klineType}
             onKlineTypeChange={setKlineType}
             onRefresh={() => fetchKline({ force: true })}
