@@ -494,7 +494,7 @@ class StockDatabase:
             print(f"❌ 写入市场宽度数据失败: {e}")
             raise
 
-    def get_market_breadth_records(self, limit: int = 30, breadth_type: Optional[str] = None) -> Dict:
+    def get_market_breadth_records(self, limit: int = 10, breadth_type: Optional[str] = None) -> Dict:
         """
         获取最近N天市场宽度数据
         """
@@ -514,11 +514,33 @@ class StockDatabase:
             if not dates:
                 return {"dates": [], "records": []}
 
-            query = self.client.table('market_breadth_daily').select('*').in_('date', dates)
-            if breadth_type:
-                query = query.eq('breadth_type', breadth_type)
-            data_resp = query.execute()
-            records = data_resp.data or []
+            # Supabase 单次查询默认最多返回约 1000 行，这里做分页聚合，确保多行业/多类型场景下数据完整。
+            page_size = 1000
+            records: List[Dict] = []
+            page = 0
+            while True:
+                offset = page * page_size
+                query = (
+                    self.client.table('market_breadth_daily')
+                    .select('*')
+                    .in_('date', dates)
+                    .order('date', desc=True)
+                    .order('breadth_type')
+                    .order('sector')
+                    .range(offset, offset + page_size - 1)
+                )
+                if breadth_type:
+                    query = query.eq('breadth_type', breadth_type)
+                data_resp = query.execute()
+                batch = data_resp.data or []
+                records.extend(batch)
+                if len(batch) < page_size:
+                    break
+                page += 1
+                # 防止异常情况下无限循环
+                if page > 30:
+                    print("⚠️ market_breadth_daily 分页超过 30 页，提前终止以避免无限循环")
+                    break
 
             # 只返回实际有数据的日期（例如当天无数据时不返回当天）
             existing_dates = {row.get('date') for row in records if row.get('date')}

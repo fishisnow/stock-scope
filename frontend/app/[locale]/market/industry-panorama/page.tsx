@@ -82,7 +82,7 @@ export default function IndustryPanoramaPage() {
     const loadBreadthData = async () => {
       setLoading(true)
       try {
-        const response = await fetch(`${API_URL}/api/market_breadth?limit=30`)
+        const response = await fetch(`${API_URL}/api/market_breadth?limit=1`)
         const result = await response.json()
         if (result.success) {
           setBreadthData(result.data)

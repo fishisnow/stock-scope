@@ -63,7 +63,8 @@ def get_futu_data(date):
 def get_market_breadth():
     """获取市场宽度数据（默认全部指数）"""
     try:
-        limit = int(request.args.get('limit', 30))
+        limit = int(request.args.get('limit', 10))
+        limit = max(1, min(limit, 30))
         breadth_type = request.args.get('breadth_type')
         data = _db.get_market_breadth_records(limit=limit, breadth_type=breadth_type)
         return jsonify({
