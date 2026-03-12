@@ -258,6 +258,25 @@ export function KLineChart({
   const axisRef = useRef<HTMLDivElement>(null)
   const chartInstance = useRef<echarts.ECharts | null>(null)
   const axisInstance = useRef<echarts.ECharts | null>(null)
+  const zoomWindowRef = useRef({ start: 0, end: 100 })
+  const panFrameRef = useRef<number | null>(null)
+  const pendingPanPercentRef = useRef(0)
+  const touchStateRef = useRef<{
+    lastX: number | null
+    lastY: number | null
+    pinchDistance: number | null
+    pinchCenterRatio: number
+  }>({
+    lastX: null,
+    lastY: null,
+    pinchDistance: null,
+    pinchCenterRatio: 0.5,
+  })
+  const mobileMousePanRef = useRef<{ active: boolean; lastX: number | null; lastY: number | null }>({
+    active: false,
+    lastX: null,
+    lastY: null,
+  })
   const [showVolume, setShowVolume] = useState(true)
   const [showMA, setShowMA] = useState(true)
   const [showTrendBands, setShowTrendBands] = useState(true)
@@ -430,7 +449,7 @@ export function KLineChart({
 
     const hasVolume = showVolume && chartData.volumes.length > 0
     const controlTop = isMobile ? 92 : 88
-    const showSliderZoom = !isMobile
+    const showSliderZoom = false
     const zoomStart = isIntraday ? 0 : chartData.dates.length > 80 ? 70 : 0
     const desiredVolumeHeight = isMobile
       ? Math.max(150, Math.round(height * 0.3))
@@ -480,12 +499,14 @@ export function KLineChart({
     }
 
     const mainOption: echarts.EChartsOption = {
-      animation: true,
-      animationDuration: 200,
+      // Keep re-render deterministic during rapid pan/zoom to avoid blank flashes.
+      animation: false,
       tooltip: {
         trigger: "axis",
+        transitionDuration: 0,
         axisPointer: {
           type: "cross",
+          animation: false,
           lineStyle: {
             color: colors.border,
             width: 1,
@@ -685,8 +706,11 @@ export function KLineChart({
           xAxisIndex: hasVolume ? [0, 1] : [0],
           start: zoomStart,
           end: 100,
-          zoomOnMouseWheel: true,
-          moveOnMouseMove: true,
+          zoomOnMouseWheel: false,
+          moveOnMouseMove: false,
+          moveOnMouseWheel: false,
+          filterMode: "none",
+          throttle: 24,
         },
         ...(showSliderZoom
           ? [{
@@ -1125,6 +1149,279 @@ export function KLineChart({
     axisInstance.current.clear()
     chartInstance.current.setOption(mainOption, true)
     axisInstance.current.setOption(axisOption, true)
+    zoomWindowRef.current = { start: zoomStart, end: 100 }
+
+    const handleDataZoom = (event: any) => {
+      const payload = Array.isArray(event?.batch) ? event.batch[0] : event
+      if (!payload) return
+      const nextStart = typeof payload.start === "number" ? payload.start : zoomWindowRef.current.start
+      const nextEnd = typeof payload.end === "number" ? payload.end : zoomWindowRef.current.end
+      zoomWindowRef.current = { start: nextStart, end: nextEnd }
+    }
+    chartInstance.current.on("datazoom", handleDataZoom)
+
+    const zr = chartInstance.current.getZr()
+    const setCursor = (cursor: string) => zr.setCursorStyle(cursor)
+    setCursor(isMobile ? "default" : "crosshair")
+
+    const panByPercent = (shiftPercent: number) => {
+      if (!chartInstance.current) return
+      if (Math.abs(shiftPercent) < 0.01) return
+      const span = Math.max(1, zoomWindowRef.current.end - zoomWindowRef.current.start)
+      if (span >= 100) return
+      const maxStart = Math.max(0, 100 - span)
+      const nextStart = Math.max(0, Math.min(maxStart, zoomWindowRef.current.start + shiftPercent))
+      const nextEnd = nextStart + span
+      zoomWindowRef.current = { start: nextStart, end: nextEnd }
+      chartInstance.current.dispatchAction({
+        type: "dataZoom",
+        dataZoomIndex: 0,
+        start: nextStart,
+        end: nextEnd,
+      })
+    }
+
+    const schedulePan = (shiftPercent: number) => {
+      pendingPanPercentRef.current += shiftPercent
+      if (panFrameRef.current !== null) return
+      panFrameRef.current = window.requestAnimationFrame(() => {
+        const pending = pendingPanPercentRef.current
+        pendingPanPercentRef.current = 0
+        panFrameRef.current = null
+        panByPercent(pending)
+      })
+    }
+
+    const zoomByFactor = (factor: number, anchorRatio = 0.5) => {
+      if (!chartInstance.current) return
+      const span = Math.max(1, zoomWindowRef.current.end - zoomWindowRef.current.start)
+      const nextSpan = Math.max(5, Math.min(100, span * factor))
+      const clampedAnchorRatio = Math.max(0, Math.min(1, anchorRatio))
+      const anchor = zoomWindowRef.current.start + span * clampedAnchorRatio
+      const maxStart = Math.max(0, 100 - nextSpan)
+      const nextStart = Math.max(0, Math.min(maxStart, anchor - nextSpan * clampedAnchorRatio))
+      const nextEnd = nextStart + nextSpan
+      zoomWindowRef.current = { start: nextStart, end: nextEnd }
+      chartInstance.current.dispatchAction({
+        type: "dataZoom",
+        dataZoomIndex: 0,
+        start: nextStart,
+        end: nextEnd,
+      })
+    }
+
+    const zoomByDelta = (deltaY: number, offsetX?: number) => {
+      if (!chartInstance.current) return
+      const factor = deltaY < 0 ? 0.88 : 1.14
+      const plotWidth = Math.max(1, chartInstance.current.getWidth())
+      const rawRatio = typeof offsetX === "number" ? offsetX / plotWidth : 0.5
+      zoomByFactor(factor, rawRatio)
+    }
+
+    const handleMouseWheel = (event: any) => {
+      if (isMobile || !chartInstance.current) return
+      const nativeEvent = event?.event
+      const deltaX = typeof nativeEvent?.deltaX === "number" ? nativeEvent.deltaX : 0
+      const deltaY = typeof nativeEvent?.deltaY === "number" ? nativeEvent.deltaY : 0
+      const offsetX = typeof event?.offsetX === "number" ? event.offsetX : undefined
+      if (Math.abs(deltaX) > Math.abs(deltaY) && Math.abs(deltaX) > 0) {
+        const plotWidth = Math.max(1, chartInstance.current.getWidth())
+        const span = Math.max(1, zoomWindowRef.current.end - zoomWindowRef.current.start)
+        const shiftPercent = (deltaX / plotWidth) * span
+        schedulePan(shiftPercent)
+      } else if (Math.abs(deltaY) > 0) {
+        zoomByDelta(deltaY, offsetX)
+      }
+      nativeEvent?.preventDefault?.()
+      nativeEvent?.stopPropagation?.()
+    }
+
+    const handleTouchStart = (event: any) => {
+      if (!isMobile || !chartRef.current) return
+      const nativeEvent = event?.event as TouchEvent | undefined
+      const touches = nativeEvent?.touches
+      if (!touches || touches.length === 0) return
+      if (touches.length >= 2) {
+        const [a, b] = [touches[0], touches[1]]
+        const dx = a.clientX - b.clientX
+        const dy = a.clientY - b.clientY
+        touchStateRef.current.pinchDistance = Math.hypot(dx, dy)
+        const rect = chartRef.current.getBoundingClientRect()
+        const centerX = (a.clientX + b.clientX) / 2
+        touchStateRef.current.pinchCenterRatio = Math.max(0, Math.min(1, (centerX - rect.left) / Math.max(1, rect.width)))
+        touchStateRef.current.lastX = null
+        touchStateRef.current.lastY = null
+        return
+      }
+      touchStateRef.current.lastX = touches[0].clientX
+      touchStateRef.current.lastY = touches[0].clientY
+      touchStateRef.current.pinchDistance = null
+    }
+
+    const handleTouchMove = (event: any) => {
+      if (!isMobile || !chartInstance.current || !chartRef.current) return
+      const nativeEvent = event?.event as TouchEvent | undefined
+      const touches = nativeEvent?.touches
+      if (!touches || touches.length === 0) return
+
+      if (touches.length >= 2) {
+        const [a, b] = [touches[0], touches[1]]
+        const dx = a.clientX - b.clientX
+        const dy = a.clientY - b.clientY
+        const distance = Math.hypot(dx, dy)
+        if (touchStateRef.current.pinchDistance === null) {
+          touchStateRef.current.pinchDistance = distance
+          return
+        }
+        if (distance > 0 && touchStateRef.current.pinchDistance > 0) {
+          const scale = distance / touchStateRef.current.pinchDistance
+          if (Math.abs(scale - 1) > 0.01) {
+            zoomByFactor(1 / scale, touchStateRef.current.pinchCenterRatio)
+            touchStateRef.current.pinchDistance = distance
+            nativeEvent?.preventDefault?.()
+            nativeEvent?.stopPropagation?.()
+          }
+        }
+        return
+      }
+
+      const touch = touches[0]
+      if (touchStateRef.current.lastX === null || touchStateRef.current.lastY === null) {
+        touchStateRef.current.lastX = touch.clientX
+        touchStateRef.current.lastY = touch.clientY
+        return
+      }
+      const deltaX = touch.clientX - touchStateRef.current.lastX
+      const deltaY = touch.clientY - touchStateRef.current.lastY
+      touchStateRef.current.lastX = touch.clientX
+      touchStateRef.current.lastY = touch.clientY
+      if (Math.abs(deltaX) <= Math.abs(deltaY) || Math.abs(deltaX) < 0.5) return
+      const plotWidth = Math.max(1, chartInstance.current.getWidth())
+      const span = Math.max(1, zoomWindowRef.current.end - zoomWindowRef.current.start)
+      const shiftPercent = -(deltaX / plotWidth) * span
+      schedulePan(shiftPercent)
+      nativeEvent?.preventDefault?.()
+      nativeEvent?.stopPropagation?.()
+    }
+
+    const handleTouchEnd = (event: any) => {
+      if (!isMobile) return
+      const nativeEvent = event?.event as TouchEvent | undefined
+      const touches = nativeEvent?.touches
+      if (touches && touches.length >= 2) {
+        const [a, b] = [touches[0], touches[1]]
+        const dx = a.clientX - b.clientX
+        const dy = a.clientY - b.clientY
+        touchStateRef.current.pinchDistance = Math.hypot(dx, dy)
+        touchStateRef.current.lastX = null
+        touchStateRef.current.lastY = null
+        return
+      }
+      if (touches && touches.length === 1) {
+        touchStateRef.current.lastX = touches[0].clientX
+        touchStateRef.current.lastY = touches[0].clientY
+        touchStateRef.current.pinchDistance = null
+        return
+      }
+      touchStateRef.current.lastX = null
+      touchStateRef.current.lastY = null
+      touchStateRef.current.pinchDistance = null
+    }
+
+    // Fallback for Chrome mobile emulation: mouse drag acts as single-finger pan.
+    const handleMobileMouseDown = (event: any) => {
+      if (!isMobile) return
+      if (event?.event?.button !== 0) return
+      mobileMousePanRef.current.active = true
+      mobileMousePanRef.current.lastX = typeof event?.offsetX === "number" ? event.offsetX : null
+      mobileMousePanRef.current.lastY = typeof event?.offsetY === "number" ? event.offsetY : null
+    }
+
+    const handleMobileMouseMove = (event: any) => {
+      if (!isMobile || !mobileMousePanRef.current.active || !chartInstance.current) return
+      const currentX = typeof event?.offsetX === "number" ? event.offsetX : null
+      const currentY = typeof event?.offsetY === "number" ? event.offsetY : null
+      if (currentX === null || currentY === null) return
+      if (mobileMousePanRef.current.lastX === null || mobileMousePanRef.current.lastY === null) {
+        mobileMousePanRef.current.lastX = currentX
+        mobileMousePanRef.current.lastY = currentY
+        return
+      }
+      const deltaX = currentX - mobileMousePanRef.current.lastX
+      const deltaY = currentY - mobileMousePanRef.current.lastY
+      mobileMousePanRef.current.lastX = currentX
+      mobileMousePanRef.current.lastY = currentY
+      if (Math.abs(deltaX) <= Math.abs(deltaY) || Math.abs(deltaX) < 0.5) return
+      const plotWidth = Math.max(1, chartInstance.current.getWidth())
+      const span = Math.max(1, zoomWindowRef.current.end - zoomWindowRef.current.start)
+      const shiftPercent = -(deltaX / plotWidth) * span
+      schedulePan(shiftPercent)
+    }
+
+    const handleMobileMouseUp = () => {
+      mobileMousePanRef.current.active = false
+      mobileMousePanRef.current.lastX = null
+      mobileMousePanRef.current.lastY = null
+    }
+
+    const handleGlobalOut = () => {
+      pendingPanPercentRef.current = 0
+      if (panFrameRef.current !== null) {
+        window.cancelAnimationFrame(panFrameRef.current)
+        panFrameRef.current = null
+      }
+      touchStateRef.current.lastX = null
+      touchStateRef.current.lastY = null
+      touchStateRef.current.pinchDistance = null
+      mobileMousePanRef.current.active = false
+      mobileMousePanRef.current.lastX = null
+      mobileMousePanRef.current.lastY = null
+    }
+
+    zr.on("mousewheel", handleMouseWheel)
+    zr.on("mousedown", handleMobileMouseDown)
+    zr.on("mousemove", handleMobileMouseMove)
+    zr.on("mouseup", handleMobileMouseUp)
+    zr.on("touchstart", handleTouchStart)
+    zr.on("touchmove", handleTouchMove)
+    zr.on("touchend", handleTouchEnd)
+    zr.on("globalout", handleGlobalOut)
+
+    const chartElement = chartRef.current
+    const handlePointerDown = (event: PointerEvent) => {
+      if (!isMobile) return
+      mobileMousePanRef.current.active = true
+      mobileMousePanRef.current.lastX = event.clientX
+      mobileMousePanRef.current.lastY = event.clientY
+    }
+    const handlePointerMove = (event: PointerEvent) => {
+      if (!isMobile || !mobileMousePanRef.current.active || !chartInstance.current) return
+      if (mobileMousePanRef.current.lastX === null || mobileMousePanRef.current.lastY === null) {
+        mobileMousePanRef.current.lastX = event.clientX
+        mobileMousePanRef.current.lastY = event.clientY
+        return
+      }
+      const deltaX = event.clientX - mobileMousePanRef.current.lastX
+      const deltaY = event.clientY - mobileMousePanRef.current.lastY
+      mobileMousePanRef.current.lastX = event.clientX
+      mobileMousePanRef.current.lastY = event.clientY
+      if (Math.abs(deltaX) <= Math.abs(deltaY) || Math.abs(deltaX) < 0.5) return
+      const plotWidth = Math.max(1, chartInstance.current.getWidth())
+      const span = Math.max(1, zoomWindowRef.current.end - zoomWindowRef.current.start)
+      const shiftPercent = -(deltaX / plotWidth) * span
+      schedulePan(shiftPercent)
+      event.preventDefault()
+    }
+    const handlePointerUp = () => {
+      mobileMousePanRef.current.active = false
+      mobileMousePanRef.current.lastX = null
+      mobileMousePanRef.current.lastY = null
+    }
+    chartElement?.addEventListener("pointerdown", handlePointerDown)
+    chartElement?.addEventListener("pointermove", handlePointerMove, { passive: false })
+    chartElement?.addEventListener("pointerup", handlePointerUp)
+    chartElement?.addEventListener("pointercancel", handlePointerUp)
+    chartElement?.addEventListener("pointerleave", handlePointerUp)
 
     const handleResize = () => {
       chartInstance.current?.resize()
@@ -1132,6 +1429,31 @@ export function KLineChart({
     }
     window.addEventListener("resize", handleResize)
     return () => {
+      chartInstance.current?.off("datazoom", handleDataZoom)
+      zr.off("mousewheel", handleMouseWheel)
+      zr.off("mousedown", handleMobileMouseDown)
+      zr.off("mousemove", handleMobileMouseMove)
+      zr.off("mouseup", handleMobileMouseUp)
+      zr.off("touchstart", handleTouchStart)
+      zr.off("touchmove", handleTouchMove)
+      zr.off("touchend", handleTouchEnd)
+      zr.off("globalout", handleGlobalOut)
+      if (panFrameRef.current !== null) {
+        window.cancelAnimationFrame(panFrameRef.current)
+        panFrameRef.current = null
+      }
+      pendingPanPercentRef.current = 0
+      touchStateRef.current.lastX = null
+      touchStateRef.current.lastY = null
+      touchStateRef.current.pinchDistance = null
+      mobileMousePanRef.current.active = false
+      mobileMousePanRef.current.lastX = null
+      mobileMousePanRef.current.lastY = null
+      chartElement?.removeEventListener("pointerdown", handlePointerDown)
+      chartElement?.removeEventListener("pointermove", handlePointerMove)
+      chartElement?.removeEventListener("pointerup", handlePointerUp)
+      chartElement?.removeEventListener("pointercancel", handlePointerUp)
+      chartElement?.removeEventListener("pointerleave", handlePointerUp)
       window.removeEventListener("resize", handleResize)
     }
   }, [chartData, data.length, showMA, showVolume, showTrendBands, symbol, height, isMobile])
@@ -1207,7 +1529,7 @@ export function KLineChart({
       </div>
       <div className={`grid h-full w-full ${isMobile ? "grid-cols-[56px_1fr]" : "grid-cols-[84px_1fr]"}`}>
         <div ref={axisRef} className="h-full w-full pointer-events-none" />
-        <div ref={chartRef} className="h-full w-full" />
+        <div ref={chartRef} className="h-full w-full [touch-action:none]" />
       </div>
     </div>
   )
