@@ -7,11 +7,12 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 DEPLOY_SCRIPT="$SCRIPT_DIR/deploy.sh"
 STATE_DIR="$SCRIPT_DIR/.deploy-state"
 STATE_FILE="$STATE_DIR/latest.digest"
 LOG_FILE="$STATE_DIR/auto-deploy.log"
-
+LOCK_DIR="$STATE_DIR/.auto-deploy.lock"
 ALIYUN_IMAGE="crpi-3f383vugjtqlop7w.cn-guangzhou.personal.cr.aliyuncs.com/fishisnow/stock-scope:latest"
 
 mkdir -p "$STATE_DIR"
@@ -20,6 +21,13 @@ log() {
   local message="$1"
   echo "[$(date '+%Y-%m-%d %H:%M:%S')] $message" | tee -a "$LOG_FILE"
 }
+
+# 防重入：上一次任务未结束时，本次直接跳过
+if ! mkdir "$LOCK_DIR" 2>/dev/null; then
+  log "检测任务仍在执行中，跳过本次运行"
+  exit 0
+fi
+trap 'rmdir "$LOCK_DIR" 2>/dev/null || true' EXIT
 
 if ! command -v docker >/dev/null 2>&1; then
   log "docker 未安装，跳过本次检查"
@@ -57,7 +65,7 @@ fi
 
 if [ "$current_digest" != "$previous_digest" ]; then
   log "检测到镜像更新：$previous_digest -> $current_digest"
-  if "$DEPLOY_SCRIPT" >>"$LOG_FILE" 2>&1; then
+  if (cd "$PROJECT_ROOT" && "$DEPLOY_SCRIPT") >>"$LOG_FILE" 2>&1; then
     echo "$current_digest" > "$STATE_FILE"
     log "自动部署成功，已更新 digest 状态"
   else

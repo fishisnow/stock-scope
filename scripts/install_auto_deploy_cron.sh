@@ -20,7 +20,7 @@ CRON_JOB="* * * * * $CHECK_SCRIPT >> $CRON_LOG 2>&1"
 
 tmp_cron="$(mktemp)"
 if crontab -l >/dev/null 2>&1; then
-  crontab -l | rg -v "auto_deploy_latest.sh" > "$tmp_cron"
+  crontab -l | grep -v "auto_deploy_latest.sh" > "$tmp_cron" || true
 fi
 
 echo "$CRON_JOB" >> "$tmp_cron"
