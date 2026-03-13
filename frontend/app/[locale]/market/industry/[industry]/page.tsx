@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react"
 import { useParams, useSearchParams } from "next/navigation"
 import { ArrowDown, ArrowLeft, ArrowUp, TrendingDown, TrendingUp } from "lucide-react"
 import { useLocale, useTranslations } from "next-intl"
+import { Area, CartesianGrid, Line, LineChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts"
 
 import { Header } from "@/components/header"
 import { Link } from "@/i18n/routing"
@@ -33,8 +34,27 @@ interface IndustryStocksData {
   selected_count: number
 }
 
+interface MarketBreadthRecord {
+  date: string
+  breadth_type: string
+  sector: string
+  breadth_pct: string | number
+}
+
+interface MarketBreadthData {
+  dates: string[]
+  records: MarketBreadthRecord[]
+}
+
 type SortKey = "amount" | "changeRatio" | "volume" | "volumeRatio" | "turnoverRate" | "pe"
 type SortDirection = "asc" | "desc"
+
+const parseBreadthIndex = (value: string | number | null | undefined): number | null => {
+  if (typeof value === "number") return Number.isFinite(value) ? value : null
+  if (typeof value !== "string") return null
+  const parsed = parseFloat(value.replace("%", "").trim())
+  return Number.isFinite(parsed) ? parsed : null
+}
 
 function buildFutuStockUrl(code?: string, exchange?: string) {
   const normalizedCode = String(code || "").trim()
@@ -270,6 +290,9 @@ export default function IndustryStocksPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [data, setData] = useState<IndustryStocksData | null>(null)
+  const [breadthSeriesLoading, setBreadthSeriesLoading] = useState(true)
+  const [breadthSeries, setBreadthSeries] = useState<Array<{ date: string; value: number }>>([])
+  const formatBreadthIndex = (value: number | null, digits = 1) => (value === null ? "--" : value.toFixed(digits))
 
   useEffect(() => {
     const load = async () => {
@@ -279,21 +302,44 @@ export default function IndustryStocksPage() {
         return
       }
       setLoading(true)
+      setBreadthSeriesLoading(true)
       setError(null)
       try {
-        const response = await fetch(
-          `${API_URL}/api/market_breadth/industry_stocks?industry=${encodeURIComponent(industry)}`
-        )
-        const result = await response.json()
-        if (result.success) {
-          setData(result.data)
+        const [stocksResponse, breadthResponse] = await Promise.all([
+          fetch(`${API_URL}/api/market_breadth/industry_stocks?industry=${encodeURIComponent(industry)}`),
+          fetch(`${API_URL}/api/market_breadth?limit=30&breadth_type=industry&sector=${encodeURIComponent(industry)}`),
+        ])
+        const stocksResult = await stocksResponse.json()
+        if (stocksResult.success) {
+          setData(stocksResult.data)
         } else {
-          setError(`${t("errors.failedToLoadData")}: ${result.error}`)
+          setError(`${t("errors.failedToLoadData")}: ${stocksResult.error}`)
+        }
+
+        const breadthResult = await breadthResponse.json()
+        if (breadthResult.success) {
+          const breadthData = breadthResult.data as MarketBreadthData
+          const seriesByDate = new Map<string, number>()
+          for (const item of breadthData.records || []) {
+            if (item.breadth_type !== "industry") continue
+            const value = parseBreadthIndex(item.breadth_pct)
+            if (value === null) continue
+            seriesByDate.set(item.date, value)
+          }
+          const points = (breadthData.dates || [])
+            .slice()
+            .reverse()
+            .map((date) => ({ date, value: seriesByDate.get(date) }))
+            .filter((item): item is { date: string; value: number } => Number.isFinite(item.value))
+          setBreadthSeries(points)
+        } else {
+          setBreadthSeries([])
         }
       } catch (err) {
         setError(`${t("errors.networkError")}: ${(err as Error).message}`)
       } finally {
         setLoading(false)
+        setBreadthSeriesLoading(false)
       }
     }
     load()
@@ -322,7 +368,7 @@ export default function IndustryStocksPage() {
                   className={`px-2 py-0.5 rounded text-sm font-mono ${getBreadthTextColor(breadthValue)}`}
                   style={{ backgroundColor: getBreadthColor(breadthValue) }}
                 >
-                  {breadthValue.toFixed(0)}
+                  {formatBreadthIndex(breadthValue, 1)}
                 </span>
                 {breadthDate && <span className="text-xs text-muted-foreground font-mono">{breadthDate}</span>}
               </div>
@@ -335,6 +381,81 @@ export default function IndustryStocksPage() {
             </Link>
           </Button>
         </div>
+
+        {(breadthSeriesLoading || breadthSeries.length > 0) && (
+          <Card className="mb-6">
+            <CardContent className="pt-5 pb-4">
+              <div className="mb-3 flex items-center justify-between">
+                <span className="text-sm font-medium text-muted-foreground">{t("breadth.currentIndustryBreadth")}</span>
+                {breadthSeries.length > 0 && (
+                  <span className="text-xs font-mono text-muted-foreground rounded bg-secondary/60 px-2 py-0.5">
+                    {breadthSeries[0]?.date} ~ {breadthSeries[breadthSeries.length - 1]?.date}
+                  </span>
+                )}
+              </div>
+              <div className="h-44 w-full">
+                {breadthSeriesLoading ? (
+                  <div className="h-full w-full animate-pulse rounded-md bg-secondary/50" />
+                ) : (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={breadthSeries} margin={{ top: 8, right: 8, left: 0, bottom: 8 }}>
+                      <CartesianGrid strokeDasharray="2 4" stroke="hsl(var(--border) / 0.35)" />
+                      <XAxis
+                        dataKey="date"
+                        minTickGap={24}
+                        tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }}
+                        tickFormatter={(value) => String(value).slice(5)}
+                      />
+                      <YAxis
+                        domain={[0, 100]}
+                        ticks={[0, 20, 40, 60, 80, 100]}
+                        width={36}
+                        tickFormatter={(value) => `${value}`}
+                        tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }}
+                      />
+                      <ReferenceLine
+                        y={50}
+                        stroke="#f59e0b"
+                        strokeDasharray="6 6"
+                        strokeOpacity={0.9}
+                        ifOverflow="visible"
+                      />
+                      <Tooltip
+                        formatter={(value: number) => formatBreadthIndex(Number(value), 1)}
+                        labelFormatter={(label) => String(label)}
+                        contentStyle={{
+                          background: "hsl(var(--card))",
+                          border: "1px solid hsl(var(--border))",
+                          borderRadius: "8px",
+                          fontSize: "11px",
+                          padding: "8px 10px",
+                          boxShadow: "0 8px 20px rgba(2, 6, 23, 0.14)",
+                        }}
+                      />
+                      <Area
+                        type="monotone"
+                        dataKey="value"
+                        stroke="none"
+                        fill="#2563eb"
+                        fillOpacity={0.12}
+                        connectNulls
+                      />
+                      <Line
+                        type="monotone"
+                        dataKey="value"
+                        stroke="#2563eb"
+                        strokeWidth={2.5}
+                        dot={{ r: 2, fill: "#2563eb", stroke: "#ffffff", strokeWidth: 1 }}
+                        activeDot={{ r: 5, fill: "#2563eb", stroke: "#ffffff", strokeWidth: 2 }}
+                        connectNulls
+                      />
+                    </LineChart>
+                  </ResponsiveContainer>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {loading && <div className="text-sm text-muted-foreground">{t("breadth.industryStocksLoading")}</div>}
 

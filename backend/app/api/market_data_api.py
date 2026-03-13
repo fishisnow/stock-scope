@@ -66,11 +66,13 @@ def get_market_breadth():
         limit = int(request.args.get('limit', 10))
         limit = max(1, min(limit, 30))
         breadth_type = request.args.get('breadth_type')
-        data = _db.get_market_breadth_records(limit=limit, breadth_type=breadth_type)
+        sector = request.args.get('sector', '').strip() or None
+        data = _db.get_market_breadth_records(limit=limit, breadth_type=breadth_type, sector=sector)
         return jsonify({
             'success': True,
             'data': data,
-            'breadth_type': breadth_type or 'all'
+            'breadth_type': breadth_type or 'all',
+            'sector': sector or 'all'
         })
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500

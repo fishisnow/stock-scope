@@ -9,6 +9,7 @@ set -e
 REGISTRY="crpi-3f383vugjtqlop7w.cn-guangzhou.personal.cr.aliyuncs.com"
 REGISTRY_VPC="crpi-3f383vugjtqlop7w-vpc.cn-guangzhou.personal.cr.aliyuncs.com"
 USERNAME="aliyun4847844216"
+REGISTRY_PASSWORD="${ALIYUN_REGISTRY_PASSWORD:-}"
 NAMESPACE="fishisnow"
 REPO="stock-scope"
 VERSION="v1.0.0"
@@ -18,6 +19,40 @@ GREEN='\033[0;32m'
 BLUE='\033[0;34m'
 YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
+
+# 前置检查：确保 Docker 已安装且 daemon 已启动
+echo -e "${GREEN}[前置检查] 检查 Docker 运行状态...${NC}"
+if ! command -v docker >/dev/null 2>&1; then
+    echo -e "${YELLOW}❌ 未检测到 docker 命令，请先安装 Docker Desktop${NC}"
+    exit 1
+fi
+
+if ! docker info >/dev/null 2>&1; then
+    if [ "$(uname -s)" = "Darwin" ]; then
+        echo -e "${YELLOW}⚠️  Docker 未启动，正在尝试启动 Docker Desktop...${NC}"
+        open -a Docker
+
+        # 最长等待 120 秒，直到 Docker daemon 就绪
+        DOCKER_READY=false
+        for _ in $(seq 1 60); do
+            if docker info >/dev/null 2>&1; then
+                DOCKER_READY=true
+                break
+            fi
+            sleep 2
+        done
+
+        if [ "$DOCKER_READY" != "true" ]; then
+            echo -e "${YELLOW}❌ Docker 启动超时，请手动打开 Docker Desktop 后重试${NC}"
+            exit 1
+        fi
+    else
+        echo -e "${YELLOW}❌ Docker daemon 未启动，请先启动 Docker 服务后重试${NC}"
+        exit 1
+    fi
+fi
+echo -e "${GREEN}✅ Docker 已就绪${NC}"
+echo ""
 
 echo -e "${BLUE}========================================${NC}"
 echo -e "${BLUE}  Stock Scope 镜像构建与推送工具${NC}"
@@ -66,8 +101,12 @@ echo ""
 
 # 步骤 4: 登录 (公网)
 echo -e "${GREEN}[4/6] 登录阿里云镜像仓库...${NC}"
-echo -e "${YELLOW}请输入密码进行登录：${NC}"
-docker login --username=${USERNAME} ${REGISTRY}
+if [ -z "$REGISTRY_PASSWORD" ]; then
+    echo -e "${YELLOW}❌ 环境变量 ALIYUN_REGISTRY_PASSWORD 未设置${NC}"
+    echo -e "${YELLOW}请先执行：export ALIYUN_REGISTRY_PASSWORD='你的阿里云镜像仓库密码'${NC}"
+    exit 1
+fi
+echo "$REGISTRY_PASSWORD" | docker login --username="${USERNAME}" --password-stdin "${REGISTRY}"
 echo -e "${GREEN}✅ 登录成功${NC}"
 echo ""
 

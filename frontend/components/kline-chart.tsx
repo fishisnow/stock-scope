@@ -264,13 +264,21 @@ export function KLineChart({
   const touchStateRef = useRef<{
     lastX: number | null
     lastY: number | null
+    startX: number | null
+    startY: number | null
     pinchDistance: number | null
     pinchCenterRatio: number
+    isInspecting: boolean
+    longPressTimer: number | null
   }>({
     lastX: null,
     lastY: null,
+    startX: null,
+    startY: null,
     pinchDistance: null,
     pinchCenterRatio: 0.5,
+    isInspecting: false,
+    longPressTimer: null,
   })
   const mobileMousePanRef = useRef<{ active: boolean; lastX: number | null; lastY: number | null }>({
     active: false,
@@ -503,6 +511,7 @@ export function KLineChart({
       animation: false,
       tooltip: {
         trigger: "axis",
+        triggerOn: isMobile ? "none" : "mousemove|click",
         transitionDuration: 0,
         axisPointer: {
           type: "cross",
@@ -518,7 +527,7 @@ export function KLineChart({
         borderWidth: 1,
         textStyle: {
           color: colors.text,
-          fontSize: 12,
+          fontSize: isMobile ? 10 : 12,
         },
         formatter: (params: any) => {
           if (!params || params.length === 0) return ""
@@ -541,45 +550,51 @@ export function KLineChart({
               ? ((priceValue - refOpen) / refOpen * 100).toFixed(2)
               : "0.00"
           const changeColor = priceValue >= (refOpen ?? priceValue) ? colors.up : colors.down
+          const panelPadding = isMobile ? 6 : 10
+          const panelMinWidth = isMobile ? 148 : 220
+          const titleMarginBottom = isMobile ? 6 : 10
+          const rowMarginBottom = isMobile ? 4 : 6
+          const sectionMarginBottom = isMobile ? 6 : 8
+          const tooltipFontSize = isMobile ? 10 : 12
           return `
-            <div style="padding: 10px; min-width: 220px;">
-              <div style="font-weight: 600; margin-bottom: 10px;">${symbol}</div>
-              <div style="display: flex; justify-content: space-between; margin-bottom: 6px;">
+            <div style="padding: ${panelPadding}px; min-width: ${panelMinWidth}px; font-size: ${tooltipFontSize}px;">
+              <div style="font-weight: 600; margin-bottom: ${titleMarginBottom}px;">${symbol}</div>
+              <div style="display: flex; justify-content: space-between; margin-bottom: ${rowMarginBottom}px;">
                 <span style="color: ${colors.textMuted}">时间</span>
                 <span style="color: ${colors.text}">${date}</span>
               </div>
               ${
                 isIntraday
                   ? `
-              <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+              <div style="display: flex; justify-content: space-between; margin-bottom: ${sectionMarginBottom}px;">
                 <span style="color: ${colors.textMuted}">价格</span>
                 <span style="color: ${changeColor}">${Number(priceValue).toFixed(3)}</span>
               </div>
               `
                   : `
-              <div style="display: flex; justify-content: space-between; margin-bottom: 6px;">
+              <div style="display: flex; justify-content: space-between; margin-bottom: ${rowMarginBottom}px;">
                 <span style="color: ${colors.textMuted}">开盘价</span>
                 <span style="color: ${colors.text}">${formatNumber(open)}</span>
               </div>
-              <div style="display: flex; justify-content: space-between; margin-bottom: 6px;">
+              <div style="display: flex; justify-content: space-between; margin-bottom: ${rowMarginBottom}px;">
                 <span style="color: ${colors.textMuted}">最高价</span>
                 <span style="color: ${colors.up}">${formatNumber(high)}</span>
               </div>
-              <div style="display: flex; justify-content: space-between; margin-bottom: 6px;">
+              <div style="display: flex; justify-content: space-between; margin-bottom: ${rowMarginBottom}px;">
                 <span style="color: ${colors.textMuted}">最低价</span>
                 <span style="color: ${colors.down}">${formatNumber(low)}</span>
               </div>
-              <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+              <div style="display: flex; justify-content: space-between; margin-bottom: ${sectionMarginBottom}px;">
                 <span style="color: ${colors.textMuted}">收盘价</span>
                 <span style="color: ${changeColor}">${formatNumber(close)}</span>
               </div>
               `
               }
-              <div style="display: flex; justify-content: space-between; margin-bottom: 6px;">
+              <div style="display: flex; justify-content: space-between; margin-bottom: ${rowMarginBottom}px;">
                 <span style="color: ${colors.textMuted}">涨跌额</span>
                 <span style="color: ${changeColor}">${changeValue.toFixed(3)}</span>
               </div>
-              <div style="display: flex; justify-content: space-between; margin-bottom: 6px;">
+              <div style="display: flex; justify-content: space-between; margin-bottom: ${rowMarginBottom}px;">
                 <span style="color: ${colors.textMuted}">涨跌幅</span>
                 <span style="color: ${changeColor}">${changeRate}%</span>
               </div>
@@ -1236,12 +1251,39 @@ export function KLineChart({
       nativeEvent?.stopPropagation?.()
     }
 
+    const hideInspector = () => {
+      if (!chartInstance.current) return
+      chartInstance.current.dispatchAction({ type: "hideTip" })
+      touchStateRef.current.isInspecting = false
+    }
+
+    const clearLongPressTimer = () => {
+      if (touchStateRef.current.longPressTimer !== null) {
+        window.clearTimeout(touchStateRef.current.longPressTimer)
+        touchStateRef.current.longPressTimer = null
+      }
+    }
+
+    const showInspectorAtClient = (clientX: number, clientY: number) => {
+      if (!chartInstance.current || !chartRef.current) return
+      const rect = chartRef.current.getBoundingClientRect()
+      const x = Math.max(0, Math.min(rect.width, clientX - rect.left))
+      const y = Math.max(0, Math.min(rect.height, clientY - rect.top))
+      chartInstance.current.dispatchAction({
+        type: "showTip",
+        x,
+        y,
+      })
+    }
+
     const handleTouchStart = (event: any) => {
       if (!isMobile || !chartRef.current) return
       const nativeEvent = event?.event as TouchEvent | undefined
       const touches = nativeEvent?.touches
       if (!touches || touches.length === 0) return
+      clearLongPressTimer()
       if (touches.length >= 2) {
+        hideInspector()
         const [a, b] = [touches[0], touches[1]]
         const dx = a.clientX - b.clientX
         const dy = a.clientY - b.clientY
@@ -1251,11 +1293,22 @@ export function KLineChart({
         touchStateRef.current.pinchCenterRatio = Math.max(0, Math.min(1, (centerX - rect.left) / Math.max(1, rect.width)))
         touchStateRef.current.lastX = null
         touchStateRef.current.lastY = null
+        touchStateRef.current.startX = null
+        touchStateRef.current.startY = null
         return
       }
-      touchStateRef.current.lastX = touches[0].clientX
-      touchStateRef.current.lastY = touches[0].clientY
+      const touch = touches[0]
+      touchStateRef.current.lastX = touch.clientX
+      touchStateRef.current.lastY = touch.clientY
+      touchStateRef.current.startX = touch.clientX
+      touchStateRef.current.startY = touch.clientY
       touchStateRef.current.pinchDistance = null
+      touchStateRef.current.isInspecting = false
+      touchStateRef.current.longPressTimer = window.setTimeout(() => {
+        touchStateRef.current.longPressTimer = null
+        touchStateRef.current.isInspecting = true
+        showInspectorAtClient(touch.clientX, touch.clientY)
+      }, 260)
     }
 
     const handleTouchMove = (event: any) => {
@@ -1265,6 +1318,8 @@ export function KLineChart({
       if (!touches || touches.length === 0) return
 
       if (touches.length >= 2) {
+        clearLongPressTimer()
+        hideInspector()
         const [a, b] = [touches[0], touches[1]]
         const dx = a.clientX - b.clientX
         const dy = a.clientY - b.clientY
@@ -1291,10 +1346,22 @@ export function KLineChart({
         touchStateRef.current.lastY = touch.clientY
         return
       }
+      const movedFromStartX = touchStateRef.current.startX === null ? 0 : touch.clientX - touchStateRef.current.startX
+      const movedFromStartY = touchStateRef.current.startY === null ? 0 : touch.clientY - touchStateRef.current.startY
+      const movedDistance = Math.hypot(movedFromStartX, movedFromStartY)
       const deltaX = touch.clientX - touchStateRef.current.lastX
       const deltaY = touch.clientY - touchStateRef.current.lastY
       touchStateRef.current.lastX = touch.clientX
       touchStateRef.current.lastY = touch.clientY
+      if (!touchStateRef.current.isInspecting && movedDistance > 10) {
+        clearLongPressTimer()
+      }
+      if (touchStateRef.current.isInspecting) {
+        showInspectorAtClient(touch.clientX, touch.clientY)
+        nativeEvent?.preventDefault?.()
+        nativeEvent?.stopPropagation?.()
+        return
+      }
       if (Math.abs(deltaX) <= Math.abs(deltaY) || Math.abs(deltaX) < 0.5) return
       const plotWidth = Math.max(1, chartInstance.current.getWidth())
       const span = Math.max(1, zoomWindowRef.current.end - zoomWindowRef.current.start)
@@ -1308,6 +1375,7 @@ export function KLineChart({
       if (!isMobile) return
       const nativeEvent = event?.event as TouchEvent | undefined
       const touches = nativeEvent?.touches
+      clearLongPressTimer()
       if (touches && touches.length >= 2) {
         const [a, b] = [touches[0], touches[1]]
         const dx = a.clientX - b.clientX
@@ -1315,16 +1383,23 @@ export function KLineChart({
         touchStateRef.current.pinchDistance = Math.hypot(dx, dy)
         touchStateRef.current.lastX = null
         touchStateRef.current.lastY = null
+        touchStateRef.current.startX = null
+        touchStateRef.current.startY = null
         return
       }
       if (touches && touches.length === 1) {
         touchStateRef.current.lastX = touches[0].clientX
         touchStateRef.current.lastY = touches[0].clientY
+        touchStateRef.current.startX = touches[0].clientX
+        touchStateRef.current.startY = touches[0].clientY
         touchStateRef.current.pinchDistance = null
         return
       }
+      hideInspector()
       touchStateRef.current.lastX = null
       touchStateRef.current.lastY = null
+      touchStateRef.current.startX = null
+      touchStateRef.current.startY = null
       touchStateRef.current.pinchDistance = null
     }
 
@@ -1365,6 +1440,8 @@ export function KLineChart({
     }
 
     const handleGlobalOut = () => {
+      clearLongPressTimer()
+      hideInspector()
       pendingPanPercentRef.current = 0
       if (panFrameRef.current !== null) {
         window.cancelAnimationFrame(panFrameRef.current)
@@ -1372,6 +1449,8 @@ export function KLineChart({
       }
       touchStateRef.current.lastX = null
       touchStateRef.current.lastY = null
+      touchStateRef.current.startX = null
+      touchStateRef.current.startY = null
       touchStateRef.current.pinchDistance = null
       mobileMousePanRef.current.active = false
       mobileMousePanRef.current.lastX = null
@@ -1445,7 +1524,11 @@ export function KLineChart({
       pendingPanPercentRef.current = 0
       touchStateRef.current.lastX = null
       touchStateRef.current.lastY = null
+      touchStateRef.current.startX = null
+      touchStateRef.current.startY = null
       touchStateRef.current.pinchDistance = null
+      touchStateRef.current.isInspecting = false
+      clearLongPressTimer()
       mobileMousePanRef.current.active = false
       mobileMousePanRef.current.lastX = null
       mobileMousePanRef.current.lastY = null

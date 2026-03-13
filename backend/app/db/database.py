@@ -494,7 +494,12 @@ class StockDatabase:
             print(f"❌ 写入市场宽度数据失败: {e}")
             raise
 
-    def get_market_breadth_records(self, limit: int = 10, breadth_type: Optional[str] = None) -> Dict:
+    def get_market_breadth_records(
+        self,
+        limit: int = 10,
+        breadth_type: Optional[str] = None,
+        sector: Optional[str] = None
+    ) -> Dict:
         """
         获取最近N天市场宽度数据
         """
@@ -514,6 +519,8 @@ class StockDatabase:
             if not dates:
                 return {"dates": [], "records": []}
 
+            normalized_sector = sector.strip() if isinstance(sector, str) and sector.strip() else None
+
             # Supabase 单次查询默认最多返回约 1000 行，这里做分页聚合，确保多行业/多类型场景下数据完整。
             page_size = 1000
             records: List[Dict] = []
@@ -531,6 +538,8 @@ class StockDatabase:
                 )
                 if breadth_type:
                     query = query.eq('breadth_type', breadth_type)
+                if normalized_sector:
+                    query = query.eq('sector', normalized_sector)
                 data_resp = query.execute()
                 batch = data_resp.data or []
                 records.extend(batch)
