@@ -108,6 +108,22 @@ sleep 3
 # 显示状态
 echo ""
 if docker ps | grep -q $CONTAINER_NAME; then
+    # 清理旧镜像，仅保留当前 latest 对应镜像，避免磁盘空间耗尽
+    echo "🧹 清理旧镜像..."
+    IMAGE_REPO="${ALIYUN_IMAGE%:*}"
+    CURRENT_IMAGE_ID="$(docker image inspect --format '{{.Id}}' "$ALIYUN_IMAGE" 2>/dev/null || true)"
+
+    if [ -n "$CURRENT_IMAGE_ID" ]; then
+        docker images --no-trunc "$IMAGE_REPO" --format '{{.ID}}' | sort -u | while read -r IMAGE_ID; do
+            if [ -n "$IMAGE_ID" ] && [ "$IMAGE_ID" != "$CURRENT_IMAGE_ID" ]; then
+                docker rmi -f "$IMAGE_ID" >/dev/null 2>&1 || true
+            fi
+        done
+        echo "✅ 镜像清理完成（已保留当前最新镜像）"
+    else
+        echo "⚠️  未能识别当前镜像 ID，跳过镜像清理"
+    fi
+
     echo "=========================================="
     echo "✅ 部署完成！"
     echo "=========================================="

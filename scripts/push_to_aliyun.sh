@@ -25,7 +25,7 @@ echo -e "${BLUE}========================================${NC}"
 echo ""
 
 # 步骤 1: 读取 .env 文件中的构建参数
-echo -e "${GREEN}[1/5] 读取 .env 配置文件...${NC}"
+echo -e "${GREEN}[1/6] 读取 .env 配置文件...${NC}"
 BUILD_ARGS=""
 if [ -f ".env" ]; then
     # 定义需要在构建时传递的环境变量列表
@@ -52,30 +52,47 @@ fi
 echo ""
 
 # 步骤 2: 构建镜像
-echo -e "${GREEN}[2/5] 构建 Docker 镜像...${NC}"
+echo -e "${GREEN}[2/6] 构建 Docker 镜像...${NC}"
 docker build $BUILD_ARGS -t stock-scope:latest .
 echo -e "${GREEN}✅ 镜像构建完成${NC}"
 echo ""
 
 # 步骤 3: 打标签
-echo -e "${GREEN}[3/5] 为镜像打标签...${NC}"
+echo -e "${GREEN}[3/6] 为镜像打标签...${NC}"
 docker tag stock-scope:latest ${REGISTRY}/${NAMESPACE}/${REPO}:${VERSION}
 docker tag stock-scope:latest ${REGISTRY}/${NAMESPACE}/${REPO}:latest
 echo -e "${GREEN}✅ 标签设置完成${NC}"
 echo ""
 
 # 步骤 4: 登录 (公网)
-echo -e "${GREEN}[4/5] 登录阿里云镜像仓库...${NC}"
+echo -e "${GREEN}[4/6] 登录阿里云镜像仓库...${NC}"
 echo -e "${YELLOW}请输入密码进行登录：${NC}"
 docker login --username=${USERNAME} ${REGISTRY}
 echo -e "${GREEN}✅ 登录成功${NC}"
 echo ""
 
 # 步骤 5: 推送镜像
-echo -e "${GREEN}[5/5] 推送镜像到仓库...${NC}"
+echo -e "${GREEN}[5/6] 推送镜像到仓库...${NC}"
 docker push ${REGISTRY}/${NAMESPACE}/${REPO}:${VERSION}
 docker push ${REGISTRY}/${NAMESPACE}/${REPO}:latest
 echo -e "${GREEN}✅ 镜像推送完成${NC}"
+echo ""
+
+# 步骤 6: 清理本地旧镜像（仅保留当前最新镜像）
+echo -e "${GREEN}[6/6] 清理本地旧镜像...${NC}"
+TARGET_REPO="${REGISTRY}/${NAMESPACE}/${REPO}"
+CURRENT_IMAGE_ID="$(docker image inspect --format '{{.Id}}' ${TARGET_REPO}:latest 2>/dev/null || true)"
+
+if [ -n "$CURRENT_IMAGE_ID" ]; then
+    docker images --no-trunc "$TARGET_REPO" --format '{{.ID}}' | sort -u | while read -r IMAGE_ID; do
+        if [ -n "$IMAGE_ID" ] && [ "$IMAGE_ID" != "$CURRENT_IMAGE_ID" ]; then
+            docker rmi -f "$IMAGE_ID" >/dev/null 2>&1 || true
+        fi
+    done
+    echo -e "${GREEN}✅ 本地旧镜像清理完成（已保留当前 latest 镜像）${NC}"
+else
+    echo -e "${YELLOW}⚠️  未识别到当前 latest 镜像 ID，跳过清理${NC}"
+fi
 echo ""
 
 # 完成信息
