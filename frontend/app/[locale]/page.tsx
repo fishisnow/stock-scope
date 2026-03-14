@@ -1,185 +1,145 @@
 "use client"
 
+import Image from "next/image"
 import { Header } from "@/components/header"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Link } from "@/i18n/routing"
-import { Sparkles, LineChart, NotebookPen, ArrowRight, ShieldCheck, Compass } from "lucide-react"
+import { ArrowRight, BarChart3, BookOpenText, Radar, Sparkles, Target, Trophy } from "lucide-react"
 import { useTranslations } from "next-intl"
 
 export default function LandingPage() {
-  const t = useTranslations("landing")
+  const t = useTranslations("landingV2")
+  const previewCards = [
+    {
+      title: t("preview.cards.opportunity.title"),
+      description: t("preview.cards.opportunity.description"),
+      icon: Target,
+      href: "/home",
+      tag: t("preview.cards.opportunity.tag"),
+      image: "/invest-opertunities.png",
+      imageAlt: t("preview.cards.opportunity.imageAlt"),
+    },
+    {
+      title: t("preview.cards.breadth.title"),
+      description: t("preview.cards.breadth.description"),
+      icon: Radar,
+      href: "/market",
+      tag: t("preview.cards.breadth.tag"),
+      image: "/market-breadth.png",
+      imageAlt: t("preview.cards.breadth.imageAlt"),
+    },
+    {
+      title: t("preview.cards.list.title"),
+      description: t("preview.cards.list.description"),
+      icon: Trophy,
+      href: "/market/industry",
+      tag: t("preview.cards.list.tag"),
+      image: "/stock-list.png",
+      imageAlt: t("preview.cards.list.imageAlt"),
+    },
+  ]
 
   return (
     <div className="min-h-screen bg-background">
       <Header />
-      <main>
-        <section className="section-shell-lg">
-          <div className="container mx-auto max-w-6xl">
-            <div className="text-center">
-              <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-secondary text-sm text-muted-foreground mb-6">
-                <Sparkles className="h-4 w-4 text-primary" />
-                <span>{t("hero.badge")}</span>
+      <main className="relative overflow-hidden">
+        <section className="relative min-h-[calc(100vh-4rem)] border-b border-border/50 bg-[radial-gradient(circle_at_10%_20%,rgba(59,130,246,0.14),transparent_38%),radial-gradient(circle_at_90%_10%,rgba(99,102,241,0.12),transparent_35%),radial-gradient(circle_at_50%_95%,rgba(59,130,246,0.08),transparent_45%)]">
+          <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(to_right,rgba(148,163,184,0.14)_1px,transparent_1px),linear-gradient(to_bottom,rgba(148,163,184,0.14)_1px,transparent_1px)] bg-[size:34px_34px] [mask-image:radial-gradient(circle_at_center,black,transparent_78%)]" />
+
+          <div className="container relative mx-auto flex min-h-[calc(100vh-4rem)] flex-col justify-center px-4 py-16 sm:px-6 lg:px-8">
+            <div className="mx-auto max-w-4xl text-center">
+              <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-primary/30 bg-primary/10 px-3 py-1 text-xs font-medium text-primary">
+                <Sparkles className="h-3.5 w-3.5" />
+                {t("hero.badge")}
               </div>
-              <h1 className="font-serif text-3xl sm:text-6xl lg:text-7xl text-primary mb-6 text-balance">
-                {t("hero.title")}
+              <h1 className="text-balance text-4xl font-semibold tracking-tight sm:text-6xl lg:text-7xl">
+                {t("hero.titlePrefix")}
+                <span className="bg-gradient-to-r from-primary via-blue-500 to-indigo-500 bg-clip-text text-transparent"> {t("hero.titleHighlight")}</span>
               </h1>
-              <p className="text-base sm:text-xl text-muted-foreground max-w-3xl mx-auto mb-8 sm:mb-10">
+              <p className="mx-auto mt-6 max-w-2xl text-sm leading-6 text-muted-foreground sm:text-base">
                 {t("hero.subtitle")}
               </p>
-              <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-                <Button size="lg" className="gap-2 w-full sm:w-auto" asChild>
-                  <Link href="/home">
-                    {t("hero.primaryCta")}
-                    <ArrowRight className="h-4 w-4" />
-                  </Link>
-                </Button>
-                <Button size="lg" variant="outline" className="w-full sm:w-auto" asChild>
-                  <Link href="/market">{t("hero.secondaryCta")}</Link>
-                </Button>
-              </div>
-              <div className="mt-8 text-sm text-muted-foreground">
-                {t("hero.note")}
-              </div>
             </div>
-          </div>
-        </section>
 
-        <section id="value" className="section-shell bg-secondary/30">
-          <div className="container mx-auto max-w-6xl">
-            <div className="text-center mb-12">
-              <h2 className="font-serif text-3xl sm:text-4xl text-primary mb-3">
-                {t("value.title")}
-              </h2>
-              <p className="text-muted-foreground max-w-2xl mx-auto">
-                {t("value.subtitle")}
-              </p>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <Card className="hover:shadow-lg transition-shadow">
-                <CardHeader>
-                  <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center mb-3">
-                    <Compass className="h-5 w-5 text-primary" />
-                  </div>
-                  <CardTitle className="font-serif text-xl">{t("value.items.discovery.title")}</CardTitle>
-                  <CardDescription>{t("value.items.discovery.desc")}</CardDescription>
-                </CardHeader>
-              </Card>
-              <Card className="hover:shadow-lg transition-shadow">
-                <CardHeader>
-                  <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center mb-3">
-                    <LineChart className="h-5 w-5 text-primary" />
-                  </div>
-                  <CardTitle className="font-serif text-xl">{t("value.items.market.title")}</CardTitle>
-                  <CardDescription>{t("value.items.market.desc")}</CardDescription>
-                </CardHeader>
-              </Card>
-              <Card className="hover:shadow-lg transition-shadow">
-                <CardHeader>
-                  <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center mb-3">
-                    <NotebookPen className="h-5 w-5 text-primary" />
-                  </div>
-                  <CardTitle className="font-serif text-xl">{t("value.items.review.title")}</CardTitle>
-                  <CardDescription>{t("value.items.review.desc")}</CardDescription>
-                </CardHeader>
-              </Card>
-            </div>
-          </div>
-        </section>
-
-        <section id="workflow" className="section-shell">
-          <div className="container mx-auto max-w-6xl">
-            <div className="grid grid-cols-1 lg:grid-cols-[1.1fr_0.9fr] gap-10 items-center">
-              <div>
-                <h2 className="font-serif text-3xl sm:text-4xl text-primary mb-4">
-                  {t("workflow.title")}
-                </h2>
-                <p className="text-muted-foreground mb-8">
-                  {t("workflow.subtitle")}
-                </p>
-                <div className="space-y-4">
-                  {(["capture", "analyze", "learn"] as const).map((key, index) => (
-                    <Card key={key} className="border-primary/10">
-                      <CardContent className="flex items-start gap-4 pt-6">
-                        <div className="h-8 w-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-sm font-semibold">
-                          {index + 1}
-                        </div>
-                        <div>
-                          <div className="font-medium">{t(`workflow.steps.${key}.title`)}</div>
-                          <p className="text-sm text-muted-foreground mt-1">
-                            {t(`workflow.steps.${key}.desc`)}
-                          </p>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))}
+            <div className="mx-auto mt-10 grid w-full max-w-5xl gap-3 sm:grid-cols-3">
+              <div className="rounded-xl border border-border/65 bg-background/75 p-4 shadow-sm backdrop-blur-sm">
+                <div className="mb-3 flex h-8 w-8 items-center justify-center rounded-md bg-primary/15 text-primary">
+                  <Target className="h-4 w-4" />
                 </div>
+                <p className="text-sm font-medium">{t("hero.features.fastDiscovery.title")}</p>
+                <p className="mt-1 text-xs text-muted-foreground">{t("hero.features.fastDiscovery.description")}</p>
               </div>
-              <div className="bg-card border rounded-2xl p-5 sm:p-8 shadow-sm">
-                <div className="flex items-center gap-3 mb-4">
-                  <ShieldCheck className="h-5 w-5 text-primary" />
-                  <span className="text-sm text-muted-foreground">{t("workflow.note")}</span>
+              <div className="rounded-xl border border-border/65 bg-background/75 p-4 shadow-sm backdrop-blur-sm">
+                <div className="mb-3 flex h-8 w-8 items-center justify-center rounded-md bg-primary/15 text-primary">
+                  <BarChart3 className="h-4 w-4" />
                 </div>
-                <h3 className="font-serif text-2xl mb-4">{t("workflow.highlight.title")}</h3>
-                <p className="text-muted-foreground mb-6">{t("workflow.highlight.desc")}</p>
-                <Button variant="outline" className="gap-2" asChild>
-                  <Link href="/home">
-                    {t("workflow.highlight.cta")}
-                    <ArrowRight className="h-4 w-4" />
-                  </Link>
-                </Button>
+                <p className="text-sm font-medium">{t("hero.features.clearSignals.title")}</p>
+                <p className="mt-1 text-xs text-muted-foreground">{t("hero.features.clearSignals.description")}</p>
+              </div>
+              <div className="rounded-xl border border-border/65 bg-background/75 p-4 shadow-sm backdrop-blur-sm">
+                <div className="mb-3 flex h-8 w-8 items-center justify-center rounded-md bg-primary/15 text-primary">
+                  <BookOpenText className="h-4 w-4" />
+                </div>
+                <p className="text-sm font-medium">{t("hero.features.fullReview.title")}</p>
+                <p className="mt-1 text-xs text-muted-foreground">{t("hero.features.fullReview.description")}</p>
               </div>
             </div>
-          </div>
-        </section>
 
-        <section id="modules" className="section-shell bg-secondary/30">
-          <div className="container mx-auto max-w-6xl">
-            <div className="text-center mb-12">
-              <h2 className="font-serif text-3xl sm:text-4xl text-primary mb-3">
-                {t("modules.title")}
-              </h2>
-              <p className="text-muted-foreground max-w-2xl mx-auto">
-                {t("modules.subtitle")}
-              </p>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <Card className="hover:shadow-lg transition-shadow">
-                <CardHeader>
-                  <CardTitle className="font-serif text-xl">{t("modules.items.opportunity.title")}</CardTitle>
-                  <CardDescription>{t("modules.items.opportunity.desc")}</CardDescription>
-                </CardHeader>
-              </Card>
-              <Card className="hover:shadow-lg transition-shadow">
-                <CardHeader>
-                  <CardTitle className="font-serif text-xl">{t("modules.items.market.title")}</CardTitle>
-                  <CardDescription>{t("modules.items.market.desc")}</CardDescription>
-                </CardHeader>
-              </Card>
-              <Card className="hover:shadow-lg transition-shadow">
-                <CardHeader>
-                  <CardTitle className="font-serif text-xl">{t("modules.items.review.title")}</CardTitle>
-                  <CardDescription>{t("modules.items.review.desc")}</CardDescription>
-                </CardHeader>
-              </Card>
-            </div>
-          </div>
-        </section>
-
-        <section className="section-shell-lg">
-          <div className="container mx-auto max-w-4xl text-center">
-            <h2 className="font-serif text-3xl sm:text-4xl text-primary mb-4">
-              {t("cta.title")}
-            </h2>
-            <p className="text-muted-foreground mb-8">
-              {t("cta.subtitle")}
-            </p>
-            <Button size="lg" className="gap-2" asChild>
-              <Link href="/home">
-                {t("cta.button")}
+            <div className="mx-auto mt-10 flex w-full max-w-4xl flex-wrap items-center justify-center gap-3">
+              <Button className="gap-2" asChild>
+                <Link href="/home">
+                {t("hero.primaryCta")}
                 <ArrowRight className="h-4 w-4" />
-              </Link>
-            </Button>
+                </Link>
+              </Button>
+            </div>
+          </div>
+        </section>
+
+        <section id="content-preview" className="container mx-auto scroll-mt-24 px-4 py-16 sm:px-6 lg:px-8">
+          <div className="mb-9 max-w-3xl">
+            <p className="text-xs font-medium uppercase tracking-[0.18em] text-primary">{t("preview.badge")}</p>
+            <h2 className="mt-2 text-xl font-semibold sm:text-2xl lg:text-3xl md:whitespace-nowrap">{t("preview.title")}</h2>
+            <p className="mt-3 text-sm text-muted-foreground">
+              {t("preview.description")}
+            </p>
+          </div>
+
+          <div className="grid gap-6 md:grid-cols-3 lg:gap-7">
+            {previewCards.map((card) => {
+              const Icon = card.icon
+              return (
+                <article key={card.title} className="group rounded-2xl border border-border/70 bg-card p-4 shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-lg">
+                  <div className="mb-3 flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span className="flex h-8 w-8 items-center justify-center rounded-md bg-primary/10 text-primary">
+                        <Icon className="h-4 w-4" />
+                      </span>
+                      <h3 className="text-base font-semibold">{card.title}</h3>
+                    </div>
+                    <span className="rounded-full bg-muted px-2 py-1 text-[11px] text-muted-foreground">{card.tag}</span>
+                  </div>
+
+                  <div className="relative mb-3 aspect-video overflow-hidden rounded-xl border border-border/70 bg-muted/35">
+                    <Image
+                      src={card.image}
+                      alt={card.imageAlt}
+                      fill
+                      className="object-cover object-top transition-transform duration-300 group-hover:scale-[1.02]"
+                      sizes="(min-width: 1024px) 30vw, (min-width: 768px) 33vw, 100vw"
+                    />
+                  </div>
+
+                  <p className="text-sm text-muted-foreground">{card.description}</p>
+                  <Button asChild variant="ghost" className="mt-3 px-0 text-primary hover:bg-transparent hover:text-primary/80 group-hover:translate-x-0.5">
+                    <Link href={card.href}>
+                      {t("preview.cardCta")}
+                      <ArrowRight className="ml-1 h-4 w-4" />
+                    </Link>
+                  </Button>
+                </article>
+              )
+            })}
           </div>
         </section>
       </main>

@@ -127,6 +127,56 @@
       "button": "Get Started"
     }
   },
+  "landingV2": {
+    "hero": {
+      "badge": "Your Investment Decision Workspace",
+      "titlePrefix": "Opportunities, market breadth, and today's leaders-",
+      "titleHighlight": "all on one screen.",
+      "subtitle": "With StockScope, research, screening, notes, and review work together in one continuous workflow-so you can spot signals faster and make better investment decisions.",
+      "primaryCta": "Get Started",
+      "secondaryCta": "Enter App",
+      "features": {
+        "fastDiscovery": {
+          "title": "Fast Opportunity Discovery",
+          "description": "View core ideas, catalysts, and related stocks in one place."
+        },
+        "clearSignals": {
+          "title": "Clear Market Signals",
+          "description": "Use breadth and strength distribution to read market phases faster."
+        },
+        "fullReview": {
+          "title": "Complete Review Loop",
+          "description": "Build replayable records and continuously improve your framework."
+        }
+      }
+    },
+    "preview": {
+      "badge": "A Smarter Way to Find Opportunities",
+      "title": "Opportunities. Market breadth. Today's leaders.",
+      "description": "Start with the big picture, then dive deeper into the ideas worth researching.",
+      "cardCta": "View Details",
+      "cards": {
+        "opportunity": {
+          "title": "Investment Opportunities",
+          "description": "Focus on high-value setups, triggers, and related stocks to shorten research time.",
+          "tag": "Opportunity Tracking",
+          "imageAlt": "Investment opportunities module preview"
+        },
+        "breadth": {
+          "title": "Market Breadth",
+          "description": "Read market rhythm and risk appetite through breadth and strength distribution.",
+          "tag": "Structure Analysis",
+          "imageAlt": "Market breadth module preview"
+        },
+        "list": {
+          "title": "Today's Lists",
+          "description": "Track strong sectors and hot names to locate direction at key moments.",
+          "tag": "Hotspot Focus",
+          "imageAlt": "Strong list module preview"
+        }
+      }
+    }
+  },
   "market": {
     "pageTitle": "Market Data",
     "pageSubtitle": "Daily stock market analysis with comprehensive performance metrics and trading insights",

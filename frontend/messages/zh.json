@@ -127,6 +127,56 @@
       "button": "立即开始"
     }
   },
+  "landingV2": {
+    "hero": {
+      "badge": "面向投资者的高效决策工作台",
+      "titlePrefix": "在一个页面里，快速看清",
+      "titleHighlight": "投资机会、市场宽度、今日强势榜单",
+      "subtitle": "StockScope 将研究、筛选、记录与复盘整合为闭环流程，帮助你在更短时间内抓住关键信号，做出更有把握的投资判断。",
+      "primaryCta": "立即开始",
+      "secondaryCta": "进入应用",
+      "features": {
+        "fastDiscovery": {
+          "title": "机会定位快",
+          "description": "核心机会、驱动逻辑、关联标的一次看全。"
+        },
+        "clearSignals": {
+          "title": "市场信号清晰",
+          "description": "宽度与强弱分布联动，行情阶段更容易判断。"
+        },
+        "fullReview": {
+          "title": "复盘链路完整",
+          "description": "沉淀可回放的机会记录，持续优化交易框架。"
+        }
+      }
+    },
+    "preview": {
+      "badge": "更聪明的投资机会扫描器",
+      "title": "投资机会、市场宽度、强势榜单一站式查看",
+      "description": "从机会库到市场宽度，再到今日榜单——轻松浏览，助你先把握市场全貌，再进入深度研究",
+      "cardCta": "点击查看",
+      "cards": {
+        "opportunity": {
+          "title": "投资机会",
+          "description": "聚焦高价值机会、触发条件与关联标的，缩短研究路径。",
+          "tag": "机会追踪",
+          "imageAlt": "投资机会模块预览"
+        },
+        "breadth": {
+          "title": "市场宽度",
+          "description": "通过强弱分布与广度信号，快速判断市场节奏与风险偏好。",
+          "tag": "结构分析",
+          "imageAlt": "市场宽度模块预览"
+        },
+        "list": {
+          "title": "今日榜单",
+          "description": "追踪强势行业与热点标的，在关键时点更快定位方向。",
+          "tag": "热点聚焦",
+          "imageAlt": "强势榜单模块预览"
+        }
+      }
+    }
+  },
   "market": {
     "pageTitle": "市场数据",
     "pageSubtitle": "每日股市分析，提供全面的性能指标和交易洞察",
