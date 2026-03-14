@@ -268,6 +268,8 @@ export function KLineChart({
     startY: number | null
     pinchDistance: number | null
     pinchCenterRatio: number
+    hasMoved: boolean
+    directionLock: "undetermined" | "horizontal" | "vertical"
     isInspecting: boolean
     longPressTimer: number | null
   }>({
@@ -277,6 +279,8 @@ export function KLineChart({
     startY: null,
     pinchDistance: null,
     pinchCenterRatio: 0.5,
+    hasMoved: false,
+    directionLock: "undetermined",
     isInspecting: false,
     longPressTimer: null,
   })
@@ -285,6 +289,7 @@ export function KLineChart({
     lastX: null,
     lastY: null,
   })
+  const touchInputDetectedRef = useRef(false)
   const [showVolume, setShowVolume] = useState(true)
   const [showMA, setShowMA] = useState(true)
   const [showTrendBands, setShowTrendBands] = useState(true)
@@ -513,6 +518,20 @@ export function KLineChart({
         trigger: "axis",
         triggerOn: isMobile ? "none" : "mousemove|click",
         transitionDuration: 0,
+        position: (point: number[], _params: any, dom: HTMLElement, _rect: any, size: any) => {
+          if (!isMobile) return point
+          const [x, y] = point
+          const viewWidth = size?.viewSize?.[0] ?? chartRef.current?.clientWidth ?? 0
+          const viewHeight = size?.viewSize?.[1] ?? chartRef.current?.clientHeight ?? 0
+          const boxWidth = size?.contentSize?.[0] ?? dom?.clientWidth ?? 0
+          const boxHeight = size?.contentSize?.[1] ?? dom?.clientHeight ?? 0
+          const margin = 8
+          const useLeftCorner = x > viewWidth / 2
+          const useTopCorner = y > viewHeight / 2
+          const posX = useLeftCorner ? margin : Math.max(margin, viewWidth - boxWidth - margin)
+          const posY = useTopCorner ? margin : Math.max(margin, viewHeight - boxHeight - margin)
+          return [posX, posY]
+        },
         axisPointer: {
           type: "cross",
           animation: false,
@@ -725,7 +744,7 @@ export function KLineChart({
           moveOnMouseMove: false,
           moveOnMouseWheel: false,
           filterMode: "none",
-          throttle: 24,
+          throttle: isMobile ? 10 : 24,
         },
         ...(showSliderZoom
           ? [{
@@ -1178,6 +1197,8 @@ export function KLineChart({
     const zr = chartInstance.current.getZr()
     const setCursor = (cursor: string) => zr.setCursorStyle(cursor)
     setCursor(isMobile ? "default" : "crosshair")
+    // Mobile drag needs a larger gain so short swipes can move visible window enough.
+    const mobilePanGain = 2.4
 
     const panByPercent = (shiftPercent: number) => {
       if (!chartInstance.current) return
@@ -1233,6 +1254,16 @@ export function KLineChart({
       zoomByFactor(factor, rawRatio)
     }
 
+    const getMobileShiftPercent = (deltaX: number) => {
+      if (!chartInstance.current) return 0
+      const plotWidth = Math.max(1, chartInstance.current.getWidth())
+      const span = Math.max(1, zoomWindowRef.current.end - zoomWindowRef.current.start)
+      const rawShiftPercent = -(deltaX / plotWidth) * span * mobilePanGain
+      const minShiftPercent = Math.max(0.28, span * 0.006)
+      if (Math.abs(rawShiftPercent) >= minShiftPercent) return rawShiftPercent
+      return Math.sign(rawShiftPercent || deltaX) * minShiftPercent
+    }
+
     const handleMouseWheel = (event: any) => {
       if (isMobile || !chartInstance.current) return
       const nativeEvent = event?.event
@@ -1281,6 +1312,10 @@ export function KLineChart({
       const nativeEvent = event?.event as TouchEvent | undefined
       const touches = nativeEvent?.touches
       if (!touches || touches.length === 0) return
+      touchInputDetectedRef.current = true
+      mobileMousePanRef.current.active = false
+      mobileMousePanRef.current.lastX = null
+      mobileMousePanRef.current.lastY = null
       clearLongPressTimer()
       if (touches.length >= 2) {
         hideInspector()
@@ -1295,20 +1330,28 @@ export function KLineChart({
         touchStateRef.current.lastY = null
         touchStateRef.current.startX = null
         touchStateRef.current.startY = null
+        touchStateRef.current.directionLock = "undetermined"
         return
       }
       const touch = touches[0]
+      hideInspector()
       touchStateRef.current.lastX = touch.clientX
       touchStateRef.current.lastY = touch.clientY
       touchStateRef.current.startX = touch.clientX
       touchStateRef.current.startY = touch.clientY
       touchStateRef.current.pinchDistance = null
+      touchStateRef.current.hasMoved = false
+      touchStateRef.current.directionLock = "undetermined"
       touchStateRef.current.isInspecting = false
       touchStateRef.current.longPressTimer = window.setTimeout(() => {
         touchStateRef.current.longPressTimer = null
+        if (touchStateRef.current.hasMoved) return
+        const inspectX = touchStateRef.current.lastX
+        const inspectY = touchStateRef.current.lastY
+        if (inspectX === null || inspectY === null) return
         touchStateRef.current.isInspecting = true
-        showInspectorAtClient(touch.clientX, touch.clientY)
-      }, 260)
+        showInspectorAtClient(inspectX, inspectY)
+      }, 180)
     }
 
     const handleTouchMove = (event: any) => {
@@ -1350,11 +1393,18 @@ export function KLineChart({
       const movedFromStartY = touchStateRef.current.startY === null ? 0 : touch.clientY - touchStateRef.current.startY
       const movedDistance = Math.hypot(movedFromStartX, movedFromStartY)
       const deltaX = touch.clientX - touchStateRef.current.lastX
-      const deltaY = touch.clientY - touchStateRef.current.lastY
       touchStateRef.current.lastX = touch.clientX
       touchStateRef.current.lastY = touch.clientY
-      if (!touchStateRef.current.isInspecting && movedDistance > 10) {
+      if (movedDistance > 4) {
+        touchStateRef.current.hasMoved = true
+      }
+      if (!touchStateRef.current.isInspecting && movedDistance > 6) {
         clearLongPressTimer()
+      }
+      if (touchStateRef.current.directionLock === "undetermined" && movedDistance > 5) {
+        const absX = Math.abs(movedFromStartX)
+        const absY = Math.abs(movedFromStartY)
+        touchStateRef.current.directionLock = absX >= absY ? "horizontal" : "vertical"
       }
       if (touchStateRef.current.isInspecting) {
         showInspectorAtClient(touch.clientX, touch.clientY)
@@ -1362,10 +1412,9 @@ export function KLineChart({
         nativeEvent?.stopPropagation?.()
         return
       }
-      if (Math.abs(deltaX) <= Math.abs(deltaY) || Math.abs(deltaX) < 0.5) return
-      const plotWidth = Math.max(1, chartInstance.current.getWidth())
-      const span = Math.max(1, zoomWindowRef.current.end - zoomWindowRef.current.start)
-      const shiftPercent = -(deltaX / plotWidth) * span
+      if (touchStateRef.current.directionLock === "vertical") return
+      if (Math.abs(deltaX) < 0.35) return
+      const shiftPercent = getMobileShiftPercent(deltaX)
       schedulePan(shiftPercent)
       nativeEvent?.preventDefault?.()
       nativeEvent?.stopPropagation?.()
@@ -1385,6 +1434,7 @@ export function KLineChart({
         touchStateRef.current.lastY = null
         touchStateRef.current.startX = null
         touchStateRef.current.startY = null
+        touchStateRef.current.isInspecting = false
         return
       }
       if (touches && touches.length === 1) {
@@ -1393,6 +1443,9 @@ export function KLineChart({
         touchStateRef.current.startX = touches[0].clientX
         touchStateRef.current.startY = touches[0].clientY
         touchStateRef.current.pinchDistance = null
+        touchStateRef.current.hasMoved = false
+        touchStateRef.current.directionLock = "undetermined"
+        touchStateRef.current.isInspecting = false
         return
       }
       hideInspector()
@@ -1401,12 +1454,16 @@ export function KLineChart({
       touchStateRef.current.startX = null
       touchStateRef.current.startY = null
       touchStateRef.current.pinchDistance = null
+      touchStateRef.current.hasMoved = false
+      touchStateRef.current.directionLock = "undetermined"
+      touchStateRef.current.isInspecting = false
     }
 
     // Fallback for Chrome mobile emulation: mouse drag acts as single-finger pan.
     const handleMobileMouseDown = (event: any) => {
       if (!isMobile) return
       if (event?.event?.button !== 0) return
+      if (touchInputDetectedRef.current) return
       mobileMousePanRef.current.active = true
       mobileMousePanRef.current.lastX = typeof event?.offsetX === "number" ? event.offsetX : null
       mobileMousePanRef.current.lastY = typeof event?.offsetY === "number" ? event.offsetY : null
@@ -1423,13 +1480,10 @@ export function KLineChart({
         return
       }
       const deltaX = currentX - mobileMousePanRef.current.lastX
-      const deltaY = currentY - mobileMousePanRef.current.lastY
       mobileMousePanRef.current.lastX = currentX
       mobileMousePanRef.current.lastY = currentY
-      if (Math.abs(deltaX) <= Math.abs(deltaY) || Math.abs(deltaX) < 0.5) return
-      const plotWidth = Math.max(1, chartInstance.current.getWidth())
-      const span = Math.max(1, zoomWindowRef.current.end - zoomWindowRef.current.start)
-      const shiftPercent = -(deltaX / plotWidth) * span
+      if (Math.abs(deltaX) < 0.35) return
+      const shiftPercent = getMobileShiftPercent(deltaX)
       schedulePan(shiftPercent)
     }
 
@@ -1452,6 +1506,8 @@ export function KLineChart({
       touchStateRef.current.startX = null
       touchStateRef.current.startY = null
       touchStateRef.current.pinchDistance = null
+      touchStateRef.current.hasMoved = false
+      touchStateRef.current.directionLock = "undetermined"
       mobileMousePanRef.current.active = false
       mobileMousePanRef.current.lastX = null
       mobileMousePanRef.current.lastY = null
@@ -1469,32 +1525,72 @@ export function KLineChart({
     const chartElement = chartRef.current
     const handlePointerDown = (event: PointerEvent) => {
       if (!isMobile) return
+      const pointerType = event.pointerType || "mouse"
+      if (pointerType === "pen") return
+      if (pointerType === "touch" && touchInputDetectedRef.current) return
+      if (pointerType !== "touch" && pointerType !== "mouse") return
+      if (pointerType === "mouse" && touchInputDetectedRef.current) return
+      clearLongPressTimer()
+      touchStateRef.current.hasMoved = false
+      touchStateRef.current.startX = event.clientX
+      touchStateRef.current.startY = event.clientY
+      touchStateRef.current.lastX = event.clientX
+      touchStateRef.current.lastY = event.clientY
+      touchStateRef.current.isInspecting = false
+      touchStateRef.current.longPressTimer = window.setTimeout(() => {
+        touchStateRef.current.longPressTimer = null
+        if (touchStateRef.current.hasMoved) return
+        touchStateRef.current.isInspecting = true
+        showInspectorAtClient(event.clientX, event.clientY)
+      }, 180)
       mobileMousePanRef.current.active = true
       mobileMousePanRef.current.lastX = event.clientX
       mobileMousePanRef.current.lastY = event.clientY
     }
     const handlePointerMove = (event: PointerEvent) => {
       if (!isMobile || !mobileMousePanRef.current.active || !chartInstance.current) return
+      const pointerType = event.pointerType || "mouse"
+      if (pointerType === "pen") return
+      if (pointerType === "touch" && touchInputDetectedRef.current) return
+      if (pointerType !== "touch" && pointerType !== "mouse") return
+      if (pointerType === "mouse" && touchInputDetectedRef.current) return
       if (mobileMousePanRef.current.lastX === null || mobileMousePanRef.current.lastY === null) {
         mobileMousePanRef.current.lastX = event.clientX
         mobileMousePanRef.current.lastY = event.clientY
         return
       }
       const deltaX = event.clientX - mobileMousePanRef.current.lastX
-      const deltaY = event.clientY - mobileMousePanRef.current.lastY
       mobileMousePanRef.current.lastX = event.clientX
       mobileMousePanRef.current.lastY = event.clientY
-      if (Math.abs(deltaX) <= Math.abs(deltaY) || Math.abs(deltaX) < 0.5) return
-      const plotWidth = Math.max(1, chartInstance.current.getWidth())
-      const span = Math.max(1, zoomWindowRef.current.end - zoomWindowRef.current.start)
-      const shiftPercent = -(deltaX / plotWidth) * span
+      const movedFromStartX = touchStateRef.current.startX === null ? 0 : event.clientX - touchStateRef.current.startX
+      const movedFromStartY = touchStateRef.current.startY === null ? 0 : event.clientY - touchStateRef.current.startY
+      const movedDistance = Math.hypot(movedFromStartX, movedFromStartY)
+      if (movedDistance > 4) touchStateRef.current.hasMoved = true
+      if (!touchStateRef.current.isInspecting && movedDistance > 6) {
+        clearLongPressTimer()
+      }
+      if (touchStateRef.current.isInspecting) {
+        showInspectorAtClient(event.clientX, event.clientY)
+        event.preventDefault()
+        return
+      }
+      if (Math.abs(deltaX) < 0.35) return
+      const shiftPercent = getMobileShiftPercent(deltaX)
       schedulePan(shiftPercent)
       event.preventDefault()
     }
     const handlePointerUp = () => {
+      clearLongPressTimer()
+      hideInspector()
       mobileMousePanRef.current.active = false
       mobileMousePanRef.current.lastX = null
       mobileMousePanRef.current.lastY = null
+      touchStateRef.current.lastX = null
+      touchStateRef.current.lastY = null
+      touchStateRef.current.startX = null
+      touchStateRef.current.startY = null
+      touchStateRef.current.isInspecting = false
+      touchStateRef.current.hasMoved = false
     }
     chartElement?.addEventListener("pointerdown", handlePointerDown)
     chartElement?.addEventListener("pointermove", handlePointerMove, { passive: false })
@@ -1527,6 +1623,8 @@ export function KLineChart({
       touchStateRef.current.startX = null
       touchStateRef.current.startY = null
       touchStateRef.current.pinchDistance = null
+      touchStateRef.current.hasMoved = false
+      touchStateRef.current.directionLock = "undetermined"
       touchStateRef.current.isInspecting = false
       clearLongPressTimer()
       mobileMousePanRef.current.active = false
