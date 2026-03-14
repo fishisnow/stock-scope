@@ -32,7 +32,7 @@ export default function LandingPage() {
       title: t("preview.cards.list.title"),
       description: t("preview.cards.list.description"),
       icon: Trophy,
-      href: "/market/industry",
+      href: "/market",
       tag: t("preview.cards.list.tag"),
       image: "/stock-list.png",
       imageAlt: t("preview.cards.list.imageAlt"),

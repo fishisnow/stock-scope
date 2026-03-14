@@ -518,7 +518,7 @@ export function KLineChart({
         trigger: "axis",
         triggerOn: isMobile ? "none" : "mousemove|click",
         transitionDuration: 0,
-        position: (point: number[], _params: any, dom: HTMLElement, _rect: any, size: any) => {
+        position: (point: number[], _params: any, dom: any, _rect: any, size: any) => {
           if (!isMobile) return point
           const [x, y] = point
           const viewWidth = size?.viewSize?.[0] ?? chartRef.current?.clientWidth ?? 0
