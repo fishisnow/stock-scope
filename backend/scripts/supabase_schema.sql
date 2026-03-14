@@ -364,5 +364,35 @@ COMMENT ON COLUMN market_breadth_daily.total_count IS '板块内总股票数';
 COMMENT ON COLUMN market_breadth_daily.above_ma20_count IS '高于MA20数量';
 COMMENT ON COLUMN market_breadth_daily.breadth_pct IS '宽度比例(%)';
 
+-- ============================================
+-- AI 投资简报表
+-- ============================================
+CREATE TABLE IF NOT EXISTS ai_briefings (
+    id BIGSERIAL PRIMARY KEY,
+    publisher VARCHAR(100) NOT NULL,                          -- 发布者（Agent 名称或用户标识）
+    published_at TIMESTAMP WITH TIME ZONE NOT NULL,           -- 发布时间
+    content TEXT NOT NULL,                                    -- 简报内容
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),        -- 创建时间
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()         -- 更新时间
+);
+
+CREATE INDEX IF NOT EXISTS idx_ai_briefings_published_at
+ON ai_briefings (published_at DESC);
+
+CREATE INDEX IF NOT EXISTS idx_ai_briefings_publisher
+ON ai_briefings (publisher);
+
+COMMENT ON TABLE ai_briefings IS 'AI 投资简报流数据';
+COMMENT ON COLUMN ai_briefings.publisher IS '发布者（Agent 名称或用户标识）';
+COMMENT ON COLUMN ai_briefings.published_at IS '简报发布时间';
+COMMENT ON COLUMN ai_briefings.content IS '简报正文内容';
+
+-- 可选：启用 RLS，并开放读取；写入建议由服务端或认证角色执行
+ALTER TABLE ai_briefings ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Allow public read ai briefings" ON ai_briefings;
+CREATE POLICY "Allow public read ai briefings" ON ai_briefings
+    FOR SELECT USING (true);
+
 
 

@@ -2,8 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useTranslations } from "next-intl"
-import { ArrowLeft, Loader2 } from "lucide-react"
-import { Link } from "@/i18n/routing"
+import { ArrowLeft } from "lucide-react"
+import { useRouter } from "@/i18n/routing"
 import { Button } from "@/components/ui/button"
 import { KLineChart, CandleData } from "@/components/kline-chart"
 
@@ -19,6 +19,7 @@ interface StockKLinePageProps {
 
 export function StockKLinePage({ code, market, name }: StockKLinePageProps) {
   const t = useTranslations("stock")
+  const router = useRouter()
   const normalizedMarket = market.toUpperCase() === "HK" ? "HK" : "A"
 
   const today = useMemo(() => new Date(), [])
@@ -136,6 +137,14 @@ export function StockKLinePage({ code, market, name }: StockKLinePageProps) {
     return () => observer.disconnect()
   }, [isMobile])
 
+  const handleBack = useCallback(() => {
+    if (typeof window !== "undefined" && window.history.length > 1) {
+      router.back()
+      return
+    }
+    router.push("/market")
+  }, [router])
+
   return (
     <section className="section-shell">
       <div className="container mx-auto max-w-6xl space-y-4 sm:space-y-6">
@@ -145,11 +154,15 @@ export function StockKLinePage({ code, market, name }: StockKLinePageProps) {
               {normalizedMarket === "HK" ? "🇭🇰" : "🇨🇳"} {code} {name ?? ""}
             </h1>
           </div>
-          <Button variant="outline" size="sm" className="gap-2 shrink-0" asChild>
-            <Link href="/market">
-              <ArrowLeft className="h-4 w-4" />
-              {t("back")}
-            </Link>
+          <Button
+            variant="outline"
+            size="sm"
+            className="gap-2 shrink-0"
+            type="button"
+            onClick={handleBack}
+          >
+            <ArrowLeft className="h-4 w-4" />
+            {t("back")}
           </Button>
         </div>
 

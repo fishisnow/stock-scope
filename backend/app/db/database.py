@@ -560,6 +560,53 @@ class StockDatabase:
             print(f"❌ 查询市场宽度数据失败: {e}")
             raise
 
+    def get_ai_briefings(
+        self,
+        page: int = 1,
+        limit: int = 20,
+        publisher: Optional[str] = None
+    ) -> Dict:
+        """
+        分页获取 AI 投资简报（按发布时间倒序，最新在前）
+        :param page: 页码，从1开始
+        :param limit: 每页数量
+        :param publisher: 发布者筛选（可选）
+        :return: 包含 data 和 pagination 的结果
+        """
+        try:
+            page = max(1, int(page))
+            limit = max(1, min(int(limit), 100))
+            offset = (page - 1) * limit
+
+            query = self.client.table('ai_briefings').select('*', count='exact')
+            if publisher:
+                query = query.eq('publisher', publisher)
+
+            response = (
+                query
+                .order('published_at', desc=True)
+                .order('id', desc=True)
+                .range(offset, offset + limit - 1)
+                .execute()
+            )
+
+            data = response.data or []
+            total = getattr(response, 'count', None)
+            has_more = False if total is None else (offset + len(data) < total)
+
+            return {
+                "data": data,
+                "pagination": {
+                    "page": page,
+                    "limit": limit,
+                    "total": total,
+                    "has_more": has_more
+                }
+            }
+        except Exception as e:
+            print(f"❌ 查询 AI 简报失败: {e}")
+            raise
+
 # 全局数据库实例
 db = StockDatabase()
 

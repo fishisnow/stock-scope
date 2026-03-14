@@ -66,18 +66,6 @@ export function LoginDialog({ open, onOpenChange, onSwitchToSignup }: LoginDialo
             {t('loginDescription')}
           </DialogDescription>
         </DialogHeader>
-        <div className="mt-4 space-y-3">
-          <Button
-            type="button"
-            variant="outline"
-            className="w-full"
-            onClick={handleGoogleLogin}
-            disabled={isLoading || isGoogleLoading}
-          >
-            {isGoogleLoading ? t('redirectingToGoogle') : t('continueWithGoogle')}
-          </Button>
-          <p className="text-center text-xs text-muted-foreground">{t('orUseEmail')}</p>
-        </div>
         <form onSubmit={handleSubmit} className="space-y-4 mt-4">
           <div className="space-y-2">
             <Label htmlFor="email">{t('email')}</Label>
@@ -116,6 +104,17 @@ export function LoginDialog({ open, onOpenChange, onSwitchToSignup }: LoginDialo
             {isLoading ? t('loggingIn') : t('loginButton')}
           </Button>
         </form>
+        <div className="mt-4">
+          <Button
+            type="button"
+            variant="outline"
+            className="w-full"
+            onClick={handleGoogleLogin}
+            disabled={isLoading || isGoogleLoading}
+          >
+            {isGoogleLoading ? t('redirectingToGoogle') : t('loginWithGoogle')}
+          </Button>
+        </div>
         <div className="mt-4 text-center text-sm">
           <span className="text-muted-foreground">{t('noAccount')} </span>
           <button

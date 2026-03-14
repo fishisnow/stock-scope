@@ -9,6 +9,7 @@ from datetime import datetime, timedelta
 
 from flask import Blueprint, jsonify, request
 
+from app.api.auth_middleware import optional_token
 from app.utils.futu_data import get_market_snapshots_by_futu_codes
 
 market_data_bp = Blueprint('market_data', __name__)
@@ -25,6 +26,16 @@ def _safe_float(value, default=0.0):
         return number
     except Exception:
         return default
+
+
+def _truncate_briefing_preview(content: str, max_len: int = 120) -> str:
+    """未登录预览内容：返回截断后的部分文本"""
+    if not content:
+        return ""
+    normalized = content.strip()
+    if len(normalized) <= max_len:
+        return normalized
+    return f"{normalized[:max_len].rstrip()}..."
 
 
 @market_data_bp.route('/api/dates')
@@ -176,6 +187,46 @@ def get_industry_stocks():
                 'total_candidates': len(stocks),
                 'selected_count': len(futu_codes)
             }
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@market_data_bp.route('/api/briefings')
+@optional_token
+def get_ai_briefings():
+    """分页获取 AI 投资简报（发布时间倒序，最新在最前）"""
+    try:
+        user = request.current_user
+        page = int(request.args.get('page', 1))
+        limit = int(request.args.get('limit', 20))
+        publisher = (request.args.get('publisher', '') or '').strip() or None
+        result = _db.get_ai_briefings(page=page, limit=limit, publisher=publisher)
+        briefings = result.get('data', [])
+
+        if not user:
+            # 仅放开全局最新一条完整内容（第1页第1条），其余条目不返回正文，仅标记 is_masked
+            for idx, item in enumerate(briefings):
+                is_latest_item = (page == 1 and idx == 0)
+                if is_latest_item:
+                    item['is_masked'] = False
+                else:
+                    item['content'] = _truncate_briefing_preview(item.get('content', ''))
+                    item['is_masked'] = True
+        else:
+            for item in briefings:
+                item['is_masked'] = False
+
+        return jsonify({
+            'success': True,
+            'data': briefings,
+            'masked': not bool(user),
+            'pagination': result.get('pagination', {
+                'page': page,
+                'limit': limit,
+                'total': 0,
+                'has_more': False
+            })
         })
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
