@@ -177,6 +177,27 @@
           "imageAlt": "Strong list module preview"
         }
       }
+    },
+    "briefing": {
+      "badge": "AI Market Brief",
+      "title": "Let AI watch the market for you.",
+      "description": "Track market movements in real time and turn scattered information into concise insights—so you can spot opportunities and risks faster.",
+      "imageAlt": "AI briefing feature preview",
+      "cta": "Explore AI Briefing",
+      "features": {
+        "hourly": {
+          "title": "Automatic intraday tracking",
+          "description": "Refresh key changes every hour so important signals are not missed."
+        },
+        "signal": {
+          "title": "Compressed actionable insights",
+          "description": "Extract decision-ready points from noisy information streams."
+        },
+        "workflow": {
+          "title": "Built for trading workflow",
+          "description": "Connect news, thesis, and risk reminders to support your watchlist process."
+        }
+      }
     }
   },
   "market": {

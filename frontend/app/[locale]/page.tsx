@@ -96,7 +96,38 @@ export default function LandingPage() {
           </div>
         </section>
 
-        <section id="content-preview" className="container mx-auto scroll-mt-24 px-4 py-16 sm:px-6 lg:px-8">
+        <section id="ai-briefing" className="container mx-auto scroll-mt-24 px-4 py-16 sm:px-6 lg:px-8">
+          <div className="rounded-2xl border border-border/70 bg-card/60 p-6 shadow-sm sm:p-8">
+            <div className="mx-auto max-w-5xl text-center">
+              <p className="inline-flex text-xs font-medium uppercase tracking-[0.18em] text-primary">{t("briefing.badge")}</p>
+              <h2 className="mt-2 whitespace-pre-line text-xl font-semibold sm:text-2xl lg:text-3xl">{t("briefing.title")}</h2>
+              <p className="mt-3 whitespace-nowrap text-sm text-muted-foreground sm:text-base">
+                {t("briefing.description")}
+              </p>
+            </div>
+
+            <div className="relative mx-auto mt-6 aspect-video w-full max-w-3xl overflow-hidden rounded-xl border border-border/70 bg-muted/35">
+              <Image
+                src="/ai-briefing.png"
+                alt={t("briefing.imageAlt")}
+                fill
+                className="object-cover object-top"
+                sizes="(min-width: 1024px) 60vw, 100vw"
+              />
+            </div>
+
+            <div className="mt-4 text-center">
+              <Button asChild variant="ghost" className="px-0 text-primary hover:bg-transparent hover:text-primary/80">
+                <Link href="/briefing">
+                  {t("preview.cardCta")}
+                  <ArrowRight className="ml-1 h-4 w-4" />
+                </Link>
+              </Button>
+            </div>
+          </div>
+        </section>
+
+        <section id="content-preview" className="container mx-auto scroll-mt-24 px-4 pb-16 sm:px-6 lg:px-8">
           <div className="mb-9 max-w-3xl">
             <p className="text-xs font-medium uppercase tracking-[0.18em] text-primary">{t("preview.badge")}</p>
             <h2 className="mt-2 text-xl font-semibold sm:text-2xl lg:text-3xl md:whitespace-nowrap">{t("preview.title")}</h2>
@@ -142,6 +173,7 @@ export default function LandingPage() {
             })}
           </div>
         </section>
+
       </main>
     </div>
   )

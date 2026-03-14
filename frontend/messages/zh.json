@@ -177,6 +177,27 @@
           "imageAlt": "强势榜单模块预览"
         }
       }
+    },
+    "briefing": {
+      "badge": "AI 简报自动盯盘",
+      "title": "让 AI 帮你快速收集整理市场信息",
+      "description": "AI 简报会在交易时段自动跟踪市场动态，把分散资讯整理成高密度要点，帮助你更快识别机会与风险，实现自动盯盘。",
+      "imageAlt": "AI 简报功能预览",
+      "cta": "查看 AI 简报",
+      "features": {
+        "hourly": {
+          "title": "自动跟踪更新",
+          "description": "盘中按小时更新关键变化，不错过重要信号。"
+        },
+        "signal": {
+          "title": "信息浓缩提炼",
+          "description": "从海量资讯中提取可执行观点，减少噪音干扰。"
+        },
+        "workflow": {
+          "title": "服务交易决策",
+          "description": "把消息、判断与风险提示串联，辅助你的盯盘流程。"
+        }
+      }
     }
   },
   "market": {
