@@ -22,11 +22,12 @@ interface LoginDialogProps {
 
 export function LoginDialog({ open, onOpenChange, onSwitchToSignup }: LoginDialogProps) {
   const t = useTranslations('auth')
-  const { login } = useAuth()
+  const { login, loginWithGoogle } = useAuth()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [isLoading, setIsLoading] = useState(false)
+  const [isGoogleLoading, setIsGoogleLoading] = useState(false)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -45,6 +46,17 @@ export function LoginDialog({ open, onOpenChange, onSwitchToSignup }: LoginDialo
     }
   }
 
+  const handleGoogleLogin = async () => {
+    setError('')
+    setIsGoogleLoading(true)
+    try {
+      await loginWithGoogle()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t('googleLoginFailed'))
+      setIsGoogleLoading(false)
+    }
+  }
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[425px]">
@@ -54,6 +66,18 @@ export function LoginDialog({ open, onOpenChange, onSwitchToSignup }: LoginDialo
             {t('loginDescription')}
           </DialogDescription>
         </DialogHeader>
+        <div className="mt-4 space-y-3">
+          <Button
+            type="button"
+            variant="outline"
+            className="w-full"
+            onClick={handleGoogleLogin}
+            disabled={isLoading || isGoogleLoading}
+          >
+            {isGoogleLoading ? t('redirectingToGoogle') : t('continueWithGoogle')}
+          </Button>
+          <p className="text-center text-xs text-muted-foreground">{t('orUseEmail')}</p>
+        </div>
         <form onSubmit={handleSubmit} className="space-y-4 mt-4">
           <div className="space-y-2">
             <Label htmlFor="email">{t('email')}</Label>
@@ -64,7 +88,7 @@ export function LoginDialog({ open, onOpenChange, onSwitchToSignup }: LoginDialo
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
-              disabled={isLoading}
+              disabled={isLoading || isGoogleLoading}
             />
           </div>
           <div className="space-y-2">
@@ -76,7 +100,7 @@ export function LoginDialog({ open, onOpenChange, onSwitchToSignup }: LoginDialo
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
-              disabled={isLoading}
+              disabled={isLoading || isGoogleLoading}
             />
           </div>
           {error && (
@@ -87,7 +111,7 @@ export function LoginDialog({ open, onOpenChange, onSwitchToSignup }: LoginDialo
           <Button 
             type="submit" 
             className="w-full bg-primary hover:bg-primary/90"
-            disabled={isLoading}
+            disabled={isLoading || isGoogleLoading}
           >
             {isLoading ? t('loggingIn') : t('loginButton')}
           </Button>

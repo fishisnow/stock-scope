@@ -10,6 +10,7 @@ import { LanguageSwitcher } from "./language-switcher"
 import { Logo } from "./logo"
 import { LoginDialog } from "./login-dialog"
 import { SignupDialog } from "./signup-dialog"
+import { GoogleLoginPrompt } from "./google-login-prompt"
 import { useTranslations } from 'next-intl'
 import { useAuth } from '@/lib/auth-context'
 import {
@@ -27,6 +28,7 @@ interface HeaderProps {
 }
 
 export function Header({ onRecordOpportunity }: HeaderProps = {}) {
+  const FIRST_VISIT_GOOGLE_PROMPT_KEY = 'stockscope_first_visit_google_prompt_v1'
   const t = useTranslations('header')
   const tOpp = useTranslations('opportunity.recorder')
   const { user, logout } = useAuth()
@@ -34,6 +36,7 @@ export function Header({ onRecordOpportunity }: HeaderProps = {}) {
   const pathname = usePathname()
   const [showLoginDialog, setShowLoginDialog] = useState(false)
   const [showSignupDialog, setShowSignupDialog] = useState(false)
+  const [showGooglePrompt, setShowGooglePrompt] = useState(false)
   const [mounted, setMounted] = useState(false)
   const navItems = [
     { href: "/", label: t('home') },
@@ -57,6 +60,21 @@ export function Header({ onRecordOpportunity }: HeaderProps = {}) {
       window.history.replaceState({}, '', url.toString())
     }
   }, [mounted, searchParams])
+
+  // 首次访问时自动弹出登录框，引导用户使用 Google 登录
+  useEffect(() => {
+    if (!mounted || user || pathname.startsWith('/auth/callback')) {
+      return
+    }
+
+    const hasPrompted = window.localStorage.getItem(FIRST_VISIT_GOOGLE_PROMPT_KEY)
+    if (hasPrompted) {
+      return
+    }
+
+    setShowGooglePrompt(true)
+    window.localStorage.setItem(FIRST_VISIT_GOOGLE_PROMPT_KEY, '1')
+  }, [FIRST_VISIT_GOOGLE_PROMPT_KEY, mounted, pathname, user])
 
   // 监听自定义事件，打开登录对话框
   useEffect(() => {
@@ -205,6 +223,10 @@ export function Header({ onRecordOpportunity }: HeaderProps = {}) {
         open={showLoginDialog}
         onOpenChange={setShowLoginDialog}
         onSwitchToSignup={() => setShowSignupDialog(true)}
+      />
+      <GoogleLoginPrompt
+        open={showGooglePrompt}
+        onClose={() => setShowGooglePrompt(false)}
       />
       <SignupDialog
         open={showSignupDialog}

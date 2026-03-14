@@ -18,6 +18,7 @@ interface AuthContextType {
   session: Session | null
   isLoading: boolean
   login: (email: string, password: string) => Promise<void>
+  loginWithGoogle: (redirectPath?: string) => Promise<void>
   signup: (email: string, password: string) => Promise<{ needsEmailVerification: boolean }>
   logout: () => Promise<void>
 }
@@ -79,6 +80,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }
 
+  const loginWithGoogle = async (redirectPath?: string) => {
+    const currentPath =
+      redirectPath ||
+      `${window.location.pathname}${window.location.search}${window.location.hash}`
+    const callbackUrl = new URL(`${window.location.origin}/auth/callback`)
+    callbackUrl.searchParams.set('redirectTo', currentPath)
+
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: callbackUrl.toString(),
+        queryParams: {
+          access_type: 'offline',
+          prompt: 'select_account',
+        },
+      },
+    })
+
+    if (error) {
+      throw new Error(error.message || 'Google 登录失败')
+    }
+  }
+
   const signup = async (email: string, password: string) => {
     const { data, error } = await supabase.auth.signUp({
       email,
@@ -124,7 +148,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <AuthContext.Provider value={{ user, session, isLoading, login, signup, logout }}>
+    <AuthContext.Provider value={{ user, session, isLoading, login, loginWithGoogle, signup, logout }}>
       {children}
     </AuthContext.Provider>
   )
