@@ -1,6 +1,7 @@
 import logging
 import threading
 import time
+import socket
 
 from futu import *
 from datetime import date
@@ -31,12 +32,66 @@ plate_code_name = {
 _quote_ctx = None
 _quote_ctx_lock = threading.Lock()
 _quote_ctx_created_at = 0.0
+_quote_ctx_unavailable_until = 0.0
+_quote_ctx_unavailable_reason = ''
 _subscription_lock = threading.Lock()
 _active_subscriptions: Dict[Tuple[str, SubType], float] = {}
 
 
 def _sub_key(code: str, sub_type: SubType) -> Tuple[str, SubType]:
     return code, sub_type
+
+
+def _get_futu_connect_timeout_sec() -> float:
+    """
+    富途端口可达性探测超时，默认 0.3 秒，避免阻塞业务接口。
+    """
+    try:
+        timeout = float(os.getenv('FUTU_CONNECT_TIMEOUT_SEC', '0.3'))
+        return max(0.05, timeout)
+    except Exception:
+        return 0.3
+
+
+def _get_futu_connect_fail_cooldown_sec() -> float:
+    """
+    富途连接失败后的冷却时间（秒），冷却期内直接快速失败。
+    """
+    try:
+        cooldown = float(os.getenv('FUTU_CONNECT_FAIL_COOLDOWN_SEC', '15'))
+        return max(0.0, cooldown)
+    except Exception:
+        return 15.0
+
+
+def _probe_futu_gateway(host: str, port: int, timeout_sec: float) -> Tuple[bool, str]:
+    """
+    先做 TCP 可达性探测，避免 OpenQuoteContext 在不可达场景中长期阻塞。
+    """
+    try:
+        with socket.create_connection((host, port), timeout=timeout_sec):
+            return True, ''
+    except socket.timeout:
+        return False, f"connect timeout after {timeout_sec:.2f}s"
+    except OSError as exc:
+        return False, str(exc)
+    except Exception as exc:
+        return False, str(exc)
+
+
+def _build_price_fallback(code: str) -> Dict:
+    return {
+        'code': code,
+        'name': '',
+        'current_price': None,
+        'change_ratio': None,
+        'volume': 0,
+        'amount': 0,
+        'open_price': None,
+        'high_price': None,
+        'low_price': None,
+        'prev_close_price': None
+    }
 
 
 def _get_subscription_limit() -> int:
@@ -132,11 +187,15 @@ def get_quote_context() -> OpenQuoteContext:
     获取共享的富途行情上下文（惰性创建，全局复用）。
     连接断开时自动重建；连接存活过久时轮换重建，避免状态长期累积。
     """
-    global _quote_ctx, _quote_ctx_created_at
+    global _quote_ctx, _quote_ctx_created_at, _quote_ctx_unavailable_until, _quote_ctx_unavailable_reason
     with _quote_ctx_lock:
+        now = time.time()
+        if _quote_ctx is None and now < _quote_ctx_unavailable_until:
+            raise TimeoutError(_quote_ctx_unavailable_reason or "Futu quote service temporarily unavailable")
+
         max_age_sec = int(os.getenv('FUTU_QUOTE_CTX_MAX_AGE_SEC', '1800'))
         if _quote_ctx is not None and max_age_sec > 0:
-            alive_sec = time.time() - _quote_ctx_created_at
+            alive_sec = now - _quote_ctx_created_at
             if alive_sec >= max_age_sec:
                 try:
                     _quote_ctx.close()
@@ -151,15 +210,27 @@ def get_quote_context() -> OpenQuoteContext:
         if _quote_ctx is None:
             futu_host = os.getenv('FUTU_HOST', '127.0.0.1')
             futu_port = int(os.getenv('FUTU_PORT', '11111'))
+            connect_timeout_sec = _get_futu_connect_timeout_sec()
+            ok, reason = _probe_futu_gateway(futu_host, futu_port, connect_timeout_sec)
+            if not ok:
+                cooldown_sec = _get_futu_connect_fail_cooldown_sec()
+                _quote_ctx_unavailable_until = now + cooldown_sec
+                _quote_ctx_unavailable_reason = (
+                    f"Futu gateway unavailable ({futu_host}:{futu_port}): {reason}"
+                )
+                logger.warning(_quote_ctx_unavailable_reason)
+                raise TimeoutError(_quote_ctx_unavailable_reason)
             _quote_ctx = OpenQuoteContext(host=futu_host, port=futu_port)
             _quote_ctx_created_at = time.time()
+            _quote_ctx_unavailable_until = 0.0
+            _quote_ctx_unavailable_reason = ''
             logger.info(f"FutuQuoteContext created: {futu_host}:{futu_port}")
         return _quote_ctx
 
 
 def _reset_quote_context():
     """连接异常时重置上下文，下次调用 get_quote_context 会重建"""
-    global _quote_ctx, _quote_ctx_created_at, _active_subscriptions
+    global _quote_ctx, _quote_ctx_created_at, _active_subscriptions, _quote_ctx_unavailable_until, _quote_ctx_unavailable_reason
     with _quote_ctx_lock:
         if _quote_ctx is not None:
             try:
@@ -169,6 +240,8 @@ def _reset_quote_context():
             _quote_ctx = None
             _quote_ctx_created_at = 0.0
             logger.info("FutuQuoteContext reset due to error")
+        _quote_ctx_unavailable_until = 0.0
+        _quote_ctx_unavailable_reason = ''
     with _subscription_lock:
         _active_subscriptions = {}
 
@@ -615,7 +688,9 @@ def get_stock_current_price(code: str, market: str) -> Dict:
             'low_price': float(row['low_price']) if pd.notna(row['low_price']) else None,
             'prev_close_price': prev_close_price
         }
-        
+    except TimeoutError as e:
+        logger.warning(f"获取股票 {code} 实时价格超时，使用降级数据: {e}")
+        return _build_price_fallback(code)
     except Exception as e:
         raise Exception(f"获取股票价格失败: {str(e)}")
 
