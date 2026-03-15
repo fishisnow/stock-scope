@@ -667,6 +667,13 @@ def get_investment_opportunities():
     """
     try:
         user = request.current_user
+        auth_error = getattr(request, 'auth_error', None)
+        if auth_error:
+            return jsonify({
+                "success": False,
+                "error": "登录状态已失效，请重新登录",
+                "code": "TOKEN_INVALID_OR_EXPIRED"
+            }), 401
         page = int(request.args.get('page', 1))
         limit = int(request.args.get('limit', 10))
         offset = (page - 1) * limit
@@ -769,6 +776,13 @@ def get_investment_opportunity(opportunity_id):
     """
     try:
         user = request.current_user
+        auth_error = getattr(request, 'auth_error', None)
+        if auth_error:
+            return jsonify({
+                "success": False,
+                "error": "登录状态已失效，请重新登录",
+                "code": "TOKEN_INVALID_OR_EXPIRED"
+            }), 401
         supabase_client = get_user_supabase_client()
         if not supabase_client:
             return jsonify({

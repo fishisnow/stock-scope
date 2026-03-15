@@ -198,6 +198,13 @@ def get_ai_briefings():
     """分页获取 AI 投资简报（发布时间倒序，最新在最前）"""
     try:
         user = request.current_user
+        auth_error = getattr(request, 'auth_error', None)
+        if auth_error:
+            return jsonify({
+                'success': False,
+                'error': '登录状态已失效，请重新登录',
+                'code': 'TOKEN_INVALID_OR_EXPIRED'
+            }), 401
         page = int(request.args.get('page', 1))
         limit = int(request.args.get('limit', 20))
         publisher = (request.args.get('publisher', '') or '').strip() or None

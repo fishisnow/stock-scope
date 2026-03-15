@@ -188,6 +188,7 @@ def optional_token(f):
     def decorated(*args, **kwargs):
         auth_header = request.headers.get('Authorization')
         request.current_user = None
+        request.auth_error = None
 
         if auth_header:
             parts = auth_header.split()
@@ -197,8 +198,14 @@ def optional_token(f):
                     user = _authenticate(token)
                     if user:
                         request.current_user = user
+                except pyjwt.ExpiredSignatureError:
+                    request.auth_error = 'token_expired'
+                except pyjwt.InvalidTokenError:
+                    request.auth_error = 'invalid_token'
                 except Exception:
-                    pass
+                    request.auth_error = 'token_verification_failed'
+            else:
+                request.auth_error = 'invalid_authorization_header'
 
         return f(*args, **kwargs)
 
@@ -295,8 +302,15 @@ def get_user_supabase_client():
     if not supabase_url or not supabase_key:
         return None
 
-    auth_header = request.headers.get('Authorization', '')
-    user_token = auth_header.replace('Bearer ', '') if auth_header else None
+    # 仅在请求已通过 token 验证（request.current_user 存在）时使用用户 token。
+    # 对于 optional_token 场景下的过期/无效 token，降级为匿名访问，避免向 Supabase 透传无效 JWT。
+    user_token = None
+    if getattr(request, 'current_user', None):
+        auth_header = request.headers.get('Authorization', '')
+        parts = auth_header.split()
+        if len(parts) == 2 and parts[0].lower() == 'bearer' and parts[1].strip():
+            user_token = parts[1].strip()
+
     token_for_header = user_token if user_token else supabase_key
     auth_value = f"Bearer {token_for_header}"
 

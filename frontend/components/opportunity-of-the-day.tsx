@@ -42,7 +42,7 @@ interface OpportunityOfTheDayProps {
 }
 
 export function OpportunityOfTheDay({ selectedOpportunity, onOpportunityChange, opportunityId, isLatest = true }: OpportunityOfTheDayProps = {}) {
-  const { session } = useAuth()
+  const { session, logout } = useAuth()
   const t = useTranslations('opportunity')
   const router = useRouter()
   const pathname = usePathname()
@@ -51,6 +51,13 @@ export function OpportunityOfTheDay({ selectedOpportunity, onOpportunityChange, 
   const [prevOpportunityId, setPrevOpportunityId] = useState<number | null>(null)
   const [nextOpportunityId, setNextOpportunityId] = useState<number | null>(null)
   const isAuthenticated = !!session?.access_token
+
+  const handleAuthExpired = async () => {
+    await logout()
+    const currentPath = pathname || '/'
+    router.push(`${currentPath}?login=true`)
+    window.dispatchEvent(new CustomEvent('openLoginDialog'))
+  }
 
   // 获取认证头（仅在已登录时添加）
   const getAuthHeaders = () => {
@@ -67,6 +74,10 @@ export function OpportunityOfTheDay({ selectedOpportunity, onOpportunityChange, 
       const response = await fetch(`${API_URL}/api/investment-opportunities?page=1&limit=1`, {
         headers: getAuthHeaders()
       })
+      if (response.status === 401) {
+        await handleAuthExpired()
+        return
+      }
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`)
       }
@@ -86,6 +97,10 @@ export function OpportunityOfTheDay({ selectedOpportunity, onOpportunityChange, 
       const response = await fetch(`${API_URL}/api/investment-opportunities/${id}`, {
         headers: getAuthHeaders()
       })
+      if (response.status === 401) {
+        await handleAuthExpired()
+        return
+      }
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`)
       }
@@ -105,6 +120,10 @@ export function OpportunityOfTheDay({ selectedOpportunity, onOpportunityChange, 
       const response = await fetch(`${API_URL}/api/investment-opportunities?page=1&limit=100`, {
         headers: getAuthHeaders()
       })
+      if (response.status === 401) {
+        await handleAuthExpired()
+        return
+      }
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`)
       }

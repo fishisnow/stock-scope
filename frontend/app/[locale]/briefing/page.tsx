@@ -45,7 +45,7 @@ function RobotAvatar() {
 export default function BriefingPage() {
   const t = useTranslations("briefing")
   const locale = useLocale()
-  const { session, user } = useAuth()
+  const { session, user, logout } = useAuth()
   const router = useRouter()
   const pathname = usePathname()
   const [records, setRecords] = useState<BriefingRecord[]>([])
@@ -71,6 +71,13 @@ export default function BriefingPage() {
           headers.Authorization = `Bearer ${session.access_token}`
         }
         const response = await fetch(`${API_URL}/api/briefings?page=${pageToLoad}&limit=${PAGE_SIZE}`, { headers })
+        if (response.status === 401) {
+          await logout()
+          const currentPath = pathname || "/"
+          router.push(`${currentPath}?login=true`)
+          window.dispatchEvent(new CustomEvent("openLoginDialog"))
+          return
+        }
         const result = await response.json()
         if (!result.success) {
           throw new Error(result.error || t("loadFailed"))
@@ -89,7 +96,7 @@ export default function BriefingPage() {
         setLoadingMore(false)
       }
     },
-    [session?.access_token, t]
+    [logout, pathname, router, session?.access_token, t]
   )
 
   useEffect(() => {

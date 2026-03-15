@@ -65,7 +65,7 @@ export function OpportunitiesDatabase({
   pageSize,
   enablePagination
 }: OpportunitiesDatabaseProps = {}) {
-  const { session, user, isLoading } = useAuth()
+  const { session, user, isLoading, logout } = useAuth()
   const t = useTranslations('opportunity')
   const tRecorder = useTranslations('opportunity.recorder')
   const router = useRouter()
@@ -106,12 +106,23 @@ export function OpportunitiesDatabase({
     return headers
   }
 
+  const handleAuthExpired = async () => {
+    await logout()
+    const currentPath = pathname || '/'
+    router.push(`${currentPath}?login=true`)
+    window.dispatchEvent(new CustomEvent('openLoginDialog'))
+  }
+
   // 加载投资机会列表（未登录用户也可以加载）
   const loadOpportunities = async () => {
     try {
       const response = await fetch(`${API_URL}/api/investment-opportunities?page=1&limit=100`, {
         headers: getAuthHeaders()
       })
+      if (response.status === 401) {
+        await handleAuthExpired()
+        return
+      }
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`)
       }
