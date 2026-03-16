@@ -5,6 +5,7 @@
 """
 
 import math
+import os
 from datetime import datetime, timedelta
 
 from flask import Blueprint, jsonify, request
@@ -36,6 +37,15 @@ def _truncate_briefing_preview(content: str, max_len: int = 120) -> str:
     if len(normalized) <= max_len:
         return normalized
     return f"{normalized[:max_len].rstrip()}..."
+
+
+def _extract_report_api_key() -> str:
+    auth = request.headers.get('Authorization', '')
+    if auth.lower().startswith('bearer '):
+        return auth[7:].strip()
+
+    key = request.headers.get('X-OpenClaw-Key', '') or request.headers.get('X-AI-Briefing-Key', '')
+    return key.strip()
 
 
 @market_data_bp.route('/api/dates')
@@ -228,6 +238,38 @@ def get_ai_briefings():
                 'has_more': False
             })
         })
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@market_data_bp.route('/api/briefings/report', methods=['POST'])
+def report_ai_briefing():
+    """供 OpenClaw Agent 上报 AI 简报"""
+    try:
+        expected_key = (os.getenv('OPENCLAW_AGENT_REPORT_KEY') or '').strip()
+        if expected_key:
+            request_key = _extract_report_api_key()
+            if request_key != expected_key:
+                return jsonify({'success': False, 'error': '未授权'}), 401
+
+        payload = request.get_json(silent=True) or {}
+        publisher = (payload.get('publisher') or '').strip()
+        content = (payload.get('content') or '').strip()
+        published_at = payload.get('published_at')
+
+        if not publisher:
+            return jsonify({'success': False, 'error': '缺少必填字段: publisher'}), 400
+        if not content:
+            return jsonify({'success': False, 'error': '缺少必填字段: content'}), 400
+
+        record = _db.create_ai_briefing(
+            publisher=publisher,
+            content=content,
+            published_at=published_at
+        )
+        return jsonify({'success': True, 'data': record}), 201
+    except ValueError as e:
+        return jsonify({'success': False, 'error': str(e)}), 400
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 

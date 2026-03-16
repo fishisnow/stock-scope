@@ -607,6 +607,42 @@ class StockDatabase:
             print(f"❌ 查询 AI 简报失败: {e}")
             raise
 
+    def create_ai_briefing(
+        self,
+        publisher: str,
+        content: str,
+        published_at: Optional[str] = None
+    ) -> Dict:
+        """
+        创建一条 AI 投资简报
+        :param publisher: 发布者（Agent 名称）
+        :param content: 简报正文
+        :param published_at: 发布时间（ISO 字符串，可选；默认当前时间）
+        :return: 新增记录
+        """
+        try:
+            publisher = (publisher or "").strip()
+            content = (content or "").strip()
+
+            if not publisher:
+                raise ValueError("publisher 不能为空")
+            if not content:
+                raise ValueError("content 不能为空")
+
+            payload = {
+                "publisher": publisher,
+                "content": content,
+                "published_at": published_at or datetime.now().isoformat()
+            }
+
+            response = self.client.table('ai_briefings').insert(payload).execute()
+            if not response.data:
+                raise RuntimeError("写入 ai_briefings 失败")
+            return response.data[0]
+        except Exception as e:
+            print(f"❌ 创建 AI 简报失败: {e}")
+            raise
+
 # 全局数据库实例
 db = StockDatabase()
 
