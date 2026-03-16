@@ -5,7 +5,7 @@
 import logging
 
 from flask import Blueprint, request, jsonify
-from app.api.auth_middleware import token_required, optional_token, get_user_supabase_client
+from app.api.auth_middleware import token_required, optional_token_reauth_on_error, get_user_supabase_client
 import os
 import sys
 from dotenv import load_dotenv
@@ -640,7 +640,7 @@ def create_investment_opportunity():
         }), 500
 
 @investment_opportunities_bp.route('', methods=['GET'])
-@optional_token
+@optional_token_reauth_on_error
 def get_investment_opportunities():
     """
     获取投资机会记录列表
@@ -667,13 +667,6 @@ def get_investment_opportunities():
     """
     try:
         user = request.current_user
-        auth_error = getattr(request, 'auth_error', None)
-        if auth_error:
-            return jsonify({
-                "success": False,
-                "error": "登录状态已失效，请重新登录",
-                "code": "TOKEN_INVALID_OR_EXPIRED"
-            }), 401
         page = int(request.args.get('page', 1))
         limit = int(request.args.get('limit', 10))
         offset = (page - 1) * limit
@@ -764,7 +757,7 @@ def get_investment_opportunities():
         }), 500
 
 @investment_opportunities_bp.route('/<int:opportunity_id>', methods=['GET'])
-@optional_token
+@optional_token_reauth_on_error
 def get_investment_opportunity(opportunity_id):
     """
     获取单条投资机会记录详情
@@ -776,13 +769,6 @@ def get_investment_opportunity(opportunity_id):
     """
     try:
         user = request.current_user
-        auth_error = getattr(request, 'auth_error', None)
-        if auth_error:
-            return jsonify({
-                "success": False,
-                "error": "登录状态已失效，请重新登录",
-                "code": "TOKEN_INVALID_OR_EXPIRED"
-            }), 401
         supabase_client = get_user_supabase_client()
         if not supabase_client:
             return jsonify({

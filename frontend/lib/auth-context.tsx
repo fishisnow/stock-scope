@@ -1,8 +1,8 @@
 "use client"
 
-import React, { createContext, useContext, useState, useEffect } from 'react'
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react'
 import { supabase } from './supabase'
-import type { User as SupabaseUser, AuthError, Session } from '@supabase/supabase-js'
+import type { User as SupabaseUser, Session } from '@supabase/supabase-js'
 
 export interface User {
   id: string
@@ -21,6 +21,7 @@ interface AuthContextType {
   loginWithGoogle: (redirectPath?: string) => Promise<void>
   signup: (email: string, password: string) => Promise<{ needsEmailVerification: boolean }>
   logout: () => Promise<void>
+  authenticatedFetch: (url: string, options?: RequestInit) => Promise<Response>
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
@@ -29,6 +30,51 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [session, setSession] = useState<Session | null>(null)
   const [isLoading, setIsLoading] = useState(true)
+
+  const mapSupabaseUser = (supabaseUser: SupabaseUser): User => {
+    return {
+      id: supabaseUser.id,
+      email: supabaseUser.email || '',
+      user_metadata: supabaseUser.user_metadata
+    }
+  }
+
+  const authenticatedFetch = useCallback(async (url: string, options: RequestInit = {}) => {
+    // 请求前读取最新 session，优先使用刷新后的 token
+    let effectiveSession = session
+    try {
+      const { data: { session: freshSession } } = await supabase.auth.getSession()
+      effectiveSession = freshSession
+      if (freshSession?.access_token !== session?.access_token) {
+        setSession(freshSession)
+        setUser(freshSession?.user ? mapSupabaseUser(freshSession.user) : null)
+      }
+    } catch (error) {
+      console.warn('Failed to refresh session:', error)
+    }
+
+    const headers = new Headers(options.headers || {})
+
+    if (effectiveSession?.access_token) {
+      headers.set('Authorization', `Bearer ${effectiveSession.access_token}`)
+    }
+
+    const response = await fetch(url, { ...options, headers })
+
+    // 统一处理登录态失效
+    if (response.status === 401) {
+      setSession(null)
+      setUser(null)
+      window.dispatchEvent(new CustomEvent('openLoginDialog'))
+      const currentPath = window.location.pathname
+      window.history.replaceState({}, '', `${currentPath}?login=true`)
+      const authError = new Error('AUTH_EXPIRED')
+      authError.name = 'AuthExpiredError'
+      throw authError
+    }
+
+    return response
+  }, [session])
 
   useEffect(() => {
     // 检查当前会话
@@ -56,14 +102,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       subscription.unsubscribe()
     }
   }, [])
-
-  const mapSupabaseUser = (supabaseUser: SupabaseUser): User => {
-    return {
-      id: supabaseUser.id,
-      email: supabaseUser.email || '',
-      user_metadata: supabaseUser.user_metadata
-    }
-  }
 
   const login = async (email: string, password: string) => {
     const { data, error } = await supabase.auth.signInWithPassword({
@@ -145,10 +183,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       console.error('Logout error:', error)
     }
     setUser(null)
+    setSession(null)
   }
 
   return (
-    <AuthContext.Provider value={{ user, session, isLoading, login, loginWithGoogle, signup, logout }}>
+    <AuthContext.Provider value={{ user, session, isLoading, login, loginWithGoogle, signup, logout, authenticatedFetch }}>
       {children}
     </AuthContext.Provider>
   )

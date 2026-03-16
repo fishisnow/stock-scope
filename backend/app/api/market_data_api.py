@@ -9,7 +9,7 @@ from datetime import datetime, timedelta
 
 from flask import Blueprint, jsonify, request
 
-from app.api.auth_middleware import optional_token
+from app.api.auth_middleware import optional_token_reauth_on_error
 from app.utils.futu_data import get_market_snapshots_by_futu_codes
 
 market_data_bp = Blueprint('market_data', __name__)
@@ -193,18 +193,11 @@ def get_industry_stocks():
 
 
 @market_data_bp.route('/api/briefings')
-@optional_token
+@optional_token_reauth_on_error
 def get_ai_briefings():
     """分页获取 AI 投资简报（发布时间倒序，最新在最前）"""
     try:
         user = request.current_user
-        auth_error = getattr(request, 'auth_error', None)
-        if auth_error:
-            return jsonify({
-                'success': False,
-                'error': '登录状态已失效，请重新登录',
-                'code': 'TOKEN_INVALID_OR_EXPIRED'
-            }), 401
         page = int(request.args.get('page', 1))
         limit = int(request.args.get('limit', 20))
         publisher = (request.args.get('publisher', '') or '').strip() or None

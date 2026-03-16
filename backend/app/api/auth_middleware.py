@@ -178,7 +178,7 @@ def token_required(f):
     return decorated
 
 
-def optional_token(f):
+def optional_token_allow_guest(f):
     """
     装饰器：可选的 token 验证
     如果提供了有效 token，则设置 request.current_user
@@ -186,31 +186,65 @@ def optional_token(f):
     """
     @wraps(f)
     def decorated(*args, **kwargs):
-        auth_header = request.headers.get('Authorization')
-        request.current_user = None
-        request.auth_error = None
-
-        if auth_header:
-            parts = auth_header.split()
-            if len(parts) == 2 and parts[0].lower() == 'bearer':
-                token = parts[1]
-                try:
-                    user = _authenticate(token)
-                    if user:
-                        request.current_user = user
-                except pyjwt.ExpiredSignatureError:
-                    request.auth_error = 'token_expired'
-                except pyjwt.InvalidTokenError:
-                    request.auth_error = 'invalid_token'
-                except Exception:
-                    request.auth_error = 'token_verification_failed'
-            else:
-                request.auth_error = 'invalid_authorization_header'
+        _apply_optional_auth()
 
         return f(*args, **kwargs)
 
     return decorated
 
+
+def _apply_optional_auth():
+    """
+    统一执行可选 token 鉴权逻辑，并在 request 上写入：
+    - request.current_user: 成功鉴权后的用户信息或 None
+    - request.auth_error: 鉴权失败原因或 None
+    """
+    auth_header = request.headers.get('Authorization')
+    request.current_user = None
+    request.auth_error = None
+
+    if not auth_header:
+        return
+
+    parts = auth_header.split()
+    if len(parts) != 2 or parts[0].lower() != 'bearer':
+        request.auth_error = 'invalid_authorization_header'
+        return
+
+    token = parts[1]
+    try:
+        user = _authenticate(token)
+        if user:
+            request.current_user = user
+        else:
+            request.auth_error = 'invalid_token'
+    except pyjwt.ExpiredSignatureError:
+        request.auth_error = 'token_expired'
+    except pyjwt.InvalidTokenError:
+        request.auth_error = 'invalid_token'
+    except Exception:
+        request.auth_error = 'token_verification_failed'
+
+
+def optional_token_reauth_on_error(f):
+    """
+    切面装饰器：
+    - 无 token：按匿名用户继续
+    - token 有效：按登录用户继续
+    - token 无效/过期：统一返回 401，提示前端重新登录
+    """
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        _apply_optional_auth()
+        if getattr(request, 'auth_error', None):
+            return jsonify({
+                'success': False,
+                'error': '登录状态已失效，请重新登录',
+                'code': 'TOKEN_INVALID_OR_EXPIRED'
+            }), 401
+        return f(*args, **kwargs)
+
+    return decorated
 
 # ============================================
 # 连接韧性：自动重试 HTTP/2 瞬时断连
@@ -303,7 +337,8 @@ def get_user_supabase_client():
         return None
 
     # 仅在请求已通过 token 验证（request.current_user 存在）时使用用户 token。
-    # 对于 optional_token 场景下的过期/无效 token，降级为匿名访问，避免向 Supabase 透传无效 JWT。
+    # 对于可选鉴权（optional_token_allow_guest）场景下的过期/无效 token，
+    # 降级为匿名访问，避免向 Supabase 透传无效 JWT。
     user_token = None
     if getattr(request, 'current_user', None):
         auth_header = request.headers.get('Authorization', '')

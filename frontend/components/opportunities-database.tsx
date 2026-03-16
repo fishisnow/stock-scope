@@ -65,7 +65,7 @@ export function OpportunitiesDatabase({
   pageSize,
   enablePagination
 }: OpportunitiesDatabaseProps = {}) {
-  const { session, user, isLoading, logout } = useAuth()
+  const { session, user, isLoading, authenticatedFetch } = useAuth()
   const t = useTranslations('opportunity')
   const tRecorder = useTranslations('opportunity.recorder')
   const router = useRouter()
@@ -97,32 +97,12 @@ export function OpportunitiesDatabase({
     setMounted(true)
   }, [])
 
-  // 获取认证头（仅在已登录时添加）
-  const getAuthHeaders = () => {
-    const headers: Record<string, string> = {}
-    if (session?.access_token) {
-      headers['Authorization'] = `Bearer ${session.access_token}`
-    }
-    return headers
-  }
 
-  const handleAuthExpired = async () => {
-    await logout()
-    const currentPath = pathname || '/'
-    router.push(`${currentPath}?login=true`)
-    window.dispatchEvent(new CustomEvent('openLoginDialog'))
-  }
 
   // 加载投资机会列表（未登录用户也可以加载）
   const loadOpportunities = async () => {
     try {
-      const response = await fetch(`${API_URL}/api/investment-opportunities?page=1&limit=100`, {
-        headers: getAuthHeaders()
-      })
-      if (response.status === 401) {
-        await handleAuthExpired()
-        return
-      }
+      const response = await authenticatedFetch(`${API_URL}/api/investment-opportunities?page=1&limit=100`)
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`)
       }
@@ -151,9 +131,8 @@ export function OpportunitiesDatabase({
     if (!confirm(t('confirmDelete'))) return
 
     try {
-      const response = await fetch(`${API_URL}/api/investment-opportunities/${id}`, {
+      const response = await authenticatedFetch(`${API_URL}/api/investment-opportunities/${id}`, {
         method: 'DELETE',
-        headers: getAuthHeaders()
       })
 
       const result = await response.json()

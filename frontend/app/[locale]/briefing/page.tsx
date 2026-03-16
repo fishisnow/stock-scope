@@ -45,7 +45,7 @@ function RobotAvatar() {
 export default function BriefingPage() {
   const t = useTranslations("briefing")
   const locale = useLocale()
-  const { session, user, logout } = useAuth()
+  const { user, authenticatedFetch } = useAuth()
   const router = useRouter()
   const pathname = usePathname()
   const [records, setRecords] = useState<BriefingRecord[]>([])
@@ -66,18 +66,7 @@ export default function BriefingPage() {
       }
 
       try {
-        const headers: Record<string, string> = {}
-        if (session?.access_token) {
-          headers.Authorization = `Bearer ${session.access_token}`
-        }
-        const response = await fetch(`${API_URL}/api/briefings?page=${pageToLoad}&limit=${PAGE_SIZE}`, { headers })
-        if (response.status === 401) {
-          await logout()
-          const currentPath = pathname || "/"
-          router.push(`${currentPath}?login=true`)
-          window.dispatchEvent(new CustomEvent("openLoginDialog"))
-          return
-        }
+        const response = await authenticatedFetch(`${API_URL}/api/briefings?page=${pageToLoad}&limit=${PAGE_SIZE}`)
         const result = await response.json()
         if (!result.success) {
           throw new Error(result.error || t("loadFailed"))
@@ -90,13 +79,16 @@ export default function BriefingPage() {
         nextPageRef.current = pageToLoad + 1
         setError(null)
       } catch (err) {
+        if ((err as Error).name === 'AuthExpiredError') {
+          return
+        }
         setError((err as Error).message || t("loadFailed"))
       } finally {
         setLoading(false)
         setLoadingMore(false)
       }
     },
-    [logout, pathname, router, session?.access_token, t]
+    [authenticatedFetch, t]
   )
 
   useEffect(() => {

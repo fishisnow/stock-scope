@@ -42,7 +42,7 @@ interface OpportunityOfTheDayProps {
 }
 
 export function OpportunityOfTheDay({ selectedOpportunity, onOpportunityChange, opportunityId, isLatest = true }: OpportunityOfTheDayProps = {}) {
-  const { session, logout } = useAuth()
+  const { session, authenticatedFetch } = useAuth()
   const t = useTranslations('opportunity')
   const router = useRouter()
   const pathname = usePathname()
@@ -52,32 +52,12 @@ export function OpportunityOfTheDay({ selectedOpportunity, onOpportunityChange, 
   const [nextOpportunityId, setNextOpportunityId] = useState<number | null>(null)
   const isAuthenticated = !!session?.access_token
 
-  const handleAuthExpired = async () => {
-    await logout()
-    const currentPath = pathname || '/'
-    router.push(`${currentPath}?login=true`)
-    window.dispatchEvent(new CustomEvent('openLoginDialog'))
-  }
 
-  // 获取认证头（仅在已登录时添加）
-  const getAuthHeaders = () => {
-    const headers: Record<string, string> = {}
-    if (session?.access_token) {
-      headers['Authorization'] = `Bearer ${session.access_token}`
-    }
-    return headers
-  }
 
   // 加载最新的投资机会（未登录用户也可以加载）
   const loadLatestOpportunity = async () => {
     try {
-      const response = await fetch(`${API_URL}/api/investment-opportunities?page=1&limit=1`, {
-        headers: getAuthHeaders()
-      })
-      if (response.status === 401) {
-        await handleAuthExpired()
-        return
-      }
+      const response = await authenticatedFetch(`${API_URL}/api/investment-opportunities?page=1&limit=1`)
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`)
       }
@@ -94,13 +74,7 @@ export function OpportunityOfTheDay({ selectedOpportunity, onOpportunityChange, 
 
   const loadOpportunityById = async (id: number | string) => {
     try {
-      const response = await fetch(`${API_URL}/api/investment-opportunities/${id}`, {
-        headers: getAuthHeaders()
-      })
-      if (response.status === 401) {
-        await handleAuthExpired()
-        return
-      }
+      const response = await authenticatedFetch(`${API_URL}/api/investment-opportunities/${id}`)
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`)
       }
@@ -117,13 +91,7 @@ export function OpportunityOfTheDay({ selectedOpportunity, onOpportunityChange, 
 
   const loadAdjacentOpportunities = async (id: number | string) => {
     try {
-      const response = await fetch(`${API_URL}/api/investment-opportunities?page=1&limit=100`, {
-        headers: getAuthHeaders()
-      })
-      if (response.status === 401) {
-        await handleAuthExpired()
-        return
-      }
+      const response = await authenticatedFetch(`${API_URL}/api/investment-opportunities?page=1&limit=100`)
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`)
       }
