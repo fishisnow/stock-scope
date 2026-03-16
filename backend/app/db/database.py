@@ -15,6 +15,10 @@ class StockDatabase:
         """初始化Supabase客户端"""
         self.supabase_url = os.getenv('SUPABASE_URL')
         self.supabase_key = os.getenv('SUPABASE_KEY')
+        self.supabase_service_role_key = (
+            os.getenv('SUPABASE_SERVICE_ROLE_KEY') or os.getenv('SUPABASE_SECRET_KEY')
+        )
+        self._service_role_client: Optional[Client] = None
         
         if not self.supabase_url or not self.supabase_key:
             raise ValueError("请在.env文件中配置SUPABASE_URL和SUPABASE_KEY")
@@ -22,6 +26,18 @@ class StockDatabase:
         self.client: Client = create_client(self.supabase_url, self.supabase_key)
         self.trading_date_utils = TradingDateUtils()
         print("✅ Supabase客户端初始化成功")
+
+    def _get_service_role_client(self) -> Client:
+        """按需初始化 service role 客户端，仅用于服务端受控写入。"""
+        if not self.supabase_service_role_key:
+            raise ValueError("请在.env中配置 SUPABASE_SERVICE_ROLE_KEY（或 SUPABASE_SECRET_KEY）")
+
+        if self._service_role_client is None:
+            self._service_role_client = create_client(
+                self.supabase_url,
+                self.supabase_service_role_key
+            )
+        return self._service_role_client
     
     def save_stock_data(self, data_source: str, market: str, data: Dict[str, List[Dict]]):
         """
@@ -635,7 +651,9 @@ class StockDatabase:
                 "published_at": published_at or datetime.now().isoformat()
             }
 
-            response = self.client.table('ai_briefings').insert(payload).execute()
+            # 该写入路径使用 service role，避免放开 anon/authenticated 的 INSERT policy。
+            service_client = self._get_service_role_client()
+            response = service_client.table('ai_briefings').insert(payload).execute()
             if not response.data:
                 raise RuntimeError("写入 ai_briefings 失败")
             return response.data[0]
