@@ -5,7 +5,12 @@
 import logging
 
 from flask import Blueprint, request, jsonify
-from app.api.auth_middleware import token_required, optional_token_reauth_on_error, get_user_supabase_client
+from app.api.auth_middleware import (
+    token_required,
+    optional_token_reauth_on_error,
+    get_user_supabase_client,
+    raise_if_auth_exception,
+)
 import os
 import sys
 from dotenv import load_dotenv
@@ -634,6 +639,7 @@ def create_investment_opportunity():
             "error": f"数据格式错误: {str(e)}"
         }), 400
     except Exception as e:
+        raise_if_auth_exception(e)
         return jsonify({
             "success": False,
             "error": f"创建投资机会记录失败: {str(e)}"
@@ -751,6 +757,7 @@ def get_investment_opportunities():
         })
 
     except Exception as e:
+        raise_if_auth_exception(e)
         return jsonify({
             "success": False,
             "error": f"获取投资机会记录失败: {str(e)}"
@@ -821,6 +828,7 @@ def get_investment_opportunity(opportunity_id):
         })
 
     except Exception as e:
+        raise_if_auth_exception(e)
         return jsonify({
             "success": False,
             "error": f"获取投资机会记录失败: {str(e)}"

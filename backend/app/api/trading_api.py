@@ -5,7 +5,7 @@
 """
 
 from flask import Blueprint, request, jsonify
-from app.api.auth_middleware import token_required, get_user_supabase_client
+from app.api.auth_middleware import token_required, get_user_supabase_client, raise_if_auth_exception
 from decimal import Decimal
 import pandas as pd
 from io import BytesIO
@@ -256,6 +256,7 @@ def upload_trading_records():
         
     except Exception as e:
         print(f"❌ 上传交易记录失败: {e}")
+        raise_if_auth_exception(e)
         return jsonify({
             'success': False,
             'error': f'上传失败: {str(e)}'
@@ -298,6 +299,7 @@ def get_trading_records():
             
     except Exception as e:
         print(f"❌ 获取交易记录失败: {e}")
+        raise_if_auth_exception(e)
         return jsonify({
             'success': False,
             'error': str(e)
@@ -476,6 +478,7 @@ def get_trading_summary():
         
     except Exception as e:
         print(f"❌ 获取交易汇总失败: {e}")
+        raise_if_auth_exception(e)
         return jsonify({
             'success': False,
             'error': str(e)
@@ -513,6 +516,7 @@ def get_stock_trades(stock_code):
         
     except Exception as e:
         print(f"❌ 获取股票交易记录失败: {e}")
+        raise_if_auth_exception(e)
         return jsonify({
             'success': False,
             'error': str(e)
@@ -546,6 +550,7 @@ def clear_trading_records():
         
     except Exception as e:
         print(f"❌ 清空交易记录失败: {e}")
+        raise_if_auth_exception(e)
         return jsonify({
             'success': False,
             'error': str(e)

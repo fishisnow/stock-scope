@@ -14,16 +14,82 @@ from functools import wraps
 import jwt as pyjwt
 from jwt import PyJWK
 from flask import request, jsonify
+from postgrest.exceptions import APIError as PostgrestAPIError
 from supabase import create_client
 
 from app.db.database import db as stock_db
 
 logger = logging.getLogger(__name__)
 
+_AUTH_ERROR_MESSAGE = '登录状态已失效，请重新登录'
+_AUTH_ERROR_CODE = 'TOKEN_INVALID_OR_EXPIRED'
+_AUTH_ERROR_MARKERS = (
+    'pgrst303',
+    'jwt expired',
+    'invalid jwt',
+    'invalid token',
+    'token has expired',
+    'expired token',
+)
 
-# ============================================
-# httpx 请求耗时日志 hook
-# ============================================
+
+class AuthSessionExpiredError(Exception):
+    """Raised when Supabase/PostgREST rejects the current bearer token."""
+
+
+
+def _auth_error_response():
+    return jsonify({
+        'success': False,
+        'error': _AUTH_ERROR_MESSAGE,
+        'code': _AUTH_ERROR_CODE,
+    }), 401
+
+
+
+def _raise_auth_session_expired(exc: Exception):
+    raise AuthSessionExpiredError(str(exc)) from exc
+
+
+
+def is_auth_session_error(exc: Exception) -> bool:
+    if isinstance(exc, (AuthSessionExpiredError, pyjwt.ExpiredSignatureError, pyjwt.InvalidTokenError)):
+        return True
+
+    if isinstance(exc, PostgrestAPIError):
+        code = str(getattr(exc, 'code', '') or '').strip().lower()
+        message = str(getattr(exc, 'message', '') or exc).strip().lower()
+        details = str(getattr(exc, 'details', '') or '').strip().lower()
+        hint = str(getattr(exc, 'hint', '') or '').strip().lower()
+        haystack = ' '.join(part for part in (code, message, details, hint) if part)
+        return any(marker in haystack for marker in _AUTH_ERROR_MARKERS)
+
+    message = str(exc).strip().lower()
+    return any(marker in message for marker in _AUTH_ERROR_MARKERS)
+
+
+
+def maybe_raise_auth_session_error(exc: Exception):
+    if is_auth_session_error(exc):
+        _raise_auth_session_expired(exc)
+
+
+
+def normalize_auth_exception_response(exc: Exception):
+    if not is_auth_session_error(exc):
+        return None
+
+    logger.warning(f"Normalized auth error response: {exc}")
+    return _auth_error_response()
+
+
+
+def raise_if_auth_exception(exc: Exception):
+    if is_auth_session_error(exc):
+        logger.warning(f"Promoting auth exception to global handler: {exc}")
+        _raise_auth_session_expired(exc)
+
+
 
 def _on_httpx_request(req):
     req.extensions['_timing_start'] = time.time()
@@ -161,18 +227,22 @@ def token_required(f):
         try:
             user = _authenticate(token)
             if not user:
-                return jsonify({'success': False, 'error': '无效或过期的令牌'}), 401
+                return _auth_error_response()
 
             request.current_user = user
             return f(*args, **kwargs)
 
-        except pyjwt.ExpiredSignatureError:
-            return jsonify({'success': False, 'error': '令牌已过期'}), 401
+        except pyjwt.ExpiredSignatureError as e:
+            logger.warning(f"JWT expired: {e}")
+            return _auth_error_response()
         except pyjwt.InvalidTokenError as e:
             logger.warning(f"JWT validation failed: {e}")
-            return jsonify({'success': False, 'error': '令牌验证失败'}), 401
+            return _auth_error_response()
         except Exception as e:
             logger.error(f"Token verification error: {e}")
+            auth_response = normalize_auth_exception_response(e)
+            if auth_response is not None:
+                return auth_response
             return jsonify({'success': False, 'error': '令牌验证失败'}), 401
 
     return decorated
@@ -237,11 +307,7 @@ def optional_token_reauth_on_error(f):
     def decorated(*args, **kwargs):
         _apply_optional_auth()
         if getattr(request, 'auth_error', None):
-            return jsonify({
-                'success': False,
-                'error': '登录状态已失效，请重新登录',
-                'code': 'TOKEN_INVALID_OR_EXPIRED'
-            }), 401
+            return _auth_error_response()
         return f(*args, **kwargs)
 
     return decorated

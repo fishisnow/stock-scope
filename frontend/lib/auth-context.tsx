@@ -40,37 +40,59 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   const authenticatedFetch = useCallback(async (url: string, options: RequestInit = {}) => {
-    // 请求前读取最新 session，优先使用刷新后的 token
+    const fetchWithSession = async (activeSession: Session | null) => {
+      const headers = new Headers(options.headers || {})
+      if (activeSession?.access_token) {
+        headers.set('Authorization', `Bearer ${activeSession.access_token}`)
+      }
+      return fetch(url, { ...options, headers })
+    }
+
+    const handleExpiredSession = async () => {
+      await supabase.auth.signOut()
+      setSession(null)
+      setUser(null)
+      window.dispatchEvent(new CustomEvent('openLoginDialog'))
+      const url = new URL(window.location.href)
+      url.searchParams.set('login', 'true')
+      window.history.replaceState({}, '', url.toString())
+      const authError = new Error('AUTH_EXPIRED')
+      authError.name = 'AuthExpiredError'
+      throw authError
+    }
+
     let effectiveSession = session
     try {
-      const { data: { session: freshSession } } = await supabase.auth.getSession()
-      effectiveSession = freshSession
-      if (freshSession?.access_token !== session?.access_token) {
-        setSession(freshSession)
-        setUser(freshSession?.user ? mapSupabaseUser(freshSession.user) : null)
+      const { data, error } = await supabase.auth.getSession()
+      if (error) {
+        console.warn('Failed to get session:', error)
+      }
+      effectiveSession = data.session
+      if (data.session?.access_token !== session?.access_token) {
+        setSession(data.session)
+        setUser(data.session?.user ? mapSupabaseUser(data.session.user) : null)
       }
     } catch (error) {
       console.warn('Failed to refresh session:', error)
     }
 
-    const headers = new Headers(options.headers || {})
+    let response = await fetchWithSession(effectiveSession)
 
-    if (effectiveSession?.access_token) {
-      headers.set('Authorization', `Bearer ${effectiveSession.access_token}`)
+    if (response.status === 401 && effectiveSession?.refresh_token) {
+      const { data, error } = await supabase.auth.refreshSession({
+        refresh_token: effectiveSession.refresh_token,
+      })
+
+      if (!error && data.session?.access_token) {
+        effectiveSession = data.session
+        setSession(data.session)
+        setUser(data.session.user ? mapSupabaseUser(data.session.user) : null)
+        response = await fetchWithSession(data.session)
+      }
     }
 
-    const response = await fetch(url, { ...options, headers })
-
-    // 统一处理登录态失效
     if (response.status === 401) {
-      setSession(null)
-      setUser(null)
-      window.dispatchEvent(new CustomEvent('openLoginDialog'))
-      const currentPath = window.location.pathname
-      window.history.replaceState({}, '', `${currentPath}?login=true`)
-      const authError = new Error('AUTH_EXPIRED')
-      authError.name = 'AuthExpiredError'
-      throw authError
+      await handleExpiredSession()
     }
 
     return response

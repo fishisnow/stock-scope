@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm run:*)",
+      "Bash(python3 -m py_compile backend/app/api/auth_middleware.py backend/app/api/api_app.py backend/app/api/stock_analysis_api.py backend/app/api/market_data_api.py backend/app/api/trading_api.py)"
+    ]
+  }
+}

@@ -111,9 +111,15 @@ export function OpportunitiesDatabase({
         setOpportunities(result.data)
       } else {
         console.error('API返回错误:', result.error)
+        setOpportunities([])
       }
     } catch (error) {
+      if ((error as Error).name === 'AuthExpiredError') {
+        setOpportunities([])
+        return
+      }
       console.error('加载投资机会失败:', error)
+      setOpportunities([])
     }
   }
 

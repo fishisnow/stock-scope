@@ -64,9 +64,14 @@ export function OpportunityOfTheDay({ selectedOpportunity, onOpportunityChange, 
       const result = await response.json()
       if (result.success && result.data && result.data.length > 0) {
         setOpportunity(result.data[0])
+      } else {
+        setOpportunity(null)
       }
     } catch (error) {
-      console.error('加载投资机会失败:', error)
+      if ((error as Error).name !== 'AuthExpiredError') {
+        console.error('加载投资机会失败:', error)
+      }
+      setOpportunity(null)
     } finally {
       setLoading(false)
     }
@@ -81,9 +86,14 @@ export function OpportunityOfTheDay({ selectedOpportunity, onOpportunityChange, 
       const result = await response.json()
       if (result.success && result.data) {
         setOpportunity(result.data)
+      } else {
+        setOpportunity(null)
       }
     } catch (error) {
-      console.error('加载投资机会失败:', error)
+      if ((error as Error).name !== 'AuthExpiredError') {
+        console.error('加载投资机会失败:', error)
+      }
+      setOpportunity(null)
     } finally {
       setLoading(false)
     }
@@ -114,7 +124,9 @@ export function OpportunityOfTheDay({ selectedOpportunity, onOpportunityChange, 
       setPrevOpportunityId(prevItem?.id ?? null)
       setNextOpportunityId(nextItem?.id ?? null)
     } catch (error) {
-      console.error('加载相邻投资机会失败:', error)
+      if ((error as Error).name !== 'AuthExpiredError') {
+        console.error('加载相邻投资机会失败:', error)
+      }
       setPrevOpportunityId(null)
       setNextOpportunityId(null)
     }

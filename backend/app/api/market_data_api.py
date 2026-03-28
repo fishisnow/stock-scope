@@ -10,7 +10,7 @@ from datetime import datetime, timedelta
 
 from flask import Blueprint, jsonify, request
 
-from app.api.auth_middleware import optional_token_reauth_on_error
+from app.api.auth_middleware import optional_token_reauth_on_error, raise_if_auth_exception
 from app.utils.futu_data import get_market_snapshots_by_futu_codes
 
 market_data_bp = Blueprint('market_data', __name__)
@@ -239,6 +239,7 @@ def get_ai_briefings():
             })
         })
     except Exception as e:
+        raise_if_auth_exception(e)
         return jsonify({'success': False, 'error': str(e)}), 500
 
 

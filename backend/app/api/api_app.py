@@ -6,7 +6,12 @@ import time
 from flask import Flask, g, request
 from flask_cors import CORS
 
-from app.api.auth_middleware import add_httpx_timing_hooks, make_session_robust
+from app.api.auth_middleware import (
+    AuthSessionExpiredError,
+    add_httpx_timing_hooks,
+    make_session_robust,
+    normalize_auth_exception_response,
+)
 from app.api.market_data_api import register_market_data_api
 from app.api.stock_analysis_api import register_investment_opportunities_api, register_stock_analysis_api
 from app.api.trading_api import trading_bp
@@ -44,6 +49,14 @@ def _log_request(response):
     elapsed = time.time() - g.start_time
     logger.info(f"{request.method} {request.full_path.rstrip('?')} -> {response.status_code} ({elapsed:.3f}s)")
     return response
+
+
+@app.errorhandler(AuthSessionExpiredError)
+def _handle_auth_session_expired(error):
+    response = normalize_auth_exception_response(error)
+    if response is not None:
+        return response
+    return error
 
 
 # 注册业务蓝图
