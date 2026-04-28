@@ -10,7 +10,7 @@ requests
 supabase
 PyJWT>=2.0.0
 python-dotenv
-wxpusher
+lark_oapi
 pydantic>=2.0.0
 openai>=1.0.0
 pandas-market-calendars

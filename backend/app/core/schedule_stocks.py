@@ -48,7 +48,9 @@ def futu_job():
         for i, stock in enumerate(data['A']['intersection'], 1):
             volume_ratio = stock.get('volumeRatio', 0)
             turnover_rate = stock.get('turnoverRate', 0)
-            message_parts.append(f"| {i} | {stock['name']} | {float(stock['amount'])/100000000:.1f} | {float(stock['changeRatio']):.1f} | {float(stock['volume'])/10000:.1f} | {float(volume_ratio):.1f} | {float(turnover_rate):.1f} | {float(stock['pe']):.1f} |")
+            stock_code = str(stock['code']).split('.')[-1]
+            stock_name = f"[{stock['name']}](https://invest.fishisnow.xyz/zh/stock/A/{stock_code}?name={stock['name']})"
+            message_parts.append(f"| {i} | {stock_name} | {float(stock['amount'])/100000000:.1f} | {float(stock['changeRatio']):.1f} | {float(stock['volume'])/10000:.1f} | {float(volume_ratio):.1f} | {float(turnover_rate):.1f} | {float(stock['pe']):.1f} |")
 
         # 涨幅前50表格
         message_parts.append("\n#### 涨幅前50")
@@ -57,7 +59,9 @@ def futu_job():
         for i, stock in enumerate(data['A']['top_change'], 1):
             volume_ratio = stock.get('volumeRatio', 0)
             turnover_rate = stock.get('turnoverRate', 0)
-            message_parts.append(f"| {i} | {stock['name']} | {float(stock['changeRatio']):.1f} | {float(stock['volume'])/10000:.1f} | {float(volume_ratio):.1f} | {float(turnover_rate):.1f} | {float(stock['pe']):.1f} |")
+            stock_code = str(stock['code']).split('.')[-1]
+            stock_name = f"[{stock['name']}](https://invest.fishisnow.xyz/zh/stock/A/{stock_code}?name={stock['name']})"
+            message_parts.append(f"| {i} | {stock_name} | {float(stock['changeRatio']):.1f} | {float(stock['volume'])/10000:.1f} | {float(volume_ratio):.1f} | {float(turnover_rate):.1f} | {float(stock['pe']):.1f} |")
 
         # 成交额前50表格
         message_parts.append("\n#### 成交额前50")
@@ -66,7 +70,9 @@ def futu_job():
         for i, stock in enumerate(data['A']['top_turnover'], 1):
             volume_ratio = stock.get('volumeRatio', 0)
             turnover_rate = stock.get('turnoverRate', 0)
-            message_parts.append(f"| {i} | {stock['name']} | {float(stock['amount'])/100000000:.1f} | {float(stock['changeRatio']):.1f} | {float(stock['volume'])/10000:.1f} | {float(volume_ratio):.1f} | {float(turnover_rate):.1f} | {float(stock['pe']):.1f} |")
+            stock_code = str(stock['code']).split('.')[-1]
+            stock_name = f"[{stock['name']}](https://invest.fishisnow.xyz/zh/stock/A/{stock_code}?name={stock['name']})"
+            message_parts.append(f"| {i} | {stock_name} | {float(stock['amount'])/100000000:.1f} | {float(stock['changeRatio']):.1f} | {float(stock['volume'])/10000:.1f} | {float(volume_ratio):.1f} | {float(turnover_rate):.1f} | {float(stock['pe']):.1f} |")
 
 
 
@@ -80,7 +86,9 @@ def futu_job():
         for i, stock in enumerate(data['HK']['intersection'], 1):
             volume_ratio = stock.get('volumeRatio', 0)
             turnover_rate = stock.get('turnoverRate', 0)
-            message_parts.append(f"| {i} | {stock['name']} | {float(stock['amount'])/100000000:.1f} | {float(stock['changeRatio']):.1f} | {float(stock['volume'])/10000:.1f} | {float(volume_ratio):.1f} | {float(turnover_rate):.1f} | {float(stock['pe']):.1f} |")
+            stock_code = str(stock['code']).split('.')[-1]
+            stock_name = f"[{stock['name']}](https://invest.fishisnow.xyz/zh/stock/HK/{stock_code}?name={stock['name']})"
+            message_parts.append(f"| {i} | {stock_name} | {float(stock['amount'])/100000000:.1f} | {float(stock['changeRatio']):.1f} | {float(stock['volume'])/10000:.1f} | {float(volume_ratio):.1f} | {float(turnover_rate):.1f} | {float(stock['pe']):.1f} |")
 
         # 涨幅前50表格
         message_parts.append("\n#### 涨幅前50")
@@ -89,7 +97,9 @@ def futu_job():
         for i, stock in enumerate(data['HK']['top_change'], 1):
             volume_ratio = stock.get('volumeRatio', 0)
             turnover_rate = stock.get('turnoverRate', 0)
-            message_parts.append(f"| {i} | {stock['name']} | {float(stock['changeRatio']):.1f} | {float(stock['volume'])/10000:.1f} | {float(volume_ratio):.1f} | {float(turnover_rate):.1f} | {float(stock['pe']):.1f} |")
+            stock_code = str(stock['code']).split('.')[-1]
+            stock_name = f"[{stock['name']}](https://invest.fishisnow.xyz/zh/stock/HK/{stock_code}?name={stock['name']})"
+            message_parts.append(f"| {i} | {stock_name} | {float(stock['changeRatio']):.1f} | {float(stock['volume'])/10000:.1f} | {float(volume_ratio):.1f} | {float(turnover_rate):.1f} | {float(stock['pe']):.1f} |")
 
         # 成交额前50表格
         message_parts.append("\n#### 成交额前50")
@@ -98,7 +108,9 @@ def futu_job():
         for i, stock in enumerate(data['HK']['top_turnover'], 1):
             volume_ratio = stock.get('volumeRatio', 0)
             turnover_rate = stock.get('turnoverRate', 0)
-            message_parts.append(f"| {i} | {stock['name']} | {float(stock['amount'])/100000000:.1f} | {float(stock['changeRatio']):.1f} | {float(stock['volume'])/10000:.1f} | {float(volume_ratio):.1f} | {float(turnover_rate):.1f} | {float(stock['pe']):.1f} |")
+            stock_code = str(stock['code']).split('.')[-1]
+            stock_name = f"[{stock['name']}](https://invest.fishisnow.xyz/zh/stock/HK/{stock_code}?name={stock['name']})"
+            message_parts.append(f"| {i} | {stock_name} | {float(stock['amount'])/100000000:.1f} | {float(stock['changeRatio']):.1f} | {float(stock['volume'])/10000:.1f} | {float(volume_ratio):.1f} | {float(turnover_rate):.1f} | {float(stock['pe']):.1f} |")
 
             # 发送消息
         message = "\n".join(message_parts)
@@ -192,5 +204,5 @@ def main():
 
 
 if __name__ == "__main__":
-    compute_market_breadth_daily()
+    futu_job()
     # clean_sector_industry_by_excel(excel_path="/Users/huangyusong/Desktop/10jqka.xlsx", full_refresh=True)
