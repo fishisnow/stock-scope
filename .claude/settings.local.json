@@ -6,7 +6,8 @@
       "Bash(python3:*)",
       "WebFetch(domain:open.feishu.cn)",
       "WebFetch(domain:pypi.org)",
-      "WebSearch"
+      "WebSearch",
+      "Bash(bash -n \"/Users/huangyusong/myspace/stock-scope/scripts/auto_deploy_latest.sh\")"
     ]
   }
 }

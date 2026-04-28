@@ -13,6 +13,7 @@ STATE_DIR="$SCRIPT_DIR/.deploy-state"
 STATE_FILE="$STATE_DIR/latest.digest"
 LOG_FILE="$STATE_DIR/auto-deploy.log"
 LOCK_DIR="$STATE_DIR/.auto-deploy.lock"
+LOCK_PID_FILE="$LOCK_DIR/pid"
 ALIYUN_IMAGE="crpi-3f383vugjtqlop7w.cn-guangzhou.personal.cr.aliyuncs.com/fishisnow/stock-scope:latest"
 
 mkdir -p "$STATE_DIR"
@@ -22,12 +23,34 @@ log() {
   echo "[$(date '+%Y-%m-%d %H:%M:%S')] $message" | tee -a "$LOG_FILE"
 }
 
+cleanup_lock() {
+  rm -f "$LOCK_PID_FILE" 2>/dev/null || true
+  rmdir "$LOCK_DIR" 2>/dev/null || true
+}
+
 # 防重入：上一次任务未结束时，本次直接跳过
 if ! mkdir "$LOCK_DIR" 2>/dev/null; then
-  log "检测任务仍在执行中，跳过本次运行"
-  exit 0
+  if [ -f "$LOCK_PID_FILE" ]; then
+    stale_pid="$(cat "$LOCK_PID_FILE" 2>/dev/null || true)"
+    if [ -n "$stale_pid" ] && ! kill -0 "$stale_pid" 2>/dev/null; then
+      log "检测到陈旧锁，清理后重试"
+      cleanup_lock
+      if ! mkdir "$LOCK_DIR" 2>/dev/null; then
+        log "锁目录仍存在，跳过本次运行"
+        exit 0
+      fi
+    else
+      log "检测任务仍在执行中，跳过本次运行"
+      exit 0
+    fi
+  else
+    log "锁目录缺少 pid 文件，跳过本次运行"
+    exit 0
+  fi
 fi
-trap 'rmdir "$LOCK_DIR" 2>/dev/null || true' EXIT
+
+echo "$$" > "$LOCK_PID_FILE"
+trap cleanup_lock EXIT
 
 if ! command -v docker >/dev/null 2>&1; then
   log "docker 未安装，跳过本次检查"
