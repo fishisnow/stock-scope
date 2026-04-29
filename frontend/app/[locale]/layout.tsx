@@ -6,6 +6,7 @@ import { getMessages } from "next-intl/server"
 import { routing } from "@/i18n/routing"
 import { notFound } from "next/navigation"
 import { Toaster } from "@/components/ui/toaster"
+import { Footer } from "@/components/footer"
 
 export const metadata: Metadata = {
   title: "StockScope - AI-Powered Investment Opportunities",
@@ -40,7 +41,12 @@ export default async function LocaleLayout({
 
   return (
     <NextIntlClientProvider messages={messages}>
-      <Suspense fallback={null}>{children}</Suspense>
+      <div className="flex min-h-screen flex-col">
+        <main className="flex-1">
+          <Suspense fallback={null}>{children}</Suspense>
+        </main>
+        <Footer />
+      </div>
       <Toaster />
     </NextIntlClientProvider>
   )

@@ -13,6 +13,10 @@
     "profile": "个人资料",
     "logout": "退出登录"
   },
+  "footer": {
+    "copyright": "@2026 StockScope",
+    "contact": "Contact"
+  },
   "auth": {
     "loginTitle": "登录",
     "loginDescription": "输入您的邮箱和密码以登录",

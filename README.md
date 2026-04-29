@@ -2,7 +2,7 @@
 
 <div align="center">
 
-# Stock Scope
+# StockScope
 
 一个面向股票研究、市场跟踪与投资机会发现的全栈项目。
 

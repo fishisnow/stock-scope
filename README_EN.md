@@ -2,7 +2,7 @@
 
 <div align="center">
 
-# Stock Scope
+# StockScope
 
 A full-stack project for stock research, market tracking, and investment opportunity discovery.
 

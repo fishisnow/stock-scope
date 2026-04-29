@@ -13,6 +13,10 @@
     "profile": "Profile",
     "logout": "Logout"
   },
+  "footer": {
+    "copyright": "@2026 StockScope",
+    "contact": "Contact"
+  },
   "auth": {
     "loginTitle": "Login",
     "loginDescription": "Enter your email and password to login",
