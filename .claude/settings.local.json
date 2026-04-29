@@ -7,7 +7,14 @@
       "WebFetch(domain:open.feishu.cn)",
       "WebFetch(domain:pypi.org)",
       "WebSearch",
-      "Bash(bash -n \"/Users/huangyusong/myspace/stock-scope/scripts/auto_deploy_latest.sh\")"
+      "Bash(bash -n \"/Users/huangyusong/myspace/stock-scope/scripts/auto_deploy_latest.sh\")",
+      "Bash(mv \"/Users/huangyusong/myspace/stock-scope/frontend/app/[locale]/home\" \"/Users/huangyusong/myspace/stock-scope/frontend/app/[locale]/opportunities\")",
+      "Bash(mkdir -p \"/Users/huangyusong/myspace/stock-scope/frontend/app/[locale]/opportunities/[id]\")",
+      "Bash(mv \"/Users/huangyusong/myspace/stock-scope/frontend/app/[locale]/opportunity/[id]/page.tsx\" \"/Users/huangyusong/myspace/stock-scope/frontend/app/[locale]/opportunities/[id]/page.tsx\")",
+      "Bash(rmdir \"/Users/huangyusong/myspace/stock-scope/frontend/app/[locale]/opportunity/[id]\")",
+      "Bash(rmdir \"/Users/huangyusong/myspace/stock-scope/frontend/app/[locale]/opportunity\")",
+      "Bash(npx tsc:*)",
+      "Bash(cd:*)"
     ]
   }
 }

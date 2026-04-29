@@ -6,7 +6,7 @@ import remarkGfm from "remark-gfm"
 import remarkBreaks from "remark-breaks"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Calendar, ExternalLink, Lightbulb, TrendingUp, ChevronRight, ChevronLeft, Lock } from "lucide-react"
+import { Calendar, ExternalLink, Lightbulb, TrendingUp, ChevronRight, ChevronLeft, Lock, ArrowLeft } from "lucide-react"
 import { useAuth } from '@/lib/auth-context'
 import { useTranslations } from 'next-intl'
 import { useRouter, usePathname } from '@/i18n/routing'
@@ -147,6 +147,14 @@ export function OpportunityOfTheDay({ selectedOpportunity, onOpportunityChange, 
     }
   }
 
+  const handleBack = () => {
+    if (typeof window !== "undefined" && window.history.length > 1) {
+      router.back()
+      return
+    }
+    router.push("/opportunities")
+  }
+
   useEffect(() => {
     if (selectedOpportunity) {
       setOpportunity(selectedOpportunity)
@@ -196,6 +204,14 @@ export function OpportunityOfTheDay({ selectedOpportunity, onOpportunityChange, 
   return (
     <section className="section-shell">
       <div className="container mx-auto max-w-4xl">
+        {!isLatest && opportunityId !== undefined && opportunityId !== null && (
+          <div className="mb-6 flex justify-start">
+            <Button variant="outline" size="sm" className="gap-2" onClick={handleBack}>
+              <ArrowLeft className="h-4 w-4" />
+              {t('back')}
+            </Button>
+          </div>
+        )}
         <div className="text-center mb-12">
           <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-secondary mb-6">
             <Lightbulb className="h-4 w-4 text-primary" />
@@ -211,7 +227,7 @@ export function OpportunityOfTheDay({ selectedOpportunity, onOpportunityChange, 
               <Button
                 variant="outline"
                 size="icon"
-                onClick={() => prevOpportunityId && router.push(`/opportunity/${prevOpportunityId}`)}
+                onClick={() => prevOpportunityId && router.push(`/opportunities/${prevOpportunityId}`)}
                 disabled={!prevOpportunityId}
                 aria-label={t('previous') || '上一个'}
               >
@@ -230,7 +246,7 @@ export function OpportunityOfTheDay({ selectedOpportunity, onOpportunityChange, 
               <Button
                 variant="outline"
                 size="icon"
-                onClick={() => nextOpportunityId && router.push(`/opportunity/${nextOpportunityId}`)}
+                onClick={() => nextOpportunityId && router.push(`/opportunities/${nextOpportunityId}`)}
                 disabled={!nextOpportunityId}
                 aria-label={t('next') || '下一个'}
               >

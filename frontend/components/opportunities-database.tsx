@@ -1,12 +1,14 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import ReactMarkdown from "react-markdown"
+import remarkGfm from "remark-gfm"
+import remarkBreaks from "remark-breaks"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Edit, Trash2, ExternalLink, Plus, TrendingUp, Lock } from "lucide-react"
 import { useRouter, usePathname } from '@/i18n/routing'
-import { InvestmentOpportunityRecorder } from "./investment-opportunity-recorder"
 import { useAuth } from '@/lib/auth-context'
 import { useToast } from "@/hooks/use-toast"
 import { useTranslations } from 'next-intl'
@@ -50,8 +52,42 @@ const truncateUrl = (url: string, maxLength: number = 50) => {
   }
 }
 
+const compactMarkdownComponents = {
+  p: ({ children }: any) => <p>{children}</p>,
+  h1: ({ children }: any) => <p className="font-semibold">{children}</p>,
+  h2: ({ children }: any) => <p className="font-semibold">{children}</p>,
+  h3: ({ children }: any) => <p className="font-semibold">{children}</p>,
+  h4: ({ children }: any) => <p className="font-semibold">{children}</p>,
+  h5: ({ children }: any) => <p className="font-semibold">{children}</p>,
+  h6: ({ children }: any) => <p className="font-semibold">{children}</p>,
+  ul: ({ children }: any) => <ul className="list-disc pl-5">{children}</ul>,
+  ol: ({ children }: any) => <ol className="list-decimal pl-5">{children}</ol>,
+  li: ({ children }: any) => <li>{children}</li>,
+  a: ({ children, href }: any) => (
+    <a
+      href={href}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="text-primary underline decoration-primary/40 underline-offset-2"
+      onClick={(e) => e.stopPropagation()}
+    >
+      {children}
+    </a>
+  ),
+  code: ({ children }: any) => <code className="rounded bg-muted px-1 py-0.5 text-[0.9em]">{children}</code>,
+  pre: () => null,
+  blockquote: ({ children }: any) => <p>{children}</p>,
+  table: () => null,
+  thead: () => null,
+  tbody: () => null,
+  tr: () => null,
+  th: () => null,
+  td: () => null,
+  img: () => null,
+  hr: () => null,
+}
+
 interface OpportunitiesDatabaseProps {
-  onOpportunityChange?: () => void
   onOpenRecorder?: () => void
   onEditOpportunity?: (opportunity: InvestmentOpportunity) => void
   pageSize?: number
@@ -59,7 +95,6 @@ interface OpportunitiesDatabaseProps {
 }
 
 export function OpportunitiesDatabase({
-  onOpportunityChange,
   onOpenRecorder,
   onEditOpportunity,
   pageSize,
@@ -183,16 +218,9 @@ export function OpportunitiesDatabase({
   }
 
   // 当投资机会记录器添加/更新后，重新加载列表
-  const handleOpportunityChange = () => {
-    loadOpportunities()
-    if (onOpportunityChange) {
-      onOpportunityChange()
-    }
-  }
-
   return (
     <section id="database" className="section-shell">
-      <div className="container mx-auto max-w-6xl">
+      <div className="container mx-auto max-w-7xl">
         {/* 顶部操作按钮（补充） */}
         {mounted && session?.access_token && (
           <div className="flex justify-end mb-6">
@@ -211,22 +239,22 @@ export function OpportunitiesDatabase({
         {/* 投资机会列表 */}
         {opportunities.length > 0 ? (
           <>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 mb-8">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 sm:gap-6 mb-8">
               {pagedOpportunities.map((opportunity, index) => {
                 const displayIndex = startIndex + index
                 return (
-              <Card 
-                key={opportunity.id} 
-                className="hover:shadow-lg transition-shadow group cursor-pointer relative"
+              <Card
+                key={opportunity.id}
+                className="group relative cursor-pointer border-border/70 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-xl"
                 onClick={() => {
                   if (opportunity.id) {
-                    router.push(`/opportunity/${opportunity.id}`)
+                    router.push(`/opportunities/${opportunity.id}`)
                   }
                 }}
               >
-                <CardHeader className="pb-3">
+                <CardHeader className="pb-4 sm:pb-5">
                   <div className="flex items-start justify-between gap-2">
-                    <CardTitle className="text-lg font-serif leading-tight text-balance group-hover:text-primary transition-colors flex-1 line-clamp-2">
+                    <CardTitle className="text-xl sm:text-2xl font-serif leading-snug text-balance group-hover:text-primary transition-colors flex-1 line-clamp-2">
                       {opportunity.core_idea || (
                         <div className="flex items-center gap-2 text-muted-foreground">
                           <Lock className="h-4 w-4" />
@@ -266,7 +294,7 @@ export function OpportunitiesDatabase({
                     )}
                   </div>
                 </CardHeader>
-                <CardContent className="space-y-3">
+                <CardContent className="space-y-4 pb-5 sm:pb-6">
                   {opportunity.core_idea ? (
                     <>
                       {opportunity.source_url ? (
@@ -287,9 +315,14 @@ export function OpportunitiesDatabase({
                       ) : null}
 
                       {opportunity.summary ? (
-                        <CardDescription className="text-sm leading-relaxed line-clamp-3">
-                          {opportunity.summary}
-                        </CardDescription>
+                        <div className="card-markdown-preview line-clamp-4 text-base leading-7 text-muted-foreground">
+                          <ReactMarkdown
+                            remarkPlugins={[remarkGfm, remarkBreaks]}
+                            components={compactMarkdownComponents}
+                          >
+                            {opportunity.summary}
+                          </ReactMarkdown>
+                        </div>
                       ) : !isAuthenticated && displayIndex > 0 ? (
                         <div className="relative cursor-pointer" onClick={handleStockClick}>
                           <CardDescription className="text-sm leading-relaxed line-clamp-3 blur-[2px] select-none">

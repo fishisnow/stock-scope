@@ -48,7 +48,7 @@ export function Header({ onRecordOpportunity }: HeaderProps = {}) {
   const [mounted, setMounted] = useState(false)
   const navItems = [
     { href: "/", label: t('home') },
-    { href: "/home", label: t('opportunity') },
+    { href: "/opportunities", label: t('opportunity') },
     { href: "/briefing", label: t('briefing') },
     { href: "/market", label: t('market') },
     { href: "/review", label: t('review') },

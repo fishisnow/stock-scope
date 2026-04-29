@@ -433,6 +433,7 @@
     "relatedStocksDesc": "该投资机会可能受益的相关标的",
     "previous": "上一个",
     "next": "下一个",
+    "back": "返回列表",
     "loginToView": "登录查看详情",
     "loginToViewStocks": "登录后查看完整股票信息",
     "loginToViewStocksTitle": "解锁完整投资机会",

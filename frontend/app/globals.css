@@ -141,6 +141,34 @@
     overflow-wrap: anywhere;
     word-break: break-word;
   }
+
+  .card-markdown-preview {
+    overflow-wrap: anywhere;
+    word-break: break-word;
+  }
+
+  .card-markdown-preview > *:first-child {
+    margin-top: 0;
+  }
+
+  .card-markdown-preview > *:last-child {
+    margin-bottom: 0;
+  }
+
+  .card-markdown-preview p,
+  .card-markdown-preview ul,
+  .card-markdown-preview ol {
+    margin: 0 0 0.45rem;
+  }
+
+  .card-markdown-preview ul,
+  .card-markdown-preview ol {
+    padding-left: 1.1rem;
+  }
+
+  .card-markdown-preview li {
+    margin: 0.1rem 0;
+  }
 }
 
 @layer components {

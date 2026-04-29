@@ -14,7 +14,7 @@ export default function LandingPage() {
       title: t("preview.cards.opportunity.title"),
       description: t("preview.cards.opportunity.description"),
       icon: Target,
-      href: "/home",
+      href: "/opportunities",
       tag: t("preview.cards.opportunity.tag"),
       image: "/invest-opertunities.png",
       imageAlt: t("preview.cards.opportunity.imageAlt"),

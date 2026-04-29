@@ -2,7 +2,6 @@
 
 import { useState } from "react"
 import { Header } from "@/components/header"
-import { OpportunityOfTheDay } from "@/components/opportunity-of-the-day"
 // import { TrendsSection } from "@/components/trends-section"
 import { OpportunitiesDatabase } from "@/components/opportunities-database"
 import { InvestmentOpportunityRecorder } from "@/components/investment-opportunity-recorder"
@@ -29,13 +28,8 @@ interface InvestmentOpportunity {
 }
 
 export default function Home() {
-  const [opportunityChangeTrigger, setOpportunityChangeTrigger] = useState(0)
   const [recorderOpen, setRecorderOpen] = useState(false)
   const [editingOpportunity, setEditingOpportunity] = useState<InvestmentOpportunity | null>(null)
-
-  const handleOpportunityChange = () => {
-    setOpportunityChangeTrigger(prev => prev + 1)
-  }
 
   const handleOpenRecorder = () => {
     setEditingOpportunity(null)
@@ -55,19 +49,15 @@ export default function Home() {
     <div className="min-h-screen bg-background">
       <Header onRecordOpportunity={handleOpenRecorder} />
       <main>
-        <OpportunityOfTheDay 
-          onOpportunityChange={opportunityChangeTrigger}
-        />
         {/* <TrendsSection /> */}
-        <OpportunitiesDatabase 
-          onOpportunityChange={handleOpportunityChange}
+        <OpportunitiesDatabase
           onOpenRecorder={handleOpenRecorder}
           onEditOpportunity={handleEditOpportunity}
-          pageSize={6}
+          pageSize={9}
           enablePagination
         />
-        <InvestmentOpportunityRecorder 
-          onOpportunityChange={handleOpportunityChange}
+        <InvestmentOpportunityRecorder
+          onOpportunityChange={() => {}}
           initialEditingOpportunity={editingOpportunity}
           onEditComplete={handleEditComplete}
           open={recorderOpen}
