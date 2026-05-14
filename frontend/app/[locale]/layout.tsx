@@ -2,7 +2,7 @@ import type React from "react"
 import type { Metadata } from "next"
 import { Suspense } from "react"
 import { NextIntlClientProvider } from "next-intl"
-import { getMessages } from "next-intl/server"
+import { setRequestLocale } from "next-intl/server"
 import { routing } from "@/i18n/routing"
 import { notFound } from "next/navigation"
 import { Toaster } from "@/components/ui/toaster"
@@ -35,9 +35,8 @@ export default async function LocaleLayout({
     notFound();
   }
 
-  // Providing all messages to the client
-  // side is the easiest way to get started
-  const messages = await getMessages();
+  setRequestLocale(locale)
+  const messages = (await import(`@/messages/${locale}.json`)).default
 
   return (
     <NextIntlClientProvider messages={messages}>

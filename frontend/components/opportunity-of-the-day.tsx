@@ -11,7 +11,7 @@ import { useAuth } from '@/lib/auth-context'
 import { useTranslations } from 'next-intl'
 import { useRouter, usePathname } from '@/i18n/routing'
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5001"
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "/api"
 
 interface StockInfo {
   stock_name: string
@@ -57,7 +57,7 @@ export function OpportunityOfTheDay({ selectedOpportunity, onOpportunityChange, 
   // 加载最新的投资机会（未登录用户也可以加载）
   const loadLatestOpportunity = async () => {
     try {
-      const response = await authenticatedFetch(`${API_URL}/api/investment-opportunities?page=1&limit=1`)
+      const response = await authenticatedFetch(`${API_URL}/investment-opportunities?page=1&limit=1`)
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`)
       }
@@ -79,7 +79,7 @@ export function OpportunityOfTheDay({ selectedOpportunity, onOpportunityChange, 
 
   const loadOpportunityById = async (id: number | string) => {
     try {
-      const response = await authenticatedFetch(`${API_URL}/api/investment-opportunities/${id}`)
+      const response = await authenticatedFetch(`${API_URL}/investment-opportunities/${id}`)
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`)
       }
@@ -101,7 +101,7 @@ export function OpportunityOfTheDay({ selectedOpportunity, onOpportunityChange, 
 
   const loadAdjacentOpportunities = async (id: number | string) => {
     try {
-      const response = await authenticatedFetch(`${API_URL}/api/investment-opportunities?page=1&limit=100`)
+      const response = await authenticatedFetch(`${API_URL}/investment-opportunities?page=1&limit=100`)
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`)
       }
@@ -142,8 +142,12 @@ export function OpportunityOfTheDay({ selectedOpportunity, onOpportunityChange, 
       window.dispatchEvent(new CustomEvent('openLoginDialog'))
     } else {
       // 已登录用户跳转到K线详情页
-      const query = new URLSearchParams({ name: stock.stock_name })
-      router.push(`/stock/${stock.market}/${encodeURIComponent(stock.stock_code)}?${query.toString()}`)
+      const query = new URLSearchParams({
+        market: stock.market,
+        code: stock.stock_code,
+        name: stock.stock_name,
+      })
+      router.push(`/stock?${query.toString()}`)
     }
   }
 
@@ -227,7 +231,7 @@ export function OpportunityOfTheDay({ selectedOpportunity, onOpportunityChange, 
               <Button
                 variant="outline"
                 size="icon"
-                onClick={() => prevOpportunityId && router.push(`/opportunities/${prevOpportunityId}`)}
+                onClick={() => prevOpportunityId && router.push(`/opportunities?id=${prevOpportunityId}`)}
                 disabled={!prevOpportunityId}
                 aria-label={t('previous') || '上一个'}
               >
@@ -246,7 +250,7 @@ export function OpportunityOfTheDay({ selectedOpportunity, onOpportunityChange, 
               <Button
                 variant="outline"
                 size="icon"
-                onClick={() => nextOpportunityId && router.push(`/opportunities/${nextOpportunityId}`)}
+                onClick={() => nextOpportunityId && router.push(`/opportunities?id=${nextOpportunityId}`)}
                 disabled={!nextOpportunityId}
                 aria-label={t('next') || '下一个'}
               >

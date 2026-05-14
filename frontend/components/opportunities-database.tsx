@@ -13,7 +13,7 @@ import { useAuth } from '@/lib/auth-context'
 import { useToast } from "@/hooks/use-toast"
 import { useTranslations } from 'next-intl'
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5001"
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "/api"
 
 interface StockInfo {
   stock_name: string
@@ -137,7 +137,7 @@ export function OpportunitiesDatabase({
   // 加载投资机会列表（未登录用户也可以加载）
   const loadOpportunities = async () => {
     try {
-      const response = await authenticatedFetch(`${API_URL}/api/investment-opportunities?page=1&limit=100`)
+      const response = await authenticatedFetch(`${API_URL}/investment-opportunities?page=1&limit=100`)
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`)
       }
@@ -172,7 +172,7 @@ export function OpportunitiesDatabase({
     if (!confirm(t('confirmDelete'))) return
 
     try {
-      const response = await authenticatedFetch(`${API_URL}/api/investment-opportunities/${id}`, {
+      const response = await authenticatedFetch(`${API_URL}/investment-opportunities/${id}`, {
         method: 'DELETE',
       })
 
@@ -248,7 +248,7 @@ export function OpportunitiesDatabase({
                 className="group relative cursor-pointer border-border/70 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-xl"
                 onClick={() => {
                   if (opportunity.id) {
-                    router.push(`/opportunities/${opportunity.id}`)
+                    router.push(`/opportunities?id=${opportunity.id}`)
                   }
                 }}
               >

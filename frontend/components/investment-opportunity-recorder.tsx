@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react"
 import { useAuth } from '@/lib/auth-context'
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5001"
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "/api"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -99,7 +99,7 @@ export function InvestmentOpportunityRecorder({
       const params = new URLSearchParams({ query })
       if (market) params.append('market', market)
 
-      const response = await fetch(`${API_URL}/api/stock-analysis/search-stocks?${params}`)
+      const response = await fetch(`${API_URL}/stock-analysis/search-stocks?${params}`)
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`)
       }
@@ -138,7 +138,7 @@ export function InvestmentOpportunityRecorder({
     // 获取当前股价
     let currentPrice: number | null = null
     try {
-      const response = await fetch(`${API_URL}/api/stock-analysis/get-stock-price?code=${stock.code}&market=${stock.market}`)
+      const response = await fetch(`${API_URL}/stock-analysis/get-stock-price?code=${stock.code}&market=${stock.market}`)
       if (response.ok) {
         const result = await response.json()
         if (result.success) {
@@ -216,8 +216,8 @@ export function InvestmentOpportunityRecorder({
 
     try {
       const url = editingOpportunity
-        ? `${API_URL}/api/investment-opportunities/${editingOpportunity.id}`
-        : `${API_URL}/api/investment-opportunities`
+        ? `${API_URL}/investment-opportunities/${editingOpportunity.id}`
+        : `${API_URL}/investment-opportunities`
 
       const method = editingOpportunity ? 'PUT' : 'POST'
 

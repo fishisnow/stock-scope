@@ -11,7 +11,7 @@ import { useLocale, useTranslations } from 'next-intl'
 import { Link } from "@/i18n/routing"
 import { getLocalizedIndustryName, getLocalizedSectorName } from "@/lib/industry-labels"
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5001"
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "/api"
 
 const WEEKDAY_LABELS = ["周日", "周一", "周二", "周三", "周四", "周五", "周六"]
 
@@ -142,8 +142,11 @@ function StockTable({
     const rawCode = String(stock.code || "").trim()
     if (!rawCode) return ""
     const normalizedCode = rawCode.includes(".") ? rawCode.split(".")[1] : rawCode
-    const nameParam = stock.name ? `?name=${encodeURIComponent(stock.name)}` : ""
-    return `/stock/${marketKey}/${normalizedCode}${nameParam}`
+    const params = new URLSearchParams({ market: marketKey, code: normalizedCode })
+    if (stock.name) {
+      params.set("name", stock.name)
+    }
+    return `/stock?${params.toString()}`
   }
 
   return (
@@ -314,7 +317,7 @@ export default function MarketPage() {
 
   const loadAvailableDates = async () => {
     try {
-      const response = await fetch(`${API_URL}/api/dates`)
+      const response = await fetch(`${API_URL}/dates`)
       const result = await response.json()
 
       if (result.success) {
@@ -341,7 +344,7 @@ export default function MarketPage() {
     setError(null)
 
     try {
-      const response = await fetch(`${API_URL}/api/futu_data/${date}`)
+      const response = await fetch(`${API_URL}/futu_data/${date}`)
       const result = await response.json()
 
       if (result.success) {
@@ -359,7 +362,7 @@ export default function MarketPage() {
   const loadBreadthData = async () => {
     setBreadthLoading(true)
     try {
-      const response = await fetch(`${API_URL}/api/market_breadth?limit=10`)
+      const response = await fetch(`${API_URL}/market_breadth?limit=10`)
       const result = await response.json()
       if (result.success) {
         setBreadthData(result.data)
@@ -406,7 +409,7 @@ export default function MarketPage() {
   }
 
   const getIndustryDetailHref = (industry: string) => {
-    const base = `/market/industry/${encodeURIComponent(industry)}`
+    const base = `/market/industry?industry=${encodeURIComponent(industry)}`
     if (!breadthData || breadthData.dates.length === 0) return base
     const latestDate = breadthData.dates[0]
     const latestBreadth = getBreadthValue(latestDate, industry, "industry")

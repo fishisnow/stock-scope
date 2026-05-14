@@ -2,8 +2,9 @@
 
 import logging
 import time
+from pathlib import Path
 
-from flask import Flask, g, request
+from flask import Flask, g, request, redirect, send_from_directory
 from flask_cors import CORS
 
 from app.api.auth_middleware import (
@@ -27,6 +28,7 @@ logging.getLogger('httpx').setLevel(logging.WARNING)
 logging.getLogger('httpcore').setLevel(logging.WARNING)
 
 logger = logging.getLogger('api')
+frontend_dist = Path(__file__).resolve().parents[3] / 'frontend' / 'out'
 
 app = Flask(__name__)
 app.config['JSON_AS_ASCII'] = False
@@ -64,6 +66,38 @@ app.register_blueprint(trading_bp)
 register_stock_analysis_api(app)
 register_investment_opportunities_api(app)
 register_market_data_api(app, db=db, trading_date_utils=trading_date_utils)
+
+
+@app.route('/')
+def serve_root():
+    return redirect('/en/')
+
+
+@app.route('/<path:path>')
+@app.route('/<path:path>/')
+def serve_frontend(path: str):
+    normalized_path = path.rstrip('/')
+    asset_path = frontend_dist / normalized_path
+    if asset_path.is_file():
+        return send_from_directory(str(frontend_dist), normalized_path)
+
+    html_path = frontend_dist / normalized_path / 'index.html'
+    if html_path.is_file():
+        return send_from_directory(str(frontend_dist), f'{normalized_path}/index.html')
+
+    request_path = request.path.rstrip('/')
+    locale_path = request_path.lstrip('/')
+    locale_html_path = frontend_dist / locale_path / 'index.html'
+    if locale_html_path.is_file():
+        return send_from_directory(str(frontend_dist), f'{locale_path}/index.html')
+
+    segments = [segment for segment in locale_path.split('/') if segment]
+    if segments:
+        locale_fallback = frontend_dist / segments[0] / 'index.html'
+        if locale_fallback.is_file():
+            return send_from_directory(str(frontend_dist), f'{segments[0]}/index.html')
+
+    return send_from_directory(str(frontend_dist), 'index.html')
 
 
 if __name__ == '__main__':

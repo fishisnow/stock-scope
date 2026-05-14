@@ -1,7 +1,7 @@
 "use client"
 
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react'
-import { supabase } from './supabase'
+import { getSupabaseClient } from './supabase'
 import type { User as SupabaseUser, Session } from '@supabase/supabase-js'
 
 export interface User {
@@ -49,7 +49,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     const handleExpiredSession = async () => {
-      await supabase.auth.signOut()
+      await getSupabaseClient().auth.signOut()
       setSession(null)
       setUser(null)
       window.dispatchEvent(new CustomEvent('openLoginDialog'))
@@ -63,7 +63,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     let effectiveSession = session
     try {
-      const { data, error } = await supabase.auth.getSession()
+      const { data, error } = await getSupabaseClient().auth.getSession()
       if (error) {
         console.warn('Failed to get session:', error)
       }
@@ -79,7 +79,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     let response = await fetchWithSession(effectiveSession)
 
     if (response.status === 401 && effectiveSession?.refresh_token) {
-      const { data, error } = await supabase.auth.refreshSession({
+      const { data, error } = await getSupabaseClient().auth.refreshSession({
         refresh_token: effectiveSession.refresh_token,
       })
 
@@ -102,7 +102,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // 检查当前会话
     const initAuth = async () => {
       try {
-        const { data: { session } } = await supabase.auth.getSession()
+        const { data: { session } } = await getSupabaseClient().auth.getSession()
         setSession(session)
         setUser(session?.user ? mapSupabaseUser(session.user) : null)
       } catch (error) {
@@ -115,7 +115,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     initAuth()
 
     // 监听认证状态变化
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = getSupabaseClient().auth.onAuthStateChange((_event, session) => {
       setSession(session)
       setUser(session?.user ? mapSupabaseUser(session.user) : null)
     })
@@ -126,7 +126,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [])
 
   const login = async (email: string, password: string) => {
-    const { data, error } = await supabase.auth.signInWithPassword({
+    const { data, error } = await getSupabaseClient().auth.signInWithPassword({
       email,
       password,
     })
@@ -147,7 +147,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const callbackUrl = new URL(`${window.location.origin}/auth/callback`)
     callbackUrl.searchParams.set('redirectTo', currentPath)
 
-    const { error } = await supabase.auth.signInWithOAuth({
+    const { error } = await getSupabaseClient().auth.signInWithOAuth({
       provider: 'google',
       options: {
         redirectTo: callbackUrl.toString(),
@@ -164,7 +164,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   const signup = async (email: string, password: string) => {
-    const { data, error } = await supabase.auth.signUp({
+    const { data, error } = await getSupabaseClient().auth.signUp({
       email,
       password,
       options: {
@@ -200,7 +200,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   const logout = async () => {
-    const { error } = await supabase.auth.signOut()
+    const { error } = await getSupabaseClient().auth.signOut()
     if (error) {
       console.error('Logout error:', error)
     }

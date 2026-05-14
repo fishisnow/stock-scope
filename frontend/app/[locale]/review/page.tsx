@@ -47,7 +47,7 @@ import { ProfitBarChart } from "@/components/profit-bar-chart"
 import { Label } from "@/components/ui/label"
 import { Input } from "@/components/ui/input"
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5001"
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "/api"
 
 interface StockSummary {
   stock_code: string
@@ -147,7 +147,7 @@ export default function ReviewPage() {
     setError(null)
     
     try {
-      let url = `${API_URL}/api/trading/summary`
+      let url = `${API_URL}/trading/summary`
       const params = new URLSearchParams()
       
       if (startDate) {
@@ -204,7 +204,7 @@ export default function ReviewPage() {
     }, 200)
     
     try {
-      const response = await fetch(`${API_URL}/api/trading/upload`, {
+      const response = await fetch(`${API_URL}/trading/upload`, {
         method: 'POST',
         headers: getAuthHeaders(),
         body: formData
@@ -264,7 +264,7 @@ export default function ReviewPage() {
     setLoadingTrades(true)
     
     try {
-      const response = await fetch(`${API_URL}/api/trading/stock/${stock.stock_code}`, {
+      const response = await fetch(`${API_URL}/trading/stock/${stock.stock_code}`, {
         headers: getAuthHeaders()
       })
       const result = await response.json()
@@ -339,7 +339,7 @@ export default function ReviewPage() {
     setError(null)
     
     try {
-      let url = `${API_URL}/api/trading/summary`
+      let url = `${API_URL}/trading/summary`
       const params = new URLSearchParams()
       
       const startParam = start !== undefined ? start : startDate

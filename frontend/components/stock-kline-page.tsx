@@ -7,7 +7,7 @@ import { useRouter } from "@/i18n/routing"
 import { Button } from "@/components/ui/button"
 import { KLineChart, CandleData } from "@/components/kline-chart"
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5001"
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "/api"
 
 const formatDate = (value: Date) => value.toISOString().slice(0, 10)
 
@@ -90,7 +90,7 @@ export function StockKLinePage({ code, market, name }: StockKLinePageProps) {
         end: queryEnd,
         ktype: queryType,
       })
-      const response = await fetch(`${API_URL}/api/stock-analysis/kline-history?${query.toString()}`)
+      const response = await fetch(`${API_URL}/stock-analysis/kline-history?${query.toString()}`)
       if (!response.ok) {
         throw new Error(`${t("loadFailed")}`)
       }

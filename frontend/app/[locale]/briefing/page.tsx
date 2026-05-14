@@ -9,7 +9,7 @@ import { usePathname, useRouter } from "@/i18n/routing"
 import { useLocale, useTranslations } from "next-intl"
 import { Clock3, Loader2, Lock, Send, Sparkles } from "lucide-react"
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5001"
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "/api"
 const PAGE_SIZE = 10
 
 interface BriefingRecord {
@@ -66,7 +66,7 @@ export default function BriefingPage() {
       }
 
       try {
-        const response = await authenticatedFetch(`${API_URL}/api/briefings?page=${pageToLoad}&limit=${PAGE_SIZE}`)
+        const response = await authenticatedFetch(`${API_URL}/briefings?page=${pageToLoad}&limit=${PAGE_SIZE}`)
         const result = await response.json()
         if (!result.success) {
           throw new Error(result.error || t("loadFailed"))

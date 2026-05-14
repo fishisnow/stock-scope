@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
-import { useParams, useSearchParams } from "next/navigation"
+import { useSearchParams } from "next/navigation"
 import { ArrowDown, ArrowLeft, ArrowUp, TrendingDown, TrendingUp } from "lucide-react"
 import { useLocale, useTranslations } from "next-intl"
 import { Area, CartesianGrid, Line, LineChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts"
@@ -13,7 +13,7 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { getLocalizedIndustryName } from "@/lib/industry-labels"
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5001"
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "/api"
 
 interface Stock {
   name: string
@@ -79,25 +79,20 @@ function StockTable({
   t,
 }: {
   data: Stock[]
-  t: any
+  t: ReturnType<typeof useTranslations>
 }) {
   const [showAll, setShowAll] = useState(false)
   const [sortKey, setSortKey] = useState<SortKey>("amount")
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc")
-  const sortedData = useMemo(() => {
-    const toNumber = (value: string | number | undefined) => {
-      const n = parseFloat(String(value ?? 0))
-      return Number.isFinite(n) ? n : 0
-    }
-    return [...data].sort((a, b) => {
-      const aValue = toNumber(a[sortKey] as string | number | undefined)
-      const bValue = toNumber(b[sortKey] as string | number | undefined)
-      if (sortDirection === "asc") return aValue - bValue
-      return bValue - aValue
+
+  const displayData = useMemo(() => {
+    const sorted = [...data].sort((a, b) => {
+      const aValue = parseFloat(String(a[sortKey] || 0))
+      const bValue = parseFloat(String(b[sortKey] || 0))
+      return sortDirection === "asc" ? aValue - bValue : bValue - aValue
     })
-  }, [data, sortDirection, sortKey])
-  const displayData = showAll ? sortedData : sortedData.slice(0, 8)
-  const hasMore = data.length > 8
+    return showAll ? sorted : sorted.slice(0, 20)
+  }, [data, showAll, sortDirection, sortKey])
 
   const handleSort = (key: SortKey) => {
     if (sortKey === key) {
@@ -114,22 +109,17 @@ function StockTable({
   }
 
   return (
-    <Card className="hover:shadow-lg transition-all duration-300">
-      <CardContent className="pt-6">
-        <div className="mb-4 flex justify-end">
-          <Badge variant="secondary" className="text-sm font-mono">
-            {data.length} {t("table.stocks")}
-          </Badge>
-        </div>
+    <Card>
+      <CardContent className="p-0 sm:p-2">
         <div className="overflow-x-auto [touch-action:pan-x] [-webkit-overflow-scrolling:touch] mobile-fit-table-wrapper">
           <table className="w-full mobile-fit-table">
             <thead>
-              <tr className="border-b-2 border-border">
+              <tr className="border-b border-border/50 bg-muted/20">
                 <th className="py-3 px-2 text-left text-[10px] sm:text-xs font-bold uppercase tracking-wide text-muted-foreground whitespace-nowrap">
                   {t("table.rank")}
                 </th>
                 <th className="py-3 px-2 text-left text-[10px] sm:text-xs font-bold uppercase tracking-wide text-muted-foreground min-w-[80px]">
-                  {t("table.stock")}
+                  {t("table.name")}
                 </th>
                 <th className="py-3 px-2 text-right text-[10px] sm:text-xs font-bold uppercase tracking-wide text-muted-foreground whitespace-nowrap">
                   <button type="button" onClick={() => handleSort("amount")} className="inline-flex items-center gap-1 hover:text-primary">
@@ -241,8 +231,8 @@ function StockTable({
           </table>
         </div>
 
-        {hasMore && (
-          <div className="mt-6 text-center">
+        {data.length > 20 && (
+          <div className="mt-6 text-center pb-4">
             <Button variant="outline" size="sm" onClick={() => setShowAll(!showAll)}>
               {showAll ? t("table.showLess") : t("table.showAll", { count: data.length })}
             </Button>
@@ -256,10 +246,8 @@ function StockTable({
 export default function IndustryStocksPage() {
   const t = useTranslations("market")
   const locale = useLocale()
-  const params = useParams()
   const searchParams = useSearchParams()
-  const industryParam = (params?.industry as string) || ""
-  const industry = useMemo(() => decodeURIComponent(industryParam), [industryParam])
+  const industry = searchParams.get("industry") || ""
   const industryLabel = useMemo(() => getLocalizedIndustryName(industry, locale), [industry, locale])
   const breadthValue = useMemo(() => {
     const raw = searchParams.get("breadth")
@@ -306,182 +294,113 @@ export default function IndustryStocksPage() {
       setError(null)
       try {
         const [stocksResponse, breadthResponse] = await Promise.all([
-          fetch(`${API_URL}/api/market_breadth/industry_stocks?industry=${encodeURIComponent(industry)}`),
-          fetch(`${API_URL}/api/market_breadth?limit=30&breadth_type=industry&sector=${encodeURIComponent(industry)}`),
+          fetch(`${API_URL}/market_breadth/industry_stocks?industry=${encodeURIComponent(industry)}`),
+          fetch(`${API_URL}/market_breadth?limit=30&breadth_type=industry&sector=${encodeURIComponent(industry)}`),
         ])
         const stocksResult = await stocksResponse.json()
         if (stocksResult.success) {
           setData(stocksResult.data)
         } else {
-          setError(`${t("errors.failedToLoadData")}: ${stocksResult.error}`)
+          throw new Error(stocksResult.error || t("errors.failedToLoadData"))
         }
 
         const breadthResult = await breadthResponse.json()
-        if (breadthResult.success) {
-          const breadthData = breadthResult.data as MarketBreadthData
-          const seriesByDate = new Map<string, number>()
-          for (const item of breadthData.records || []) {
-            if (item.breadth_type !== "industry") continue
-            const value = parseBreadthIndex(item.breadth_pct)
-            if (value === null) continue
-            seriesByDate.set(item.date, value)
-          }
-          const points = (breadthData.dates || [])
-            .slice()
+        if (breadthResult.success && Array.isArray(breadthResult.data)) {
+          const series = breadthResult.data
+            .map((item: MarketBreadthRecord) => ({
+              date: item.date,
+              value: parseBreadthIndex(item.breadth_pct) ?? 0,
+            }))
             .reverse()
-            .map((date) => ({ date, value: seriesByDate.get(date) }))
-            .filter((item): item is { date: string; value: number } => Number.isFinite(item.value))
-          setBreadthSeries(points)
+          setBreadthSeries(series)
         } else {
           setBreadthSeries([])
         }
       } catch (err) {
-        setError(`${t("errors.networkError")}: ${(err as Error).message}`)
+        setError(err instanceof Error ? err.message : t("errors.failedToLoadData"))
       } finally {
         setLoading(false)
         setBreadthSeriesLoading(false)
       }
     }
+
     load()
   }, [industry, t])
 
   return (
     <div className="min-h-screen bg-background">
       <Header />
-      <main className="page-shell page-main-spacing">
-        <div className="mb-10 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div className="min-w-0">
-            <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-              <h1 className="font-serif text-3xl sm:text-5xl lg:text-6xl tracking-tight text-primary">
-                {industryLabel || "-"}
-              </h1>
-              {!loading && !error && data && (
-                <span className="text-sm sm:text-base font-mono tabular-nums text-muted-foreground">
-                  {t("breadth.industryCountInline", { count: data.total_candidates })}
+      <main className="container mx-auto max-w-6xl px-4 py-6 sm:px-6 lg:px-8">
+        <div className="mb-6 flex items-center gap-3">
+          <Button asChild variant="outline" size="sm" className="gap-2">
+            <Link href="/market">
+              <ArrowLeft className="h-4 w-4" />
+              {t("detail.backToMarket")}
+            </Link>
+          </Button>
+          <div>
+            <h1 className="text-2xl font-serif text-primary sm:text-3xl">{industryLabel || t("detail.industryDetail")}</h1>
+            <p className="text-sm text-muted-foreground">{t("detail.industryDetailDesc")}</p>
+          </div>
+        </div>
+
+        {breadthValue !== null && (
+          <Card className="mb-6 border-border/60">
+            <CardContent className="flex flex-wrap items-center gap-4 p-5">
+              <Badge
+                className={`${getBreadthTextColor(breadthValue)}`}
+                style={{ backgroundColor: getBreadthColor(breadthValue) }}
+              >
+                {t("breadth.latestBreadth")}: {formatBreadthIndex(breadthValue)}%
+              </Badge>
+              {breadthDate && <span className="text-sm text-muted-foreground">{t("breadth.latestDate")}: {breadthDate}</span>}
+            </CardContent>
+          </Card>
+        )}
+
+        <Card className="mb-6 border-border/60">
+          <CardContent className="p-5">
+            <div className="mb-4 flex items-center justify-between gap-3">
+              <div>
+                <h2 className="text-lg font-semibold">{t("breadth.trendTitle")}</h2>
+                <p className="text-sm text-muted-foreground">{t("breadth.trendDesc")}</p>
+              </div>
+              {breadthSeries.length > 0 && (
+                <span className="text-xs text-muted-foreground">
+                  {breadthSeries[0]?.date} ~ {breadthSeries[breadthSeries.length - 1]?.date}
                 </span>
               )}
             </div>
-            {breadthValue !== null && (
-              <div className="mt-3 inline-flex items-center gap-2">
-                <span className="text-sm text-muted-foreground">{t("breadth.currentIndustryBreadth")}</span>
-                <span
-                  className={`px-2 py-0.5 rounded text-sm font-mono ${getBreadthTextColor(breadthValue)}`}
-                  style={{ backgroundColor: getBreadthColor(breadthValue) }}
-                >
-                  {formatBreadthIndex(breadthValue, 1)}
-                </span>
-                {breadthDate && <span className="text-xs text-muted-foreground font-mono">{breadthDate}</span>}
-              </div>
-            )}
-          </div>
-          <Button asChild variant="outline" className="gap-2 shrink-0 self-start sm:self-auto">
-            <Link href="/market">
-              <ArrowLeft className="h-4 w-4" />
-              {t("breadth.backToMarket")}
-            </Link>
-          </Button>
-        </div>
 
-        {(breadthSeriesLoading || breadthSeries.length > 0) && (
-          <Card className="mb-6">
-            <CardContent className="pt-5 pb-4">
-              <div className="mb-3 flex items-center justify-between">
-                <span className="text-sm font-medium text-muted-foreground">{t("breadth.currentIndustryBreadth")}</span>
-                {breadthSeries.length > 0 && (
-                  <span className="text-xs font-mono text-muted-foreground rounded bg-secondary/60 px-2 py-0.5">
-                    {breadthSeries[0]?.date} ~ {breadthSeries[breadthSeries.length - 1]?.date}
-                  </span>
-                )}
-              </div>
-              <div className="h-44 w-full">
-                {breadthSeriesLoading ? (
-                  <div className="h-full w-full animate-pulse rounded-md bg-secondary/50" />
-                ) : (
-                  <ResponsiveContainer width="100%" height="100%">
-                    <LineChart data={breadthSeries} margin={{ top: 8, right: 8, left: 0, bottom: 8 }}>
-                      <CartesianGrid strokeDasharray="2 4" stroke="hsl(var(--border) / 0.35)" />
-                      <XAxis
-                        dataKey="date"
-                        minTickGap={24}
-                        tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }}
-                        tickFormatter={(value) => String(value).slice(5)}
-                      />
-                      <YAxis
-                        domain={[0, 100]}
-                        ticks={[0, 20, 40, 60, 80, 100]}
-                        width={36}
-                        tickFormatter={(value) => `${value}`}
-                        tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }}
-                      />
-                      <ReferenceLine
-                        y={50}
-                        stroke="#f59e0b"
-                        strokeDasharray="6 6"
-                        strokeOpacity={0.9}
-                        ifOverflow="visible"
-                      />
-                      <Tooltip
-                        formatter={(value: number) => formatBreadthIndex(Number(value), 1)}
-                        labelFormatter={(label) => String(label)}
-                        contentStyle={{
-                          background: "hsl(var(--card))",
-                          border: "1px solid hsl(var(--border))",
-                          borderRadius: "8px",
-                          fontSize: "11px",
-                          padding: "8px 10px",
-                          boxShadow: "0 8px 20px rgba(2, 6, 23, 0.14)",
-                        }}
-                      />
-                      <Area
-                        type="monotone"
-                        dataKey="value"
-                        stroke="none"
-                        fill="#2563eb"
-                        fillOpacity={0.12}
-                        connectNulls
-                      />
-                      <Line
-                        type="monotone"
-                        dataKey="value"
-                        stroke="#2563eb"
-                        strokeWidth={2.5}
-                        dot={{ r: 2, fill: "#2563eb", stroke: "#ffffff", strokeWidth: 1 }}
-                        activeDot={{ r: 5, fill: "#2563eb", stroke: "#ffffff", strokeWidth: 2 }}
-                        connectNulls
-                      />
-                    </LineChart>
-                  </ResponsiveContainer>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-        )}
+            <div className="h-[280px] w-full">
+              {breadthSeriesLoading ? (
+                <div className="flex h-full items-center justify-center text-sm text-muted-foreground">{t("loading")}</div>
+              ) : breadthSeries.length === 0 ? (
+                <div className="flex h-full items-center justify-center text-sm text-muted-foreground">{t("errors.failedToLoadData")}</div>
+              ) : (
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={breadthSeries} margin={{ top: 10, right: 12, left: -12, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(148,163,184,0.2)" />
+                    <XAxis dataKey="date" tick={{ fontSize: 12 }} minTickGap={24} />
+                    <YAxis domain={[0, 100]} ticks={[0, 20, 40, 60, 80, 100]} tick={{ fontSize: 12 }} />
+                    <Tooltip formatter={(value: number) => [`${value.toFixed(1)}%`, t("breadth.latestBreadth")]} />
+                    <ReferenceLine y={50} stroke="rgba(148,163,184,0.4)" strokeDasharray="4 4" />
+                    <Area type="monotone" dataKey="value" fill="rgba(59,130,246,0.12)" stroke="none" />
+                    <Line type="monotone" dataKey="value" stroke="#2563eb" strokeWidth={2.5} dot={false} />
+                  </LineChart>
+                </ResponsiveContainer>
+              )}
+            </div>
+          </CardContent>
+        </Card>
 
-        {loading && <div className="text-sm text-muted-foreground">{t("breadth.industryStocksLoading")}</div>}
-
-        {!loading && error && (
-          <Card className="border-destructive bg-destructive/5">
-            <CardContent className="py-8">
-              <div className="text-center text-destructive">
-                <p className="font-semibold mb-2">{t("errors.errorLoadingData")}</p>
-                <p className="text-sm">{error}</p>
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-        {!loading && !error && data && (
-          <>
-            {data.stocks.length > 0 ? (
-              <StockTable
-                data={data.stocks}
-                t={t}
-              />
-            ) : (
-              <div className="text-sm text-muted-foreground">{t("breadth.industryStocksNoData")}</div>
-            )}
-          </>
-        )}
+        {loading ? (
+          <div className="flex min-h-[240px] items-center justify-center text-sm text-muted-foreground">{t("loading")}</div>
+        ) : error ? (
+          <div className="flex min-h-[240px] items-center justify-center text-sm text-destructive">{error}</div>
+        ) : data ? (
+          <StockTable data={data.stocks} t={t} />
+        ) : null}
       </main>
     </div>
   )

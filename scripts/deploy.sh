@@ -120,7 +120,6 @@ echo "🔒 应用安全加固配置..."
 
 docker run -d \
     --name "$CONTAINER_NAME" \
-    -p 3000:3000 \
     -p 5001:5001 \
     "${ENV_ARGS[@]}" \
     "${EXTRA_ARGS[@]}" \
@@ -171,7 +170,7 @@ if docker ps | grep -q "$CONTAINER_NAME" && [ "$HEALTH_READY" = true ]; then
     echo "=========================================="
     echo "使用镜像: $ALIYUN_IMAGE"
     echo ""
-    echo "📱 前端地址: http://localhost:3000"
+    echo "📱 应用地址: http://localhost:5001"
     echo "🔌 后端地址: http://localhost:5001"
     echo "🩺 健康检查: $BACKEND_HEALTH_URL"
     echo ""

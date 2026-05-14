@@ -14,7 +14,10 @@
       "Bash(rmdir \"/Users/huangyusong/myspace/stock-scope/frontend/app/[locale]/opportunity/[id]\")",
       "Bash(rmdir \"/Users/huangyusong/myspace/stock-scope/frontend/app/[locale]/opportunity\")",
       "Bash(npx tsc:*)",
-      "Bash(cd:*)"
+      "Bash(cd:*)",
+      "Bash(rg --files \"/Users/huangyusong/myspace/stock-scope\")",
+      "Bash(rg *)",
+      "WebFetch(domain:next-intl.dev)"
     ]
   }
 }

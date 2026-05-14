@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button"
 import { Link } from "@/i18n/routing"
 import { getLocalizedIndustryName } from "@/lib/industry-labels"
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5001"
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "/api"
 
 interface MarketBreadthRecord {
   date: string
@@ -82,7 +82,7 @@ export default function IndustryPanoramaPage() {
     const loadBreadthData = async () => {
       setLoading(true)
       try {
-        const response = await fetch(`${API_URL}/api/market_breadth?limit=1`)
+        const response = await fetch(`${API_URL}/market_breadth?limit=1`)
         const result = await response.json()
         if (result.success) {
           setBreadthData(result.data)
@@ -222,7 +222,7 @@ export default function IndustryPanoramaPage() {
                   {row.map((tile) => (
                     <Link
                       key={tile.key}
-                      href={`/market/industry/${encodeURIComponent(tile.industry)}`}
+                      href={`/market/industry?industry=${encodeURIComponent(tile.industry)}`}
                       className={`relative flex items-center justify-center rounded border border-border/30 p-2 text-center ${getBreadthTextColor(tile.breadthValue)}`}
                       style={{
                         backgroundColor: getBreadthColor(tile.breadthValue),

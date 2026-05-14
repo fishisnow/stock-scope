@@ -38,11 +38,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /tmp/* \
     && rm -rf /var/tmp/*
 
-# 从 frontend-builder 阶段复制 Node.js 和 npm（因为该阶段已经使用了官方 Node.js 镜像）
-# 复制整个 Node.js 安装目录，确保包含所有二进制文件、库文件和符号链接
-COPY --from=frontend-builder /usr/local/bin/ /usr/local/bin/
-COPY --from=frontend-builder /usr/local/lib/node_modules/ /usr/local/lib/node_modules/
-
 # 创建非 root 用户（安全最佳实践）
 RUN groupadd -r appuser && useradd -r -g appuser -u 1000 appuser \
     && mkdir -p /app /home/appuser \
@@ -60,14 +55,14 @@ RUN pip install --no-cache-dir -r backend/requirements.txt
 # 复制后端代码
 COPY backend/ ./backend/
 
-# 从构建阶段复制前端构建产物
-COPY --from=frontend-builder /app/frontend ./frontend
+# 从构建阶段复制前端静态产物
+COPY --from=frontend-builder /app/frontend/out ./frontend/out
 
 # 设置文件权限（确保非 root 用户可以访问）
 RUN chown -R appuser:appuser /app
 
 # 暴露端口
-EXPOSE 3000 5001
+EXPOSE 5001
 
 # 设置环境变量
 ENV NODE_ENV=production
@@ -78,7 +73,7 @@ ENV HOME=/home/appuser
 # 切换到非 root 用户（安全最佳实践）
 USER appuser
 
-# 启动应用（定时任务 + 后端 API + 前端）
-# 使用 POSIX sh 兼容的进程等待逻辑（避免 wait -n 报错）
-CMD ["sh", "-c", "cd /app/backend && python -c \"from app.core import schedule_stocks; schedule_stocks.main()\" & p1=$!; cd /app/backend && gunicorn -w 4 -b 0.0.0.0:5001 app.api.api_app:app & p2=$!; cd /app/frontend && npm start & p3=$!; while true; do for p in $p1 $p2 $p3; do if ! kill -0 \"$p\" 2>/dev/null; then wait \"$p\"; exit $?; fi; done; sleep 1; done"]
+# 启动应用（定时任务 + 后端 API）
+# 保持单容器部署，但移除 Next.js 运行时以降低内存占用
+CMD ["sh", "-c", "cd /app/backend && python -c \"from app.core import schedule_stocks; schedule_stocks.main()\" & p1=$!; cd /app/backend && gunicorn -w 2 --threads 2 --timeout 120 --max-requests 500 --max-requests-jitter 50 -b 0.0.0.0:5001 app.api.api_app:app & p2=$!; while true; do for p in $p1 $p2; do if ! kill -0 \"$p\" 2>/dev/null; then wait \"$p\"; exit $?; fi; done; sleep 1; done"]
 

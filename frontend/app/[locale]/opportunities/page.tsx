@@ -1,8 +1,10 @@
 "use client"
 
 import { useState } from "react"
+import { useSearchParams } from "next/navigation"
+
 import { Header } from "@/components/header"
-// import { TrendsSection } from "@/components/trends-section"
+import { OpportunityOfTheDay } from "@/components/opportunity-of-the-day"
 import { OpportunitiesDatabase } from "@/components/opportunities-database"
 import { InvestmentOpportunityRecorder } from "@/components/investment-opportunity-recorder"
 
@@ -27,7 +29,9 @@ interface InvestmentOpportunity {
   updated_at?: string
 }
 
-export default function Home() {
+export default function OpportunitiesPage() {
+  const searchParams = useSearchParams()
+  const id = searchParams.get("id") || undefined
   const [recorderOpen, setRecorderOpen] = useState(false)
   const [editingOpportunity, setEditingOpportunity] = useState<InvestmentOpportunity | null>(null)
 
@@ -47,22 +51,27 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-background">
-      <Header onRecordOpportunity={handleOpenRecorder} />
+      <Header onRecordOpportunity={!id ? handleOpenRecorder : undefined} />
       <main>
-        {/* <TrendsSection /> */}
-        <OpportunitiesDatabase
-          onOpenRecorder={handleOpenRecorder}
-          onEditOpportunity={handleEditOpportunity}
-          pageSize={9}
-          enablePagination
-        />
-        <InvestmentOpportunityRecorder
-          onOpportunityChange={() => {}}
-          initialEditingOpportunity={editingOpportunity}
-          onEditComplete={handleEditComplete}
-          open={recorderOpen}
-          onOpenChange={setRecorderOpen}
-        />
+        {id ? (
+          <OpportunityOfTheDay opportunityId={id} isLatest={false} />
+        ) : (
+          <>
+            <OpportunitiesDatabase
+              onOpenRecorder={handleOpenRecorder}
+              onEditOpportunity={handleEditOpportunity}
+              pageSize={9}
+              enablePagination
+            />
+            <InvestmentOpportunityRecorder
+              onOpportunityChange={() => {}}
+              initialEditingOpportunity={editingOpportunity}
+              onEditComplete={handleEditComplete}
+              open={recorderOpen}
+              onOpenChange={setRecorderOpen}
+            />
+          </>
+        )}
       </main>
     </div>
   )

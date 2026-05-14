@@ -4,7 +4,6 @@ import { GeistSans } from "geist/font/sans"
 import { GeistMono } from "geist/font/mono"
 import { Playfair_Display } from "next/font/google"
 import Script from "next/script"
-import { getLocale } from "next-intl/server"
 import { routing } from "@/i18n/routing"
 import { AuthProvider } from "@/lib/auth-context"
 import "./globals.css"
@@ -21,23 +20,10 @@ export const viewport: Viewport = {
   viewportFit: "cover",
 }
 
-export default async function RootLayout({ children }: { children: ReactNode }) {
+export default function RootLayout({ children }: { children: ReactNode }) {
   const appEnv = process.env.NEXT_PUBLIC_APP_ENV ?? process.env.NODE_ENV
   const shouldEnableAnalytics = appEnv !== "development"
-
-  let locale: (typeof routing.locales)[number] = routing.defaultLocale
-  try {
-    const resolvedLocale = await getLocale()
-    if (
-      routing.locales.includes(
-        resolvedLocale as (typeof routing.locales)[number]
-      )
-    ) {
-      locale = resolvedLocale as (typeof routing.locales)[number]
-    }
-  } catch {
-    // Fallback to default locale for non-i18n routes like /auth/callback
-  }
+  const locale = routing.defaultLocale
 
   return (
     <html lang={locale}>

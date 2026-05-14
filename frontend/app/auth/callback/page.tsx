@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
-import { supabase } from "@/lib/supabase"
+import { getSupabaseClient } from "@/lib/supabase"
 
 function getSafeRedirect(value: string | null) {
   if (!value) return "/"
@@ -24,6 +24,7 @@ export default function AuthCallbackPage() {
         const url = new URL(window.location.href)
         const code = url.searchParams.get("code")
         if (code) {
+          const supabase = getSupabaseClient()
           const { error } = await supabase.auth.exchangeCodeForSession(code)
           if (error) throw error
         } else {
@@ -31,6 +32,7 @@ export default function AuthCallbackPage() {
           const accessToken = hashParams.get("access_token")
           const refreshToken = hashParams.get("refresh_token")
           if (accessToken && refreshToken) {
+            const supabase = getSupabaseClient()
             const { error } = await supabase.auth.setSession({
               access_token: accessToken,
               refresh_token: refreshToken
