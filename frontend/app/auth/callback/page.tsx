@@ -6,7 +6,21 @@ import { getSupabaseClient } from "@/lib/supabase"
 
 function getSafeRedirect(value: string | null) {
   if (!value) return "/"
-  return value.startsWith("/") ? value : "/"
+  const safeValue = value.startsWith("/") ? value : "/"
+  const [pathnameWithQuery, hash = ""] = safeValue.split("#", 2)
+  const [pathname = "/", search = ""] = pathnameWithQuery.split("?", 2)
+
+  let normalizedPathname = pathname
+    .replace(/\/index\.(txt|html)\/?$/i, "")
+    .replace(/\.(txt|html)\/?$/i, "")
+
+  if (!normalizedPathname) {
+    normalizedPathname = "/"
+  }
+
+  const normalizedSearch = search ? `?${search}` : ""
+  const normalizedHash = hash ? `#${hash}` : ""
+  return `${normalizedPathname}${normalizedSearch}${normalizedHash}`
 }
 
 export default function AuthCallbackPage() {

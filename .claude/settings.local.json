@@ -17,7 +17,19 @@
       "Bash(cd:*)",
       "Bash(rg --files \"/Users/huangyusong/myspace/stock-scope\")",
       "Bash(rg *)",
-      "WebFetch(domain:next-intl.dev)"
+      "WebFetch(domain:next-intl.dev)",
+      "Bash(curl -I -sS \"http://localhost:5001/api/stock-analysis/health\")",
+      "Bash(curl -I -sS \"https://invest.fishisnow.xyz/api/stock-analysis/health\")",
+      "Bash(curl -sS \"https://invest.fishisnow.xyz/en/\")",
+      "Bash(curl -sS \"https://invest.fishisnow.xyz/_next/static/chunks/app/%5Blocale%5D/page-b51e83629da5bdeb.js\")",
+      "Bash(curl -sS \"https://invest.fishisnow.xyz/en/market/\")",
+      "Bash(curl -I -sS \"https://invest.fishisnow.xyz/api/dates\")",
+      "Bash(curl -I -sS \"https://invest.fishisnow.xyz/dates\")",
+      "Bash(curl -I -sS \"http://localhost:5001/api/dates\")",
+      "Bash(curl -I -sS \"http://localhost:5001/dates\")",
+      "Bash(python *)",
+      "Bash(curl -sS \"https://invest.fishisnow.xyz/_next/static/chunks/app/%5Blocale%5D/market/page-2fbcb32790357e82.js/\")",
+      "Bash(curl -sS \"https://invest.fishisnow.xyz/_next/static/chunks/app/%5Blocale%5D/market/page-70ba23d11c71ac9a.js\")"
     ]
   }
 }

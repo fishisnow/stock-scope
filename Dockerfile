@@ -49,8 +49,10 @@ WORKDIR /app
 # 复制后端依赖文件
 COPY backend/requirements.txt ./backend/
 
-# 安装后端依赖
-RUN pip install --no-cache-dir -r backend/requirements.txt
+# 单独安装镜像源缺失的包，其余依赖走国内镜像
+RUN pip install --no-cache-dir --root-user-action=ignore futu-api \
+    && grep -vE '^futu-api([[:space:]]|$)' backend/requirements.txt > /tmp/requirements.domestic.txt \
+    && pip install --no-cache-dir --root-user-action=ignore -i https://mirrors.aliyun.com/pypi/simple/ -r /tmp/requirements.domestic.txt
 
 # 复制后端代码
 COPY backend/ ./backend/

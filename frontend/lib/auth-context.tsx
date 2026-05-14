@@ -4,6 +4,23 @@ import React, { createContext, useContext, useState, useEffect, useCallback } fr
 import { getSupabaseClient } from './supabase'
 import type { User as SupabaseUser, Session } from '@supabase/supabase-js'
 
+function normalizeAppPath(path: string) {
+  const [pathnameWithQuery, hash = ''] = path.split('#', 2)
+  const [pathname = '/', search = ''] = pathnameWithQuery.split('?', 2)
+
+  let normalizedPathname = pathname
+    .replace(/\/index\.(txt|html)\/?$/i, '')
+    .replace(/\.(txt|html)\/?$/i, '')
+
+  if (!normalizedPathname) {
+    normalizedPathname = '/'
+  }
+
+  const normalizedSearch = search ? `?${search}` : ''
+  const normalizedHash = hash ? `#${hash}` : ''
+  return `${normalizedPathname}${normalizedSearch}${normalizedHash}`
+}
+
 export interface User {
   id: string
   email: string
@@ -141,9 +158,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   const loginWithGoogle = async (redirectPath?: string) => {
-    const currentPath =
+    const currentPath = normalizeAppPath(
       redirectPath ||
       `${window.location.pathname}${window.location.search}${window.location.hash}`
+    )
     const callbackUrl = new URL(`${window.location.origin}/auth/callback`)
     callbackUrl.searchParams.set('redirectTo', currentPath)
 
