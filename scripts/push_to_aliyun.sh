@@ -87,8 +87,9 @@ fi
 echo ""
 
 # 步骤 2: 构建镜像
-echo -e "${GREEN}[2/6] 构建 Docker 镜像...${NC}"
-docker build $BUILD_ARGS -t stock-scope:latest .
+TARGET_PLATFORM="linux/amd64"
+echo -e "${GREEN}[2/6] 构建 Docker 镜像 (${TARGET_PLATFORM})...${NC}"
+docker build --platform ${TARGET_PLATFORM} $BUILD_ARGS -t stock-scope:latest .
 echo -e "${GREEN}✅ 镜像构建完成${NC}"
 echo ""
 

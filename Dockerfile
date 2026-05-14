@@ -65,7 +65,6 @@ RUN chown -R appuser:appuser /app
 EXPOSE 5001
 
 # 设置环境变量
-ENV NODE_ENV=production
 ENV PYTHONUNBUFFERED=1
 ENV TZ=Asia/Shanghai
 ENV HOME=/home/appuser

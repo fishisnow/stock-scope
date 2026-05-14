@@ -204,5 +204,5 @@ def main():
 
 
 if __name__ == "__main__":
-    futu_job()
+    compute_market_breadth_daily()
     # clean_sector_industry_by_excel(excel_path="/Users/huangyusong/Desktop/10jqka.xlsx", full_refresh=True)
