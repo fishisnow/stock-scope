@@ -1,4 +1,5 @@
 import json
+import math
 import os
 
 import lark_oapi as lark
@@ -24,7 +25,10 @@ def _guess_data_type(header):
     if header == "股票名称":
         return "lark_md"
 
-    numeric_tokens = ["成交额", "成交量", "量比", "换手率", "市盈率"]
+    # 市盈率常缺失，飞书 number 列不接受空字符串，用 text 展示
+    if "市盈率" in header:
+        return "text"
+    numeric_tokens = ["成交额", "成交量", "量比", "换手率"]
     if any(token in header for token in numeric_tokens):
         return "number"
     return "text"
@@ -56,11 +60,15 @@ def _get_column_width(header):
 
 
 def _format_change_value(value):
-    normalized = value.replace("%", "")
+    normalized = value.replace("%", "").strip()
+    if not normalized or normalized.lower() in ("nan", "inf", "-inf"):
+        return ""
     try:
         numeric_value = float(normalized)
     except ValueError:
         return value
+    if not math.isfinite(numeric_value):
+        return ""
 
     sign = "+" if numeric_value > 0 else ""
     formatted = f"{sign}{numeric_value:.1f}%"
@@ -80,11 +88,38 @@ def _parse_cell_value(header, value):
     if _guess_data_type(header) != "number":
         return value
 
-    normalized = value.replace(",", "").replace("%", "")
+    normalized = value.replace(",", "").replace("%", "").strip()
+    if not normalized or normalized.lower() in ("nan", "inf", "-inf"):
+        return ""
     try:
-        return float(normalized)
+        number = float(normalized)
+        if not math.isfinite(number):
+            return ""
+        return number
     except ValueError:
         return value
+
+
+def _normalize_table_cell(data_type, header, raw_value):
+    """飞书 table 的 number 列必须是数字，空值需省略。"""
+    parsed = _parse_cell_value(header, raw_value)
+    if data_type != "number":
+        return parsed
+
+    if parsed == "":
+        return None
+    if isinstance(parsed, (int, float)):
+        return parsed if math.isfinite(parsed) else None
+    if isinstance(parsed, str):
+        normalized = parsed.replace(",", "").replace("%", "").strip()
+        if not normalized or normalized.lower() in ("nan", "inf", "-inf"):
+            return None
+        try:
+            number = float(normalized)
+            return number if math.isfinite(number) else None
+        except ValueError:
+            return None
+    return None
 
 
 def _build_table_element(headers, rows, section_title, element_id):
@@ -113,7 +148,14 @@ def _build_table_element(headers, rows, section_title, element_id):
         row_data = {}
         for column, source_index in zip(columns, active_indices):
             value = parsed_row[source_index] if source_index < len(parsed_row) else ""
-            row_data[column["name"]] = _parse_cell_value(headers[source_index], value)
+            cell = _normalize_table_cell(
+                column["data_type"],
+                headers[source_index],
+                value,
+            )
+            if cell is None and column["data_type"] == "number":
+                continue
+            row_data[column["name"]] = cell
         table_rows.append(row_data)
 
     return [

@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 
+import math
 import os
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional
@@ -9,6 +10,20 @@ from app.utils.date_utils import TradingDateUtils
 
 # 加载环境变量
 load_dotenv()
+
+
+def _safe_float(value, default: float = 0.0) -> float:
+    """将数值转为 float，NaN/Inf 等非有限值替换为 default（JSON 不可序列化）。"""
+    if value is None:
+        return default
+    try:
+        number = float(value)
+        if not math.isfinite(number):
+            return default
+        return number
+    except (TypeError, ValueError):
+        return default
+
 
 class StockDatabase:
     def __init__(self):
@@ -69,12 +84,12 @@ class StockDatabase:
                         'rank_order': rank,
                         'stock_code': str(stock.get('code', '')),
                         'stock_name': str(stock.get('name', '')),
-                        'change_ratio': float(stock.get('changeRatio', 0)) if stock.get('changeRatio') is not None else 0.0,
-                        'volume': float(stock.get('volume', 0)) if stock.get('volume') is not None else 0.0,
-                        'amount': float(stock.get('amount', 0)) if stock.get('amount') is not None else 0.0,
-                        'pe_ratio': float(stock.get('pe', 0)) if stock.get('pe') is not None else 0.0,
-                        'volume_ratio': float(stock.get('volumeRatio', 0)) if stock.get('volumeRatio') is not None else 0.0,
-                        'turnover_rate': float(stock.get('turnoverRate', 0)) if stock.get('turnoverRate') is not None else 0.0
+                        'change_ratio': _safe_float(stock.get('changeRatio')),
+                        'volume': _safe_float(stock.get('volume')),
+                        'amount': _safe_float(stock.get('amount')),
+                        'pe_ratio': _safe_float(stock.get('pe')),
+                        'volume_ratio': _safe_float(stock.get('volumeRatio')),
+                        'turnover_rate': _safe_float(stock.get('turnoverRate'))
                     }
                     records_to_insert.append(record)
             
@@ -125,12 +140,12 @@ class StockDatabase:
                 stock_info = {
                     'code': row['stock_code'],
                     'name': row['stock_name'],
-                    'changeRatio': row['change_ratio'],
-                    'volume': row['volume'],
-                    'amount': row['amount'],
-                    'pe': row['pe_ratio'],
-                    'volumeRatio': row['volume_ratio'] if row['volume_ratio'] is not None else 0,
-                    'turnoverRate': row['turnover_rate'] if row['turnover_rate'] is not None else 0
+                    'changeRatio': _safe_float(row['change_ratio']),
+                    'volume': _safe_float(row['volume']),
+                    'amount': _safe_float(row['amount']),
+                    'pe': _safe_float(row['pe_ratio']),
+                    'volumeRatio': _safe_float(row['volume_ratio']),
+                    'turnoverRate': _safe_float(row['turnover_rate'])
                 }
                 data[source][market][data_type].append(stock_info)
             
@@ -186,12 +201,12 @@ class StockDatabase:
                     'stock_info': {
                         'code': row['stock_code'],
                         'name': row['stock_name'],
-                        'changeRatio': row['change_ratio'],
-                        'volume': row['volume'],
-                        'amount': row['amount'],
-                        'pe': row['pe_ratio'],
-                        'volumeRatio': row['volume_ratio'] if row['volume_ratio'] is not None else 0,
-                        'turnoverRate': row['turnover_rate'] if row['turnover_rate'] is not None else 0
+                        'changeRatio': _safe_float(row['change_ratio']),
+                        'volume': _safe_float(row['volume']),
+                        'amount': _safe_float(row['amount']),
+                        'pe': _safe_float(row['pe_ratio']),
+                        'volumeRatio': _safe_float(row['volume_ratio']),
+                        'turnoverRate': _safe_float(row['turnover_rate'])
                     }
                 })
             

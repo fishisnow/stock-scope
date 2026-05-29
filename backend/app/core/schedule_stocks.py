@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
 
+import math
 import time
+import traceback
 from datetime import datetime
 
 import schedule
@@ -15,15 +17,52 @@ from app.utils.market_breadth import compute_market_breadth_daily
 from app.utils.wx_push import send_md_message
 
 
+def _fmt_metric(value, divisor=1.0, decimals=1):
+    """格式化表格数值；NaN/Inf 等非有限值输出空字符串。"""
+    if value is None:
+        return ""
+    try:
+        number = float(value)
+        if not math.isfinite(number):
+            return ""
+        return f"{number / divisor:.{decimals}f}"
+    except (TypeError, ValueError):
+        return ""
+
+
+def _stock_row_cells(stock, *, with_amount=False):
+    volume_ratio = stock.get('volumeRatio', 0)
+    turnover_rate = stock.get('turnoverRate', 0)
+    cells = []
+    if with_amount:
+        cells.append(_fmt_metric(stock.get('amount'), 100000000))
+    cells.extend([
+        _fmt_metric(stock.get('changeRatio')),
+        _fmt_metric(stock.get('volume'), 10000),
+        _fmt_metric(volume_ratio),
+        _fmt_metric(turnover_rate),
+        _fmt_metric(stock.get('pe')),
+    ])
+    return " | ".join(cells)
+
+
+def _stock_name_link(stock, market):
+    stock_code = str(stock['code']).split('.')[-1]
+    return (
+        f"[{stock['name']}](https://invest.fishisnow.xyz/zh/stock/"
+        f"{market}/{stock_code}?name={stock['name']})"
+    )
+
+
 def futu_job():
     # 检查是否在交易时间（周一到周五，9:00-16:00）
     now = datetime.now()
     current_time = now.time()
     current_weekday = now.weekday()  # 0-6，0是周一，6是周日
-    
-    if not (0 <= current_weekday <= 4 and 9 <= current_time.hour <= 16):
-        # 非交易时间，直接返回
-        return
+    #
+    # if not (0 <= current_weekday <= 4 and 9 <= current_time.hour <= 16):
+    #     # 非交易时间，直接返回
+    #     return
     
     try:
         # 获取股票数据
@@ -46,33 +85,28 @@ def futu_job():
         message_parts.append("| 排名 | 股票名称 | 成交额(亿) | 涨跌幅(%) | 成交量(万手) | 量比 | 换手率(%) | 市盈率 |")
         message_parts.append("|------|----------|------------|-----------|-------------|------|---------|--------|")
         for i, stock in enumerate(data['A']['intersection'], 1):
-            volume_ratio = stock.get('volumeRatio', 0)
-            turnover_rate = stock.get('turnoverRate', 0)
-            stock_code = str(stock['code']).split('.')[-1]
-            stock_name = f"[{stock['name']}](https://invest.fishisnow.xyz/zh/stock/A/{stock_code}?name={stock['name']})"
-            message_parts.append(f"| {i} | {stock_name} | {float(stock['amount'])/100000000:.1f} | {float(stock['changeRatio']):.1f} | {float(stock['volume'])/10000:.1f} | {float(volume_ratio):.1f} | {float(turnover_rate):.1f} | {float(stock['pe']):.1f} |")
+            stock_name = _stock_name_link(stock, 'A')
+            message_parts.append(
+                f"| {i} | {stock_name} | {_stock_row_cells(stock, with_amount=True)} |"
+            )
 
         # 涨幅前50表格
         message_parts.append("\n#### 涨幅前50")
         message_parts.append("| 排名 | 股票名称 | 涨跌幅(%) | 成交量(万手) | 量比 | 换手率(%) | 市盈率 |")
         message_parts.append("|------|----------|-----------|-------------|------|---------|--------|")
         for i, stock in enumerate(data['A']['top_change'], 1):
-            volume_ratio = stock.get('volumeRatio', 0)
-            turnover_rate = stock.get('turnoverRate', 0)
-            stock_code = str(stock['code']).split('.')[-1]
-            stock_name = f"[{stock['name']}](https://invest.fishisnow.xyz/zh/stock/A/{stock_code}?name={stock['name']})"
-            message_parts.append(f"| {i} | {stock_name} | {float(stock['changeRatio']):.1f} | {float(stock['volume'])/10000:.1f} | {float(volume_ratio):.1f} | {float(turnover_rate):.1f} | {float(stock['pe']):.1f} |")
+            stock_name = _stock_name_link(stock, 'A')
+            message_parts.append(f"| {i} | {stock_name} | {_stock_row_cells(stock)} |")
 
         # 成交额前50表格
         message_parts.append("\n#### 成交额前50")
         message_parts.append("| 排名 | 股票名称 | 成交额(亿) | 涨跌幅(%) | 成交量(万手) | 量比 | 换手率(%) | 市盈率 |")
         message_parts.append("|------|----------|------------|-----------|-------------|------|---------|--------|")
         for i, stock in enumerate(data['A']['top_turnover'], 1):
-            volume_ratio = stock.get('volumeRatio', 0)
-            turnover_rate = stock.get('turnoverRate', 0)
-            stock_code = str(stock['code']).split('.')[-1]
-            stock_name = f"[{stock['name']}](https://invest.fishisnow.xyz/zh/stock/A/{stock_code}?name={stock['name']})"
-            message_parts.append(f"| {i} | {stock_name} | {float(stock['amount'])/100000000:.1f} | {float(stock['changeRatio']):.1f} | {float(stock['volume'])/10000:.1f} | {float(volume_ratio):.1f} | {float(turnover_rate):.1f} | {float(stock['pe']):.1f} |")
+            stock_name = _stock_name_link(stock, 'A')
+            message_parts.append(
+                f"| {i} | {stock_name} | {_stock_row_cells(stock, with_amount=True)} |"
+            )
 
 
 
@@ -84,38 +118,33 @@ def futu_job():
         message_parts.append("| 排名 | 股票名称 | 成交额(亿) | 涨跌幅(%) | 成交量(万手) | 量比 | 换手率(%) | 市盈率 |")
         message_parts.append("|------|----------|------------|-----------|-------------|------|---------|--------|")
         for i, stock in enumerate(data['HK']['intersection'], 1):
-            volume_ratio = stock.get('volumeRatio', 0)
-            turnover_rate = stock.get('turnoverRate', 0)
-            stock_code = str(stock['code']).split('.')[-1]
-            stock_name = f"[{stock['name']}](https://invest.fishisnow.xyz/zh/stock/HK/{stock_code}?name={stock['name']})"
-            message_parts.append(f"| {i} | {stock_name} | {float(stock['amount'])/100000000:.1f} | {float(stock['changeRatio']):.1f} | {float(stock['volume'])/10000:.1f} | {float(volume_ratio):.1f} | {float(turnover_rate):.1f} | {float(stock['pe']):.1f} |")
+            stock_name = _stock_name_link(stock, 'HK')
+            message_parts.append(
+                f"| {i} | {stock_name} | {_stock_row_cells(stock, with_amount=True)} |"
+            )
 
         # 涨幅前50表格
         message_parts.append("\n#### 涨幅前50")
         message_parts.append("| 排名 | 股票名称 | 涨跌幅(%) | 成交量(万手) | 量比 | 换手率(%) | 市盈率 |")
         message_parts.append("|------|----------|-----------|-------------|------|---------|--------|")
         for i, stock in enumerate(data['HK']['top_change'], 1):
-            volume_ratio = stock.get('volumeRatio', 0)
-            turnover_rate = stock.get('turnoverRate', 0)
-            stock_code = str(stock['code']).split('.')[-1]
-            stock_name = f"[{stock['name']}](https://invest.fishisnow.xyz/zh/stock/HK/{stock_code}?name={stock['name']})"
-            message_parts.append(f"| {i} | {stock_name} | {float(stock['changeRatio']):.1f} | {float(stock['volume'])/10000:.1f} | {float(volume_ratio):.1f} | {float(turnover_rate):.1f} | {float(stock['pe']):.1f} |")
+            stock_name = _stock_name_link(stock, 'HK')
+            message_parts.append(f"| {i} | {stock_name} | {_stock_row_cells(stock)} |")
 
         # 成交额前50表格
         message_parts.append("\n#### 成交额前50")
         message_parts.append("| 排名 | 股票名称 | 成交额(亿) | 涨跌幅(%) | 成交量(万手) | 量比 | 换手率(%) | 市盈率 |")
         message_parts.append("|------|----------|------------|-----------|-------------|------|---------|--------|")
         for i, stock in enumerate(data['HK']['top_turnover'], 1):
-            volume_ratio = stock.get('volumeRatio', 0)
-            turnover_rate = stock.get('turnoverRate', 0)
-            stock_code = str(stock['code']).split('.')[-1]
-            stock_name = f"[{stock['name']}](https://invest.fishisnow.xyz/zh/stock/HK/{stock_code}?name={stock['name']})"
-            message_parts.append(f"| {i} | {stock_name} | {float(stock['amount'])/100000000:.1f} | {float(stock['changeRatio']):.1f} | {float(stock['volume'])/10000:.1f} | {float(volume_ratio):.1f} | {float(turnover_rate):.1f} | {float(stock['pe']):.1f} |")
+            stock_name = _stock_name_link(stock, 'HK')
+            message_parts.append(
+                f"| {i} | {stock_name} | {_stock_row_cells(stock, with_amount=True)} |"
+            )
 
-            # 发送消息
         message = "\n".join(message_parts)
         send_md_message(message)
     except Exception as e:
+        traceback.print_exc()
         print(f"富途任务执行出错: {e}")
 
 
@@ -204,5 +233,5 @@ def main():
 
 
 if __name__ == "__main__":
-    compute_market_breadth_daily()
+    futu_job()
     # clean_sector_industry_by_excel(excel_path="/Users/huangyusong/Desktop/10jqka.xlsx", full_refresh=True)
