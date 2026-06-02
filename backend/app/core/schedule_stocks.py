@@ -59,10 +59,10 @@ def futu_job():
     now = datetime.now()
     current_time = now.time()
     current_weekday = now.weekday()  # 0-6，0是周一，6是周日
-    #
-    # if not (0 <= current_weekday <= 4 and 9 <= current_time.hour <= 16):
-    #     # 非交易时间，直接返回
-    #     return
+
+    if not (0 <= current_weekday <= 4 and 9 <= current_time.hour <= 16):
+        # 非交易时间，直接返回
+        return
     
     try:
         # 获取股票数据
