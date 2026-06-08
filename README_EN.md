@@ -56,10 +56,21 @@ Built with `Next.js` + `Flask`, it combines market data collection, AI analysis,
 
 ### Runtime
 
-- The frontend runs on port `3000`
-- The backend API runs on port `5001`
-- The frontend rewrites `/api/*` to `http://localhost:5001/api/*` via `frontend/next.config.ts`
-- The backend entrypoint starts both the scheduler thread and the API service
+Production and Docker **do not run a Next.js server**. Instead:
+
+1. **Build**: `next build` static export → `frontend/out`
+2. **Runtime**: Flask (Gunicorn) on port **5001** serves both:
+   - Static pages from `frontend/out`
+   - Backend APIs under `/api/*`
+
+Local workflows:
+
+| Mode | Frontend | Backend | URLs |
+|------|----------|---------|------|
+| **Development** (HMR) | `npm run dev` → 3000 | `python app/main.py` → 5001 | UI at `http://localhost:3000`, API at `http://localhost:5001/api` |
+| **Production-like** | `npm run build` → `out/` | Flask static + API → 5001 | Everything at `http://localhost:5001` |
+
+`frontend/next.config.ts` uses `output: 'export'`. There is **no** Next.js dev proxy; set `NEXT_PUBLIC_API_URL` to reach the backend during development.
 
 ## Repository Structure
 
@@ -68,9 +79,8 @@ Built with `Next.js` + `Flask`, it combines market data collection, AI analysis,
 ├── backend/                  # Flask API, scheduled jobs, data access, market integrations
 ├── frontend/                 # Next.js web application
 ├── scripts/                  # Docker deployment and auto-deploy scripts
-├── Dockerfile                # Unified frontend + backend image build
-├── .env.example              # Backend environment variables example
-├── frontend/.env.example     # Frontend environment variables example
+├── Dockerfile                # Multi-stage: static frontend + Python runtime
+├── .env.example              # Backend env (includes NEXT_PUBLIC_* for Docker build)
 └── SECURITY_CHECKLIST.md     # Security hardening and investigation guide
 ```
 
@@ -85,15 +95,7 @@ Built with `Next.js` + `Flask`, it combines market data collection, AI analysis,
 
 ### 1. Configure environment variables
 
-Frontend `frontend/.env`, based on `frontend/.env.example`:
-
-```bash
-NEXT_PUBLIC_API_URL=http://localhost:5001
-NEXT_PUBLIC_SUPABASE_URL=YOUR_SUPABASE_URL
-NEXT_PUBLIC_SUPABASE_ANON_KEY=YOUR_SUPABASE_ANON_KEY
-```
-
-Backend `.env`, based on the root `.env.example`:
+**Backend** — root `.env` (see `.env.example`):
 
 ```bash
 SUPABASE_URL=your-supabase-url
@@ -112,22 +114,25 @@ BRIEFING_REPORT_API_URL=http://localhost:5001
 
 Note: AI analysis requires at least one of `DEEPSEEK_API_KEY` or `OPENAI_API_KEY`.
 
-### 2. Start the frontend
+**Frontend (local dev)** — `frontend/.env.local`:
 
 ```bash
-cd frontend
-npm ci
-npm run dev
+NEXT_PUBLIC_API_URL=http://localhost:5001/api
+NEXT_PUBLIC_SUPABASE_URL=YOUR_SUPABASE_URL
+NEXT_PUBLIC_SUPABASE_ANON_KEY=YOUR_SUPABASE_ANON_KEY
 ```
 
-Available frontend scripts:
+**Docker build** — set in root `.env` (passed as `--build-arg` by `scripts/push_to_aliyun.sh`):
 
-- `npm run dev`
-- `npm run build`
-- `npm run start`
-- `npm run lint`
+```bash
+NEXT_PUBLIC_API_URL=/api
+NEXT_PUBLIC_SUPABASE_URL=YOUR_SUPABASE_URL
+NEXT_PUBLIC_SUPABASE_ANON_KEY=YOUR_SUPABASE_ANON_KEY
+```
 
-### 3. Start the backend
+### 2. Local development (split servers, best for UI work)
+
+Terminal 1 — backend:
 
 ```bash
 cd backend
@@ -135,30 +140,46 @@ pip install -r requirements.txt
 python app/main.py
 ```
 
-Default local endpoints after startup:
+Terminal 2 — frontend with HMR:
 
-- Frontend: `http://localhost:3000`
-- Backend: `http://localhost:5001`
-- Health check: `http://localhost:5001/api/stock-analysis/health`
+```bash
+cd frontend
+npm ci
+npm run dev
+```
+
+Open:
+
+- UI: `http://localhost:3000/en`
+- Health: `http://localhost:5001/api/stock-analysis/health`
+
+### 3. Local production-like (single port, matches Docker)
+
+```bash
+cd frontend && npm ci && npm run build
+cd ../backend && pip install -r requirements.txt && python app/main.py
+```
+
+Open: `http://localhost:5001/en` (static assets and API both served by Flask in `backend/app/api/api_app.py`).
 
 ## Deployment
 
-The repository includes a unified Docker build and deployment flow:
+The Docker image is a **single container on port 5001**:
 
-- `Dockerfile` uses a multi-stage build for the frontend and installs backend dependencies in the runtime image
-- The container runs scheduled jobs, the Gunicorn backend, and the Next.js frontend together
-- `scripts/deploy.sh` pulls the image, loads `.env`, starts the container, and waits for the health check
+- **Build stage** (Node 20): `npm run build` → `frontend/out` static export
+- **Runtime** (Python 3.12): Gunicorn serves `/api/*` and static files from `frontend/out`; scheduler runs in the same container
+- **No Next.js runtime** in production
 
-Common deployment command:
+Scripts:
+
+- `scripts/push_to_aliyun.sh` — build and push; requires `NEXT_PUBLIC_*` in `.env` (use `NEXT_PUBLIC_API_URL=/api` for same-origin deploy)
+- `scripts/deploy.sh` — pull image, load `.env`, expose **5001**, health check
 
 ```bash
 ./scripts/deploy.sh
 ```
 
-The deployment script exposes:
-
-- `3000` for the frontend
-- `5001` for the backend
+After deploy: `http://<host>:5001` (UI and API on the same origin; API paths under `/api/...`).
 
 ## Security and Operations
 

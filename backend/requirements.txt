@@ -1,4 +1,4 @@
-futu-api
+futu-api>=10.7.6708
 schedule
 pandas
 openpyxl

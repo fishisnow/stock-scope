@@ -29,7 +29,11 @@ from app.search_engine import (
     DeepSeekAnalyzer,
     StockAnalysisWorkflow
 )
-from app.utils.futu_data import get_stock_current_price, get_stock_history_kline
+from app.utils.futu_data import (
+    get_stock_current_price,
+    get_stock_history_kline,
+    get_stock_valuation_metrics,
+)
 
 # 加载环境变量
 load_dotenv()
@@ -300,7 +304,7 @@ def search_stocks():
         # 搜索股票名称
         name_query = db.client.table('stock_basic_info').select(
             'stock_code, stock_name, market, exchange'
-        ).ilike('stock_name', f'{query}%')
+        ).ilike('stock_name', f'%{query}%')
         
         if market_filter in ['A', 'HK']:
             name_query = name_query.eq('market', market_filter)
@@ -402,6 +406,38 @@ def get_stock_price():
         return jsonify({
             "success": False,
             "error": f"获取股票价格失败: {str(e)}"
+        }), 500
+
+
+@stock_analysis_bp.route('/valuation-metrics', methods=['GET'])
+def get_valuation_metrics():
+    """
+    获取 PEG / 盈利回收期计算所需的估值与财报指标（富途快照 + 财报 + 估值详情）
+
+    查询参数:
+    - code: 股票代码
+    - market: 市场 ('A' 或 'HK')
+    """
+    try:
+        code = request.args.get('code', '').strip()
+        market = request.args.get('market', '').upper()
+
+        if not code or market not in ['A', 'HK']:
+            return jsonify({
+                "success": False,
+                "error": "缺少必需参数: code 或 market无效"
+            }), 400
+
+        result = get_stock_valuation_metrics(code, market)
+        return jsonify({
+            "success": True,
+            "data": result
+        })
+    except Exception as e:
+        logging.error(f"get_valuation_metrics error: {e}")
+        return jsonify({
+            "success": False,
+            "error": f"获取估值指标失败: {str(e)}"
         }), 500
 
 

@@ -1,49 +1,42 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Frontend
 
-## Getting Started
+Next.js App Router 应用，使用 `output: 'export'` **静态导出**，生产环境由 Flask 托管 `out/` 目录，不单独运行 Next 服务。
 
-### Environment Variables
+## 本地开发
 
-Create a `.env` file in the frontend directory with the following content:
+在 `frontend/.env.local` 中配置：
 
 ```bash
-# API Configuration
-NEXT_PUBLIC_API_URL=http://localhost:5001
+NEXT_PUBLIC_API_URL=http://localhost:5001/api
+NEXT_PUBLIC_SUPABASE_URL=YOUR_SUPABASE_URL
+NEXT_PUBLIC_SUPABASE_ANON_KEY=YOUR_SUPABASE_ANON_KEY
 ```
 
-You can modify the `NEXT_PUBLIC_API_URL` to point to your backend API server.
-
-### Running the Development Server
-
-First, run the development server:
+先启动后端（见根目录 README），再：
 
 ```bash
+npm ci
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+打开 [http://localhost:3000/zh](http://localhost:3000/zh)。
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## 静态构建（与 Docker / 生产一致）
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```bash
+npm run build   # 输出到 frontend/out
+```
 
-## Learn More
+构建后由 `backend/app/api/api_app.py` 在 5001 端口提供页面；本地可只启后端访问 `http://localhost:5001`。
 
-To learn more about Next.js, take a look at the following resources:
+## Docker 构建参数
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+镜像构建时通过根目录 `.env` 注入（见 `scripts/push_to_aliyun.sh`）：
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+```bash
+NEXT_PUBLIC_API_URL=/api
+NEXT_PUBLIC_SUPABASE_URL=...
+NEXT_PUBLIC_SUPABASE_ANON_KEY=...
+```
 
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+生产环境 API 与页面同域，使用相对路径 `/api` 即可。

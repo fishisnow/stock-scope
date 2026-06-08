@@ -182,6 +182,93 @@
         }
       }
     },
+    "atrCalculator": {
+      "badge": "Risk Tool",
+      "title": "ATR Stop-Loss Calculator",
+      "description": "Enter an A-share or HK code/name to estimate a stop-loss from the 14-day ATR.",
+      "marketLabel": "Market",
+      "marketA": "A-Shares",
+      "marketHK": "Hong Kong",
+      "queryLabel": "Code or name",
+      "queryPlaceholder": "e.g. 600519 or Kweichow Moutai",
+      "codeLabel": "Stock Code",
+      "searching": "Searching…",
+      "calculate": "Calculate",
+      "calculating": "Calculating…",
+      "formulaHint": "Stop-loss = current price − 2 × 14-day ATR (Wilder smoothing)",
+      "resultStock": "Symbol",
+      "asOfDate": "K-line data as of {date}",
+      "currentPrice": "Current Price",
+      "atr14": "{period}-Day ATR",
+      "stopLoss": "Suggested Stop-Loss",
+      "lossPercent": "-{percent}%",
+      "errors": {
+        "queryRequired": "Please enter a stock code or name",
+        "codeRequired": "Please enter a stock code",
+        "notFound": "No matching stock found — pick one from the list",
+        "multipleMatches": "Multiple matches found — pick one from the list",
+        "searchFailed": "Stock search failed",
+        "priceFailed": "Failed to fetch current price",
+        "priceUnavailable": "Current price is unavailable",
+        "klineFailed": "Failed to fetch K-line data",
+        "insufficientData": "Not enough history to calculate 14-day ATR",
+        "generic": "Calculation failed, please try again"
+      }
+    },
+    "pegPaybackCalculator": {
+      "badge": "Valuation Tool",
+      "title": "PEG & Profit Payback Period",
+      "fetch": {
+        "title": "Pull valuation data from Futu",
+        "marketLabel": "Market",
+        "marketA": "A-Shares",
+        "marketHK": "Hong Kong",
+        "queryLabel": "Code or name",
+        "queryPlaceholder": "e.g. 600519 or Kweichow Moutai",
+        "searching": "Searching…",
+        "action": "Fetch & calculate",
+        "loading": "Fetching…",
+        "failed": "Failed to fetch valuation metrics",
+        "stockRequired": "Select or enter a stock",
+        "pickStock": "Pick the single matching stock from the list",
+        "hintGrowthFailed": "{error}",
+        "hintGrowthFailedWithOpend": "{error} (OpenD server_ver={version})"
+      },
+      "scenarios": {
+        "dynamicTab": "Dynamic",
+        "ttmTab": "TTM"
+      },
+      "growthLabelFallback": "Profit growth (%)",
+      "resultPe": "PE",
+      "resultPeg": "PEG",
+      "resultPayback": "Payback period",
+      "paybackYearsValue": "{years} years",
+      "paybackInterpretation": "At {growth}% annual growth, about {years} years of cumulative profit cover market cap.",
+      "scenarioErrors": {
+        "invalid_pe": "Could not derive PE",
+        "missing_growth": "Missing profit growth",
+        "non_positive_growth": "Growth must be positive to compute PEG",
+        "invalid_profit": "Invalid market cap or profit",
+        "invalid_peg": "Could not calculate PEG",
+        "payback_unavailable": "Payback unavailable",
+        "insufficient_quarters_for_ttm_growth": "Need 8+ quarters for TTM YoY core profit growth",
+        "missing_pe_ttm": "Missing TTM P/E"
+      },
+      "verdict": {
+        "severe_under": "PEG < 0.5: severely undervalued (confirm sustainability)",
+        "under": "PEG 0.5–1.0: undervalued or reasonably cheap",
+        "fair": "PEG ≈ 1.0: growth and valuation aligned",
+        "high": "PEG 1.0–2.0: elevated or bubbly",
+        "over": "PEG > 2.0: overvalued (unless hyper-growth)"
+      },
+      "errors": {
+        "invalidGrowth": "Enter a valid positive profit growth rate (%)",
+        "invalidPe": "Could not derive a valid PE",
+        "invalidPeg": "Could not calculate PEG",
+        "invalidProfitInputs": "Market cap and TTM profit must be positive",
+        "paybackUnavailable": "Payback unavailable (negative profit, growth too low, or never pays back)"
+      }
+    },
     "briefing": {
       "badge": "AI Market Brief",
       "title": "Let AI watch the market for you.",

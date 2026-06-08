@@ -1,6 +1,7 @@
 "use client"
 
-import Image from "next/image"
+import { AtrStopLossCalculator } from "@/components/atr-stop-loss-calculator"
+import { PegPaybackCalculator } from "@/components/peg-payback-calculator"
 import { Header } from "@/components/header"
 import { Button } from "@/components/ui/button"
 import { Link } from "@/i18n/routing"
@@ -43,6 +44,16 @@ export default function LandingPage() {
     <div className="min-h-screen bg-background">
       <Header />
       <main className="relative overflow-hidden">
+        <section
+          id="calculators"
+          className="border-b border-border/50 bg-background/95 px-4 py-6 sm:px-6 lg:px-8"
+        >
+          <div className="mx-auto grid max-w-6xl gap-5 lg:grid-cols-2 lg:items-start">
+            <AtrStopLossCalculator />
+            <PegPaybackCalculator />
+          </div>
+        </section>
+
         <section className="relative min-h-[calc(100vh-4rem)] border-b border-border/50 bg-[radial-gradient(circle_at_10%_20%,rgba(59,130,246,0.14),transparent_38%),radial-gradient(circle_at_90%_10%,rgba(99,102,241,0.12),transparent_35%),radial-gradient(circle_at_50%_95%,rgba(59,130,246,0.08),transparent_45%)]">
           <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(to_right,rgba(148,163,184,0.14)_1px,transparent_1px),linear-gradient(to_bottom,rgba(148,163,184,0.14)_1px,transparent_1px)] bg-[size:34px_34px] [mask-image:radial-gradient(circle_at_center,black,transparent_78%)]" />
 
@@ -107,12 +118,12 @@ export default function LandingPage() {
             </div>
 
             <div className="relative mx-auto mt-6 aspect-video w-full max-w-3xl overflow-hidden rounded-xl border border-border/70 bg-muted/35">
-              <Image
+              <img
                 src="/ai-briefing.png"
                 alt={t("briefing.imageAlt")}
-                fill
-                className="object-cover object-top"
-                sizes="(min-width: 1024px) 60vw, 100vw"
+                className="h-full w-full object-cover object-top"
+                loading="lazy"
+                decoding="async"
               />
             </div>
 
@@ -152,12 +163,12 @@ export default function LandingPage() {
                   </div>
 
                   <div className="relative mb-3 aspect-video overflow-hidden rounded-xl border border-border/70 bg-muted/35">
-                    <Image
+                    <img
                       src={card.image}
                       alt={card.imageAlt}
-                      fill
-                      className="object-cover object-top transition-transform duration-300 group-hover:scale-[1.02]"
-                      sizes="(min-width: 1024px) 30vw, (min-width: 768px) 33vw, 100vw"
+                      className="h-full w-full object-cover object-top transition-transform duration-300 group-hover:scale-[1.02]"
+                      loading="lazy"
+                      decoding="async"
                     />
                   </div>
 

@@ -56,10 +56,21 @@
 
 ### 运行方式
 
-- 前端默认运行在 `3000` 端口
-- 后端 API 默认运行在 `5001` 端口
-- 前端通过 `frontend/next.config.ts` 将 `/api/*` 代理到 `http://localhost:5001/api/*`
-- 后端入口会同时启动定时任务线程与 API 服务
+生产环境与 Docker **不运行 Next.js 服务**，而是：
+
+1. 构建阶段：`next build` 静态导出到 `frontend/out`
+2. 运行阶段：Flask（Gunicorn）在 **5001** 端口同时提供：
+   - 静态页面（`frontend/out` 中的 HTML / JS / CSS）
+   - 后端 API（`/api/*`）
+
+本地有两种常用方式：
+
+| 模式 | 前端 | 后端 | 访问地址 |
+|------|------|------|----------|
+| **开发**（热更新） | `npm run dev` → 3000 | `python app/main.py` → 5001 | 页面 `http://localhost:3000`，API 指向 `http://localhost:5001/api` |
+| **贴近生产** | `npm run build` 生成 `out/` | Flask 托管静态 + API → 5001 | 全部 `http://localhost:5001` |
+
+`frontend/next.config.ts` 使用 `output: 'export'`，**没有** dev proxy；开发时通过 `NEXT_PUBLIC_API_URL` 直连后端。
 
 ## 仓库结构
 
@@ -68,9 +79,8 @@
 ├── backend/                  # Flask API、定时任务、数据访问与行情处理
 ├── frontend/                 # Next.js Web 应用
 ├── scripts/                  # Docker 部署与自动部署脚本
-├── Dockerfile                # 前后端一体化镜像构建
-├── .env.example              # 后端环境变量示例
-├── frontend/.env.example     # 前端环境变量示例
+├── Dockerfile                # 多阶段构建：静态前端 + Python 运行时
+├── .env.example              # 后端环境变量示例（含 Docker 构建前端用的 NEXT_PUBLIC_*）
 └── SECURITY_CHECKLIST.md     # 安全加固与排查文档
 ```
 
@@ -85,15 +95,7 @@
 
 ### 1. 配置环境变量
 
-前端 `frontend/.env`，参考 `frontend/.env.example`：
-
-```bash
-NEXT_PUBLIC_API_URL=http://localhost:5001
-NEXT_PUBLIC_SUPABASE_URL=YOUR_SUPABASE_URL
-NEXT_PUBLIC_SUPABASE_ANON_KEY=YOUR_SUPABASE_ANON_KEY
-```
-
-后端 `.env`，参考根目录 `.env.example`：
+**后端** — 项目根目录 `.env`（参考 `.env.example`）：
 
 ```bash
 SUPABASE_URL=your-supabase-url
@@ -112,22 +114,27 @@ BRIEFING_REPORT_API_URL=http://localhost:5001
 
 说明：AI 分析至少需要配置 `DEEPSEEK_API_KEY` 或 `OPENAI_API_KEY` 之一。
 
-### 2. 启动前端
+**前端** — 本地开发用 `frontend/.env.local`：
 
 ```bash
-cd frontend
-npm ci
-npm run dev
+# 开发模式：Next dev 在 3000，API 在 5001，注意要带 /api 前缀
+NEXT_PUBLIC_API_URL=http://localhost:5001/api
+NEXT_PUBLIC_SUPABASE_URL=YOUR_SUPABASE_URL
+NEXT_PUBLIC_SUPABASE_ANON_KEY=YOUR_SUPABASE_ANON_KEY
 ```
 
-前端可用脚本：
+**Docker 构建** — 在根目录 `.env` 中配置（`scripts/push_to_aliyun.sh` 会作为 `--build-arg` 传入）：
 
-- `npm run dev`
-- `npm run build`
-- `npm run start`
-- `npm run lint`
+```bash
+# 与 Flask 同域部署时使用相对路径，浏览器请求 /api/...
+NEXT_PUBLIC_API_URL=/api
+NEXT_PUBLIC_SUPABASE_URL=YOUR_SUPABASE_URL
+NEXT_PUBLIC_SUPABASE_ANON_KEY=YOUR_SUPABASE_ANON_KEY
+```
 
-### 3. 启动后端
+### 2. 本地开发（前后端分离，推荐改 UI 时用）
+
+终端 1 — 后端（API + 可选定时任务）：
 
 ```bash
 cd backend
@@ -135,30 +142,58 @@ pip install -r requirements.txt
 python app/main.py
 ```
 
-启动后默认地址：
+终端 2 — 前端热更新：
 
-- 前端：`http://localhost:3000`
-- 后端：`http://localhost:5001`
+```bash
+cd frontend
+npm ci
+npm run dev
+```
+
+访问：
+
+- 页面：`http://localhost:3000/zh`
 - 健康检查：`http://localhost:5001/api/stock-analysis/health`
+
+前端脚本：`npm run dev` · `npm run build` · `npm run lint`
+
+### 3. 本地贴近生产（单端口，与 Docker 一致）
+
+```bash
+cd frontend && npm ci && npm run build    # 产出 frontend/out
+cd ../backend && pip install -r requirements.txt && python app/main.py
+```
+
+访问：`http://localhost:5001/zh`（静态页与 API 均由 Flask 提供，见 `backend/app/api/api_app.py`）。
 
 ## 部署
 
-仓库提供了前后端一体化 Docker 构建与部署方案：
+Docker 镜像为 **单容器、单端口（5001）** 部署：
 
-- `Dockerfile` 使用多阶段构建前端，并在运行镜像中安装后端依赖
-- 容器会同时运行定时任务、Gunicorn 后端与 Next.js 前端
-- `scripts/deploy.sh` 会拉取镜像、加载 `.env`、启动容器并执行健康检查
+```text
+┌─────────────────────────────────────────────┐
+│  Docker 容器 (:5001)                         │
+│  ┌─────────────────┐  ┌──────────────────┐  │
+│  │ Gunicorn/Flask  │  │ 定时任务          │  │
+│  │ · /api/*  API   │  │ schedule_stocks  │  │
+│  │ · /*  静态页面   │  │                  │  │
+│  │   (frontend/out)│  │                  │  │
+│  └─────────────────┘  └──────────────────┘  │
+└─────────────────────────────────────────────┘
+         ▲ 构建时 npm run build → frontend/out
+         ▲ 无 Next.js 运行时
+```
 
-常用部署命令：
+- `Dockerfile`：Stage 1 用 Node 20 构建静态前端；Stage 2 用 Python 3.12 运行 Gunicorn + 定时任务
+- 静态资源由 `api_app.py` 的 `serve_frontend` 从 `frontend/out` 提供
+- `scripts/push_to_aliyun.sh`：构建镜像并推送；需提前在 `.env` 配置 `NEXT_PUBLIC_*`（生产建议 `NEXT_PUBLIC_API_URL=/api`）
+- `scripts/deploy.sh`：拉取镜像、加载 `.env`、映射 **5001**、健康检查
 
 ```bash
 ./scripts/deploy.sh
 ```
 
-部署脚本默认暴露：
-
-- `3000`：前端
-- `5001`：后端
+部署后访问：`http://<主机>:5001`（页面与 API 同域，API 路径为 `/api/...`）。
 
 ## 安全与运维
 

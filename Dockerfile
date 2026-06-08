@@ -50,7 +50,7 @@ WORKDIR /app
 COPY backend/requirements.txt ./backend/
 
 # 单独安装镜像源缺失的包，其余依赖走国内镜像
-RUN pip install --no-cache-dir --root-user-action=ignore futu-api \
+RUN pip install --no-cache-dir --root-user-action=ignore "futu-api>=10.7.6708" \
     && grep -vE '^futu-api([[:space:]]|$)' backend/requirements.txt > /tmp/requirements.domestic.txt \
     && pip install --no-cache-dir --root-user-action=ignore -i https://mirrors.aliyun.com/pypi/simple/ -r /tmp/requirements.domestic.txt
 

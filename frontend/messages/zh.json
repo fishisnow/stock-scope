@@ -182,6 +182,93 @@
         }
       }
     },
+    "atrCalculator": {
+      "badge": "风险管理工具",
+      "title": "ATR 止损计算器",
+      "description": "输入 A 股或港股代码/名称，基于近 14 日 ATR 计算建议止损价。",
+      "marketLabel": "市场",
+      "marketA": "A 股",
+      "marketHK": "港股",
+      "queryLabel": "股票代码或名称",
+      "queryPlaceholder": "如 600519 或 贵州茅台",
+      "codeLabel": "股票代码",
+      "searching": "搜索中…",
+      "calculate": "计算止损",
+      "calculating": "计算中…",
+      "formulaHint": "止损价 = 当前价 − 2 × 14日ATR（Wilder 平滑）",
+      "resultStock": "标的",
+      "asOfDate": "K 线数据截至 {date}",
+      "currentPrice": "当前价",
+      "atr14": "{period} 日 ATR",
+      "stopLoss": "建议止损价",
+      "lossPercent": "-{percent}%",
+      "errors": {
+        "queryRequired": "请输入股票代码或名称",
+        "codeRequired": "请输入股票代码",
+        "notFound": "未找到匹配股票，请从下拉列表选择",
+        "multipleMatches": "匹配到多只标的，请从下拉列表选择",
+        "searchFailed": "股票搜索失败",
+        "priceFailed": "获取当前价失败",
+        "priceUnavailable": "当前价不可用",
+        "klineFailed": "获取 K 线数据失败",
+        "insufficientData": "历史 K 线不足，无法计算 14 日 ATR",
+        "generic": "计算失败，请稍后重试"
+      }
+    },
+    "pegPaybackCalculator": {
+      "badge": "估值工具",
+      "title": "PEG 与盈利回收期",
+      "fetch": {
+        "title": "从富途拉取估值数据",
+        "marketLabel": "市场",
+        "marketA": "A 股",
+        "marketHK": "港股",
+        "queryLabel": "股票代码或名称",
+        "queryPlaceholder": "如 600519 或 贵州茅台",
+        "searching": "搜索中…",
+        "action": "拉取并计算",
+        "loading": "拉取中…",
+        "failed": "拉取估值数据失败",
+        "stockRequired": "请选择或输入股票",
+        "pickStock": "请从下拉列表选择唯一匹配的股票",
+        "hintGrowthFailed": "{error}",
+        "hintGrowthFailedWithOpend": "{error}（当前 OpenD server_ver={version}）"
+      },
+      "scenarios": {
+        "dynamicTab": "动态",
+        "ttmTab": "TTM"
+      },
+      "growthLabelFallback": "利润增速（%）",
+      "resultPe": "PE",
+      "resultPeg": "PEG",
+      "resultPayback": "盈利回收期",
+      "paybackYearsValue": "{years} 年",
+      "paybackInterpretation": "在 {growth}% 年增速假设下，约 {years} 年累计净利润可覆盖当前市值。",
+      "scenarioErrors": {
+        "invalid_pe": "无法计算 PE",
+        "missing_growth": "缺少利润增速",
+        "non_positive_growth": "利润增速须为正数才能计算 PEG",
+        "invalid_profit": "市值或利润数据无效",
+        "invalid_peg": "无法计算 PEG",
+        "payback_unavailable": "无法计算盈利回收期",
+        "insufficient_quarters_for_ttm_growth": "历史季报不足 8 期，无法计算扣非 TTM 同比增速",
+        "missing_pe_ttm": "缺少 TTM 市盈率"
+      },
+      "verdict": {
+        "severe_under": "PEG < 0.5：严重低估（需确认增长可持续性）",
+        "under": "PEG 0.5~1.0：低估或合理偏低",
+        "fair": "PEG ≈ 1.0：估值与增长基本匹配",
+        "high": "PEG 1.0~2.0：偏高或存在一定泡沫",
+        "over": "PEG > 2.0：高估（除非处于超高速增长）"
+      },
+      "errors": {
+        "invalidGrowth": "请输入有效的正数利润增速（%）",
+        "invalidPe": "无法得到有效 PE",
+        "invalidPeg": "无法计算 PEG",
+        "invalidProfitInputs": "市值与 TTM 净利润须为正数",
+        "paybackUnavailable": "无法计算盈利回收期（利润为负、增速过低或永远无法回本）"
+      }
+    },
     "briefing": {
       "badge": "AI 简报自动盯盘",
       "title": "让 AI 帮你快速收集整理市场信息",

@@ -5,8 +5,9 @@ import re
 import time
 from pathlib import Path
 
-from flask import Flask, g, request, redirect, send_from_directory
+from flask import Flask, abort, g, request, redirect, send_from_directory
 from flask_cors import CORS
+from werkzeug.middleware.proxy_fix import ProxyFix
 
 from app.api.auth_middleware import (
     AuthSessionExpiredError,
@@ -35,6 +36,8 @@ PAGE_ROUTE_SUFFIX_RE = re.compile(r'(/index\.(?:txt|html)|\.(?:txt|html))/?$', r
 app = Flask(__name__)
 app.config['JSON_AS_ASCII'] = False
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024
+# 反向代理（nginx）终止 TLS 时，让重定向与绝对 URL 使用正确的 https scheme
+app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
 CORS(app)
 
 db = StockDatabase()
@@ -96,9 +99,19 @@ def serve_root():
     return redirect('/en/')
 
 
-@app.route('/<path:path>')
-@app.route('/<path:path>/')
+@app.route('/_next/<path:path>', strict_slashes=False)
+def serve_next_assets(path: str):
+    """Next.js 静态资源：禁止尾斜杠重定向，避免 Mixed Content。"""
+    normalized = f'_next/{path}'.rstrip('/')
+    asset_path = frontend_dist / normalized
+    if asset_path.is_file():
+        return send_from_directory(str(frontend_dist), normalized)
+    abort(404)
+
+
+@app.route('/<path:path>', strict_slashes=False)
 def serve_frontend(path: str):
+    path = path.rstrip('/')
     canonical_path = _canonicalize_page_route(request.path)
     if canonical_path is not None:
         query_string = request.query_string.decode()
