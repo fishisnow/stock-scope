@@ -1,5 +1,6 @@
 import logging
 import math
+import re
 import threading
 import time
 import socket
@@ -886,9 +887,252 @@ def _normalize_financial_item(item: Dict) -> Dict:
 STATEMENT_INCOME = 1
 STATEMENT_MAIN_INDEX = 4
 
-# A 股利润表归母净利润；主要指标扣非
-PARENT_NET_PROFIT_FIELD_IDS = (1047, 5051, 5052)
-DEDUCTED_NET_PROFIT_FIELD_IDS = {1024}
+_STATEMENT_TYPE_LABELS = {
+    STATEMENT_INCOME: 'income',
+    STATEMENT_MAIN_INDEX: 'main_index',
+}
+
+# A 股利润表归母净利润 field_id（按板块，与 OpenD lang 无关）
+_INCOME_PARENT_FIELD_ID_STAR = 1047   # 科创板 SH.688
+_INCOME_PARENT_FIELD_ID_MAIN = 3047   # 主板/创业板 SH./SZ.（非 688）
+_INCOME_PARENT_FIELD_IDS_HK = (5051, 5052)
+PARENT_NET_PROFIT_FIELD_IDS = (
+    _INCOME_PARENT_FIELD_ID_STAR,
+    _INCOME_PARENT_FIELD_ID_MAIN,
+    *_INCOME_PARENT_FIELD_IDS_HK,
+)
+
+_PARENT_NET_PROFIT_DISPLAY_KEYWORDS_ZH = (
+    '归属母公司净利润',
+    '归属于母公司所有者的净利润',
+    '归属母公司股东的净利润',
+    '归属普通股股东净利润',
+)
+_PARENT_NET_PROFIT_DISPLAY_KEYWORDS_EN = (
+    'net profit attributable',
+    'profit attributable to owners',
+    'profit attributable to equity holders',
+    'common stockholders',
+)
+
+# A 股主要指标表扣非净利润：富途按板块模板分配 field_id（与 OpenD lang 无关）
+# 科创板 SH.688 → 1024；主板/创业板等 SH./SZ.（非 688）→ 3026
+_MAIN_INDEX_DEDUCTED_FIELD_ID_STAR = 1024
+_MAIN_INDEX_DEDUCTED_FIELD_ID_MAIN = 3026
+
+_DEDUCTED_NET_PROFIT_DISPLAY_KEYWORDS_ZH = (
+    '扣非净利润',
+    '扣除非经常性损益后的净利润',
+)
+_DEDUCTED_NET_PROFIT_DISPLAY_KEYWORDS_EN = (
+    'deducted net profit',
+    'net profit after deducting',
+    'net profit after deduction',
+    'excluding non-recurring',
+    'non-recurring gains and losses',
+    'non recurring gains and losses',
+)
+
+# 港股利润表：正常经营利润 = 营业利润(5034) - 经营利润特殊项目(5032)
+_HK_INCOME_OPERATING_PROFIT_FIELD_ID = 5034
+_HK_INCOME_OPERATING_SPECIAL_FIELD_ID = 5032
+
+
+def _field_amount_from_items(item_list: List[Dict], field_id: int) -> Optional[float]:
+    for item in item_list or []:
+        normalized = _normalize_financial_item(item)
+        if normalized.get('field_id') == field_id:
+            return _metric_float(normalized.get('data'))
+    return None
+
+
+def _prior_year_period(period_text: Optional[str]) -> Optional[str]:
+    if not period_text:
+        return None
+    match = re.match(r'^(\d{4})/(Q[1-4]|FY|H1|Q9)$', period_text)
+    if not match:
+        return None
+    return f'{int(match.group(1)) - 1}/{match.group(2)}'
+
+
+def _attach_prior_year_yoy_percent(series: List[Dict]) -> None:
+    """按同比期利润重算复合指标的 yoy（%）。"""
+    by_period = {item['period']: item for item in series if item.get('period')}
+    for item in series:
+        prev_period = _prior_year_period(item.get('period'))
+        if not prev_period:
+            continue
+        prev = by_period.get(prev_period)
+        if not prev:
+            continue
+        curr_profit = item.get('profit')
+        prev_profit = prev.get('profit')
+        if (
+            curr_profit is None
+            or prev_profit is None
+            or not math.isfinite(curr_profit)
+            or not math.isfinite(prev_profit)
+            or prev_profit == 0
+        ):
+            continue
+        item['yoy_percent'] = (curr_profit / prev_profit - 1) * 100
+
+
+def _calc_hk_normal_operating_profit_from_items(
+    item_list: List[Dict],
+) -> Tuple[Optional[float], Dict]:
+    """
+    港股正常经营利润 = 营业利润(5034) - 经营利润特殊项目(5032)。
+    5032 缺失时按 0 处理。
+    """
+    meta: Dict = {'formula': 'operating_profit - operating_special_items'}
+    if not item_list:
+        return None, meta
+
+    operating_profit = _field_amount_from_items(
+        item_list,
+        _HK_INCOME_OPERATING_PROFIT_FIELD_ID,
+    )
+    if operating_profit is None:
+        return None, meta
+
+    special_items = _field_amount_from_items(
+        item_list,
+        _HK_INCOME_OPERATING_SPECIAL_FIELD_ID,
+    )
+    special_items_value = special_items if special_items is not None else 0.0
+    normal_profit = operating_profit - special_items_value
+    meta.update({
+        'operating_profit': operating_profit,
+        'operating_special_items': special_items,
+        'operating_special_items_missing': special_items is None,
+    })
+    return normal_profit, meta
+
+
+def _extract_hk_normal_operating_profit_yoy_from_reports(
+    reports: List[Dict],
+    period_text: Optional[str],
+) -> Optional[float]:
+    """按同比期正常经营利润重算 yoy（%）。"""
+    if not period_text:
+        return None
+    prev_period = _prior_year_period(period_text)
+    if not prev_period:
+        return None
+
+    by_period: Dict[str, float] = {}
+    for report in reports or []:
+        period = report.get('period_text')
+        if not period:
+            continue
+        profit, _ = _calc_hk_normal_operating_profit_from_items(report.get('item_list') or [])
+        if profit is not None:
+            by_period[period] = profit
+
+    curr_profit = by_period.get(period_text)
+    prev_profit = by_period.get(prev_period)
+    if (
+        curr_profit is None
+        or prev_profit is None
+        or not math.isfinite(curr_profit)
+        or not math.isfinite(prev_profit)
+        or prev_profit == 0
+    ):
+        return None
+    return (curr_profit / prev_profit - 1) * 100
+
+
+def _structure_field_ids(structure_list: List[Dict]) -> set:
+    field_ids = set()
+    for item in structure_list or []:
+        normalized = _normalize_financial_item(item)
+        field_id = normalized.get('field_id')
+        if field_id is not None:
+            field_ids.add(int(field_id))
+    return field_ids
+
+
+def _expected_income_parent_net_profit_field_ids(futu_code: str) -> set:
+    """利润表归母 field_id，按板块推断。"""
+    code = (futu_code or '').upper()
+    if code.startswith('SH.688'):
+        return {_INCOME_PARENT_FIELD_ID_STAR}
+    if code.startswith(('SH.', 'SZ.')):
+        return {_INCOME_PARENT_FIELD_ID_MAIN}
+    if code.startswith('HK.'):
+        return set(_INCOME_PARENT_FIELD_IDS_HK)
+    return set()
+
+
+def _is_parent_net_profit_display_name(display_name: str) -> bool:
+    """按展示名识别归母净利润（中英文），排除合并净利润/比率字段。"""
+    if _is_ratio_style_field(display_name):
+        return False
+    lowered = display_name.lower()
+    if display_name in ('净利润',) or lowered == 'net profit':
+        return False
+    if '持续经营' in display_name and '净利' in display_name:
+        return False
+    if any(key in display_name for key in _PARENT_NET_PROFIT_DISPLAY_KEYWORDS_ZH):
+        return True
+    if any(key in lowered for key in _PARENT_NET_PROFIT_DISPLAY_KEYWORDS_EN):
+        return True
+    return False
+
+
+def _parent_net_profit_field_ids_by_display_name(structure_list: List[Dict]) -> set:
+    field_ids = set()
+    for item in structure_list or []:
+        normalized = _normalize_financial_item(item)
+        display_name = str(normalized.get('display_name', ''))
+        if not _is_parent_net_profit_display_name(display_name):
+            continue
+        field_id = normalized.get('field_id')
+        if field_id is not None:
+            field_ids.add(int(field_id))
+    return field_ids
+
+
+def _parent_net_profit_field_ids(
+    structure_list: List[Dict],
+    futu_code: str,
+) -> Tuple[set, str]:
+    """利润表归母 field_id：优先板块 id + structure 校验，否则展示名。"""
+    structure_ids = _structure_field_ids(structure_list)
+    expected = _expected_income_parent_net_profit_field_ids(futu_code)
+    matched = expected & structure_ids
+    if matched:
+        return matched, 'board_field_id'
+
+    by_name = _parent_net_profit_field_ids_by_display_name(structure_list)
+    if by_name:
+        return by_name, 'display_name'
+    return set(), 'none'
+
+
+def _expected_main_index_deducted_field_id(futu_code: str) -> Optional[int]:
+    """A 股主要指标表扣非 field_id，按板块模板推断。"""
+    code = (futu_code or '').upper()
+    if code.startswith('SH.688'):
+        return _MAIN_INDEX_DEDUCTED_FIELD_ID_STAR
+    if code.startswith(('SH.', 'SZ.')):
+        return _MAIN_INDEX_DEDUCTED_FIELD_ID_MAIN
+    return None
+
+
+def _is_deducted_net_profit_display_name(display_name: str) -> bool:
+    """按展示名识别扣非净利润（中英文），排除比率类字段。"""
+    if _is_ratio_style_field(display_name):
+        return False
+    if any(key in display_name for key in _DEDUCTED_NET_PROFIT_DISPLAY_KEYWORDS_ZH):
+        return True
+    lowered = display_name.lower()
+    if any(key in lowered for key in _DEDUCTED_NET_PROFIT_DISPLAY_KEYWORDS_EN):
+        return True
+    if 'non-recurring' in lowered or 'non recurring' in lowered:
+        return 'profit' in lowered or '净利' in display_name
+    return False
 
 
 def _item_yoy_only(item: Dict) -> Optional[float]:
@@ -923,27 +1167,19 @@ def _extract_deducted_net_profit_yoy_from_items(
     item_list: List[Dict],
     deducted_field_ids: Optional[set] = None,
 ) -> Optional[float]:
-    """从 item_list 提取扣非净利润同比增速（%），优先主要指标表字段。"""
+    """从 item_list 提取扣非净利润同比增速（%）。"""
     if not item_list:
         return None
 
-    merged_field_ids = set(DEDUCTED_NET_PROFIT_FIELD_IDS)
     if deducted_field_ids:
-        merged_field_ids.update(int(field_id) for field_id in deducted_field_ids)
-
-    yoy = _extract_yoy_by_field_ids(item_list, merged_field_ids)
-    if yoy is not None:
-        return yoy
+        yoy = _extract_yoy_by_field_ids(item_list, deducted_field_ids)
+        if yoy is not None:
+            return yoy
 
     normalized_items = [_normalize_financial_item(item) for item in item_list]
     for item in normalized_items:
         display_name = str(item.get('display_name', ''))
-        lowered = display_name.lower()
-        if _is_ratio_style_field(display_name):
-            continue
-        if '扣非' not in display_name and 'non-recurring' not in lowered and 'non recurring' not in lowered:
-            continue
-        if '净利润' not in display_name and 'net profit' not in lowered:
+        if not _is_deducted_net_profit_display_name(display_name):
             continue
         yoy = _item_yoy_only(item)
         if yoy is not None:
@@ -951,33 +1187,28 @@ def _extract_deducted_net_profit_yoy_from_items(
     return None
 
 
-def _extract_parent_net_profit_yoy_from_items(item_list: List[Dict]) -> Optional[float]:
+def _extract_parent_net_profit_yoy_from_items(
+    item_list: List[Dict],
+    parent_field_ids: Optional[set] = None,
+) -> Optional[float]:
     """归母净利润同比（%），避免误用合并口径「净利润」。"""
     if not item_list:
         return None
 
-    yoy = _extract_yoy_by_field_ids(item_list, set(PARENT_NET_PROFIT_FIELD_IDS))
-    if yoy is not None:
-        return yoy
+    field_ids = parent_field_ids or set()
+    if field_ids:
+        yoy = _extract_yoy_by_field_ids(item_list, field_ids)
+        if yoy is not None:
+            return yoy
 
     normalized_items = [_normalize_financial_item(item) for item in item_list]
-    keywords = (
-        '归属于母公司所有者的净利润',
-        '归属母公司股东的净利润',
-        '归属母公司净利润',
-        '归属普通股股东净利润',
-        'net profit attributable',
-        'common stockholders',
-    )
     for item in normalized_items:
         display_name = str(item.get('display_name', ''))
-        lowered = display_name.lower()
-        if display_name == '净利润' or display_name.lower() == 'net profit':
+        if not _is_parent_net_profit_display_name(display_name):
             continue
-        if any(key in display_name or key in lowered for key in keywords):
-            yoy = _item_yoy_only(item)
-            if yoy is not None:
-                return yoy
+        yoy = _item_yoy_only(item)
+        if yoy is not None:
+            return yoy
     return None
 
 
@@ -1029,17 +1260,41 @@ def _report_financial_type(report: Dict) -> Optional[int]:
         return None
 
 
-def _deducted_net_profit_field_ids(structure_list: List[Dict]) -> set:
+def _deducted_net_profit_field_ids_by_display_name(structure_list: List[Dict]) -> set:
     field_ids = set()
     for item in structure_list or []:
         normalized = _normalize_financial_item(item)
         display_name = str(normalized.get('display_name', ''))
-        lowered = display_name.lower()
-        if '扣非' in display_name or 'non-recurring' in lowered or 'non recurring' in lowered:
-            field_id = normalized.get('field_id')
-            if field_id is not None:
-                field_ids.add(int(field_id))
+        if not _is_deducted_net_profit_display_name(display_name):
+            continue
+        field_id = normalized.get('field_id')
+        if field_id is not None:
+            field_ids.add(int(field_id))
     return field_ids
+
+
+def _deducted_net_profit_field_ids(
+    structure_list: List[Dict],
+    futu_code: str,
+    *,
+    main_index: bool = True,
+) -> Tuple[set, str]:
+    """
+    解析扣非净利润 field_id。
+    A 股主要指标表优先按板块 field_id（lang 无关），并在 structure 中校验存在；
+    其余情况回退展示名匹配。
+    返回 (field_ids, resolve_source)。
+    """
+    structure_ids = _structure_field_ids(structure_list)
+    if main_index:
+        expected_id = _expected_main_index_deducted_field_id(futu_code)
+        if expected_id is not None and expected_id in structure_ids:
+            return {expected_id}, 'board_field_id'
+
+    by_name = _deducted_net_profit_field_ids_by_display_name(structure_list)
+    if by_name:
+        return by_name, 'display_name'
+    return set(), 'none'
 
 
 def _pick_latest_quarter_report(reports: List[Dict]) -> Optional[Dict]:
@@ -1054,14 +1309,29 @@ def _pick_latest_quarter_report(reports: List[Dict]) -> Optional[Dict]:
     return max(candidates, key=lambda item: item.get('date_time') or 0)
 
 
+def _financial_fetch_log_ctx(
+    futu_code: str,
+    statement_type: int,
+    financial_type: int,
+) -> str:
+    label = _STATEMENT_TYPE_LABELS.get(statement_type, str(statement_type))
+    return (
+        f'futu_code={futu_code} statement_type={statement_type}({label}) '
+        f'financial_type={financial_type}'
+    )
+
+
 def _fetch_financial_reports(
     quote_ctx,
     futu_code: str,
     statement_type: int,
     financial_type: int,
 ) -> Tuple[List[Dict], Optional[str], List[Dict]]:
+    ctx = _financial_fetch_log_ctx(futu_code, statement_type, financial_type)
     if not hasattr(quote_ctx, 'get_financials_statements'):
-        return [], '当前 futu-api 版本不支持 get_financials_statements，请升级 futu-api>=10.7', []
+        error = '当前 futu-api 版本不支持 get_financials_statements，请升级 futu-api>=10.7'
+        logger.warning('[财报拉取] %s 返回空数据: %s', ctx, error)
+        return [], error, []
     try:
         fin_ret, fin_data = quote_ctx.get_financials_statements(
             futu_code,
@@ -1072,14 +1342,20 @@ def _fetch_financial_reports(
         if fin_ret != RET_OK:
             error_text = str(fin_data)
             if '未知的协议' in error_text or 'unknown protocol' in error_text.lower():
-                return [], (
+                error = (
                     'OpenD 版本过低，不支持财报接口 get_financials_statements，'
                     '请升级富途 OpenD 至最新版（与 futu-api 10.7+ 匹配）'
-                ), []
-            return [], f'获取财报失败: {error_text}', []
+                )
+                logger.warning('[财报拉取] %s 返回空数据: %s', ctx, error)
+                return [], error, []
+            error = f'获取财报失败: {error_text}'
+            logger.warning('[财报拉取] %s 返回空数据: %s', ctx, error)
+            return [], error, []
 
         if not fin_data:
-            return [], '财报接口返回空数据', []
+            error = '财报接口返回空数据'
+            logger.warning('[财报拉取] %s 返回空数据: %s', ctx, error)
+            return [], error, []
 
         fin_data = _normalize_financial_dict(fin_data)
         structure_list = [
@@ -1090,13 +1366,33 @@ def _fetch_financial_reports(
             _normalize_financial_dict(report)
             for report in (fin_data.get('report_list') or [])
         ]
+        if not reports:
+            logger.warning(
+                '[财报拉取] %s report_list 为空 structure_count=%d',
+                ctx,
+                len(structure_list),
+            )
+        elif not structure_list:
+            logger.warning(
+                '[财报拉取] %s structure_list 为空 report_count=%d',
+                ctx,
+                len(reports),
+            )
+        empty_item_reports = sum(
+            1 for report in reports if not (report.get('item_list') or [])
+        )
+        if empty_item_reports:
+            logger.warning(
+                '[财报拉取] %s %d/%d 期 report 的 item_list 为空',
+                ctx,
+                empty_item_reports,
+                len(reports),
+            )
         return reports, None, structure_list
     except Exception as exc:
         logger.warning(
-            'get_financials_statements(statement=%s, type=%s) failed for %s: %s',
-            statement_type,
-            financial_type,
-            futu_code,
+            '[财报拉取] %s 返回空数据: 获取财报异常: %s',
+            ctx,
             exc,
         )
         return [], f'获取财报异常: {exc}', []
@@ -1105,15 +1401,36 @@ def _fetch_financial_reports(
 def _extract_profit_growth_from_report(
     report: Dict,
     structure_list: List[Dict],
+    futu_code: str,
     *,
     prefer_deducted: bool,
     allow_parent_fallback: bool = True,
+    main_index: bool = True,
+    prefer_hk_normal_operating_profit: bool = False,
+    income_reports: Optional[List[Dict]] = None,
 ) -> Tuple[Optional[float], Optional[str], Optional[str]]:
     item_list = [
         _normalize_financial_item(item)
         for item in (report.get('item_list') or [])
     ]
-    deducted_field_ids = _deducted_net_profit_field_ids(structure_list)
+    deducted_field_ids, _ = _deducted_net_profit_field_ids(
+        structure_list,
+        futu_code,
+        main_index=main_index,
+    )
+    parent_field_ids, _ = (
+        _parent_net_profit_field_ids(structure_list, futu_code)
+        if not main_index
+        else (set(), 'none')
+    )
+
+    if prefer_hk_normal_operating_profit:
+        growth = _extract_hk_normal_operating_profit_yoy_from_reports(
+            income_reports or [],
+            report.get('period_text'),
+        )
+        if growth is not None:
+            return growth, '正常经营利润同比', 'hk_normal_operating_profit'
 
     if prefer_deducted:
         growth = _extract_deducted_net_profit_yoy_from_items(
@@ -1125,7 +1442,10 @@ def _extract_profit_growth_from_report(
             return growth, label, 'deducted'
 
     if allow_parent_fallback:
-        growth = _extract_parent_net_profit_yoy_from_items(item_list)
+        growth = _extract_parent_net_profit_yoy_from_items(
+            item_list,
+            parent_field_ids=parent_field_ids or None,
+        )
         if growth is not None:
             label = _find_profit_growth_field_label(item_list, growth)
             return growth, label, 'parent'
@@ -1139,15 +1459,53 @@ def _load_latest_quarter_profit_growth(
 ) -> Tuple[Optional[float], Optional[str], Optional[str], Optional[str], Optional[str], Optional[str]]:
     """
     A 股：优先主要指标表扣非净利润同比；扣非缺失时再尝试利润表扣非，最后才回退归母。
-    港股：优先扣非，无则归母。
+    港股：利润表正常经营利润（5034-5032）同比。
     """
     last_error = None
     protocol_unsupported = False
     is_a_share = market == 'A'
+    is_hk = market == 'HK'
 
     for financial_type in (10, 9, 11):
         if protocol_unsupported:
             break
+
+        if is_hk:
+            income_reports, error, income_structure = _fetch_financial_reports(
+                quote_ctx,
+                futu_code,
+                statement_type=STATEMENT_INCOME,
+                financial_type=financial_type,
+            )
+            if error and ('未知的协议' in error or 'unknown protocol' in error.lower()):
+                protocol_unsupported = True
+                last_error = error
+                break
+            latest_income = _pick_latest_quarter_report(income_reports)
+            if latest_income:
+                growth, field_label, growth_kind = _extract_profit_growth_from_report(
+                    latest_income,
+                    income_structure,
+                    futu_code,
+                    prefer_deducted=False,
+                    allow_parent_fallback=False,
+                    main_index=False,
+                    prefer_hk_normal_operating_profit=True,
+                    income_reports=income_reports,
+                )
+                if growth is not None:
+                    return (
+                        growth,
+                        latest_income.get('period_text'),
+                        None,
+                        'financial_statements_income_hk_normal_operating_profit',
+                        field_label,
+                        growth_kind,
+                    )
+            last_error = '港股未找到正常经营利润同比增速'
+            if error:
+                last_error = error
+            continue
 
         main_reports, error, main_structure = _fetch_financial_reports(
             quote_ctx,
@@ -1165,8 +1523,10 @@ def _load_latest_quarter_profit_growth(
             growth, field_label, growth_kind = _extract_profit_growth_from_report(
                 latest_quarter,
                 main_structure,
+                futu_code,
                 prefer_deducted=True,
                 allow_parent_fallback=not is_a_share,
+                main_index=True,
             )
             if growth is not None:
                 return (
@@ -1191,8 +1551,10 @@ def _load_latest_quarter_profit_growth(
             growth, field_label, growth_kind = _extract_profit_growth_from_report(
                 latest_income,
                 income_structure,
+                futu_code,
                 prefer_deducted=True,
                 allow_parent_fallback=False,
+                main_index=False,
             )
             if growth is not None:
                 return (
@@ -1208,8 +1570,10 @@ def _load_latest_quarter_profit_growth(
                 growth, field_label, growth_kind = _extract_profit_growth_from_report(
                     latest_income,
                     income_structure,
+                    futu_code,
                     prefer_deducted=False,
                     allow_parent_fallback=True,
+                    main_index=False,
                 )
                 if growth is not None:
                     return (
@@ -1236,38 +1600,30 @@ def _load_latest_quarter_profit_growth(
 
 def _extract_parent_net_profit_from_items(
     item_list: List[Dict],
+    parent_field_ids: Optional[set] = None,
 ) -> Tuple[Optional[float], Optional[float]]:
-    """返回 (归母净利润金额, 同比增速%)，对应利润表 field 1047 等。"""
+    """返回 (归母净利润金额, 同比增速%)。"""
     if not item_list:
         return None, None
 
     normalized_items = [_normalize_financial_item(item) for item in item_list]
-    for field_id in PARENT_NET_PROFIT_FIELD_IDS:
-        for item in normalized_items:
-            if item.get('field_id') == field_id:
-                data = _metric_float(item.get('data'))
-                yoy = _item_yoy_only(item)
-                if data is not None:
-                    return data, yoy
+    if parent_field_ids:
+        for field_id in parent_field_ids:
+            for item in normalized_items:
+                if item.get('field_id') == field_id:
+                    data = _metric_float(item.get('data'))
+                    yoy = _item_yoy_only(item)
+                    if data is not None:
+                        return data, yoy
 
-    keywords = (
-        '归属于母公司所有者的净利润',
-        '归属母公司股东的净利润',
-        '归属母公司净利润',
-        '归属普通股股东净利润',
-        'net profit attributable',
-        'common stockholders',
-    )
     for item in normalized_items:
         display_name = str(item.get('display_name', ''))
-        lowered = display_name.lower()
-        if display_name == '净利润' or lowered == 'net profit':
+        if not _is_parent_net_profit_display_name(display_name):
             continue
-        if any(key in display_name or key in lowered for key in keywords):
-            data = _metric_float(item.get('data'))
-            yoy = _item_yoy_only(item)
-            if data is not None:
-                return data, yoy
+        data = _metric_float(item.get('data'))
+        yoy = _item_yoy_only(item)
+        if data is not None:
+            return data, yoy
     return None, None
 
 
@@ -1279,33 +1635,47 @@ def _extract_deducted_net_profit_from_items(
     if not item_list:
         return None, None
 
-    merged_field_ids = set(DEDUCTED_NET_PROFIT_FIELD_IDS)
-    if deducted_field_ids:
-        merged_field_ids.update(int(field_id) for field_id in deducted_field_ids)
-
     normalized_items = [_normalize_financial_item(item) for item in item_list]
-    for field_id in merged_field_ids:
-        for item in normalized_items:
-            if item.get('field_id') == field_id:
-                data = _metric_float(item.get('data'))
-                yoy = _item_yoy_only(item)
-                if data is not None:
-                    return data, yoy
+    if deducted_field_ids:
+        for field_id in deducted_field_ids:
+            for item in normalized_items:
+                if item.get('field_id') == field_id:
+                    data = _metric_float(item.get('data'))
+                    yoy = _item_yoy_only(item)
+                    if data is not None:
+                        return data, yoy
 
     for item in normalized_items:
         display_name = str(item.get('display_name', ''))
-        lowered = display_name.lower()
-        if _is_ratio_style_field(display_name):
-            continue
-        if '扣非' not in display_name and 'non-recurring' not in lowered and 'non recurring' not in lowered:
-            continue
-        if '净利润' not in display_name and 'net profit' not in lowered:
+        if not _is_deducted_net_profit_display_name(display_name):
             continue
         data = _metric_float(item.get('data'))
         yoy = _item_yoy_only(item)
         if data is not None:
             return data, yoy
     return None, None
+
+
+def _log_opend_environment(quote_ctx, futu_code: str) -> Optional[str]:
+    """记录 OpenD / futu-api 环境，便于对比生产与本地。"""
+    server_ver = None
+    try:
+        import futu as futu_pkg
+
+        ret, global_state = quote_ctx.get_global_state()
+        if ret == RET_OK and isinstance(global_state, dict):
+            server_ver = global_state.get('server_ver')
+        logger.info(
+            '[估值数据][%s] 环境 OpenD server_ver=%s futu-api=%s FUTU_HOST=%s FUTU_PORT=%s',
+            futu_code,
+            server_ver,
+            getattr(futu_pkg, '__version__', 'unknown'),
+            os.getenv('FUTU_HOST', '127.0.0.1'),
+            os.getenv('FUTU_PORT', '11111'),
+        )
+    except Exception as exc:
+        logger.warning('[估值数据][%s] 读取 OpenD 环境失败: %s', futu_code, exc)
+    return server_ver
 
 
 def _collect_quarter_deducted_series(
@@ -1334,10 +1704,22 @@ def _collect_quarter_deducted_series(
                 last_error = error
             continue
 
-        deducted_field_ids = _deducted_net_profit_field_ids(structure)
+        deducted_field_ids, resolve_source = _deducted_net_profit_field_ids(
+            structure,
+            futu_code,
+            main_index=True,
+        )
+        logger.info(
+            '[估值数据][%s] 扣非 field_id=%s source=%s structure_count=%d',
+            futu_code,
+            sorted(deducted_field_ids) if deducted_field_ids else [],
+            resolve_source,
+            len(structure or []),
+        )
         series: List[Dict] = []
         for report in reports:
-            if _report_financial_type(report) not in _QUARTERLY_F10_TYPES:
+            ft = _report_financial_type(report)
+            if ft not in _QUARTERLY_F10_TYPES:
                 continue
             item_list = report.get('item_list') or []
             profit, yoy = _extract_deducted_net_profit_from_items(
@@ -1355,23 +1737,42 @@ def _collect_quarter_deducted_series(
 
         if series:
             series.sort(key=lambda item: item['date_time'])
+            logger.info(
+                '[估值数据][%s] 扣非序列命中 financial_type=%s count=%d latest=%s',
+                futu_code,
+                financial_type,
+                len(series),
+                series[-1],
+            )
             return series, None
 
-    return [], last_error or '未找到季报扣非净利润数据'
+    if last_error and (
+        '未知的协议' in last_error
+        or 'unknown protocol' in last_error.lower()
+        or '不支持 get_financials_statements' in last_error
+    ):
+        logger.info('[估值数据][%s] 扣非序列失败 error=%r', futu_code, last_error)
+        return [], 'opend_unsupported'
+    logger.info(
+        '[估值数据][%s] 扣非序列为空 last_error=%r',
+        futu_code,
+        last_error,
+    )
+    return [], 'missing_deducted_net_profit'
 
 
-def _collect_quarter_net_profit_series(
+def _collect_hk_normal_operating_profit_series(
     quote_ctx,
     futu_code: str,
 ) -> Tuple[List[Dict], Optional[str]]:
-    """收集单季归母净利润序列（利润表 1047），按 date_time 升序。"""
+    """收集港股单季正常经营利润（5034-5032）序列（利润表），按 date_time 升序。"""
     last_error = None
     protocol_unsupported = False
 
     for financial_type in (10, 9, 11):
         if protocol_unsupported:
             break
-        reports, error, _structure = _fetch_financial_reports(
+        reports, error, structure = _fetch_financial_reports(
             quote_ctx,
             futu_code,
             statement_type=STATEMENT_INCOME,
@@ -1386,12 +1787,103 @@ def _collect_quarter_net_profit_series(
                 last_error = error
             continue
 
+        logger.info(
+            '[估值数据][%s] 港股正常经营利润 formula=5034-5032 structure_count=%d',
+            futu_code,
+            len(structure or []),
+        )
+
         series: List[Dict] = []
         for report in reports:
-            if _report_financial_type(report) not in _QUARTERLY_F10_TYPES:
+            ft = _report_financial_type(report)
+            if ft not in _QUARTERLY_F10_TYPES:
                 continue
             item_list = report.get('item_list') or []
-            profit, yoy = _extract_parent_net_profit_from_items(item_list)
+            profit, _ = _calc_hk_normal_operating_profit_from_items(item_list)
+            if profit is None:
+                continue
+            series.append({
+                'period': report.get('period_text'),
+                'date_time': report.get('date_time') or 0,
+                'profit': profit,
+                'yoy_percent': None,
+            })
+
+        if series:
+            series.sort(key=lambda item: item['date_time'])
+            _attach_prior_year_yoy_percent(series)
+            logger.info(
+                '[估值数据][%s] 港股正常经营利润序列命中 financial_type=%s count=%d latest=%s',
+                futu_code,
+                financial_type,
+                len(series),
+                series[-1],
+            )
+            return series, None
+
+    if last_error and (
+        '未知的协议' in last_error
+        or 'unknown protocol' in last_error.lower()
+        or '不支持 get_financials_statements' in last_error
+    ):
+        logger.info('[估值数据][%s] 港股正常经营利润序列失败 error=%r', futu_code, last_error)
+        return [], 'opend_unsupported'
+    logger.info(
+        '[估值数据][%s] 港股正常经营利润序列为空 last_error=%r',
+        futu_code,
+        last_error,
+    )
+    return [], 'missing_hk_non_ifrs_operating_profit'
+
+
+def _collect_quarter_net_profit_series(
+    quote_ctx,
+    futu_code: str,
+) -> Tuple[List[Dict], Optional[str]]:
+    """收集单季归母净利润序列（利润表），按 date_time 升序。"""
+    last_error = None
+    protocol_unsupported = False
+
+    for financial_type in (10, 9, 11):
+        if protocol_unsupported:
+            break
+        reports, error, structure = _fetch_financial_reports(
+            quote_ctx,
+            futu_code,
+            statement_type=STATEMENT_INCOME,
+            financial_type=financial_type,
+        )
+        if error and ('未知的协议' in error or 'unknown protocol' in error.lower()):
+            protocol_unsupported = True
+            last_error = error
+            break
+        if not reports:
+            if error:
+                last_error = error
+            continue
+
+        parent_field_ids, resolve_source = _parent_net_profit_field_ids(
+            structure,
+            futu_code,
+        )
+        logger.info(
+            '[估值数据][%s] 归母 field_id=%s source=%s structure_count=%d',
+            futu_code,
+            sorted(parent_field_ids) if parent_field_ids else [],
+            resolve_source,
+            len(structure or []),
+        )
+
+        series: List[Dict] = []
+        for report in reports:
+            ft = _report_financial_type(report)
+            if ft not in _QUARTERLY_F10_TYPES:
+                continue
+            item_list = report.get('item_list') or []
+            profit, yoy = _extract_parent_net_profit_from_items(
+                item_list,
+                parent_field_ids=parent_field_ids or None,
+            )
             if profit is None:
                 continue
             series.append({
@@ -1403,9 +1895,28 @@ def _collect_quarter_net_profit_series(
 
         if series:
             series.sort(key=lambda item: item['date_time'])
+            logger.info(
+                '[估值数据][%s] 归母序列命中 financial_type=%s count=%d latest=%s',
+                futu_code,
+                financial_type,
+                len(series),
+                series[-1],
+            )
             return series, None
 
-    return [], last_error or '未找到季报归母净利润数据'
+    if last_error and (
+        '未知的协议' in last_error
+        or 'unknown protocol' in last_error.lower()
+        or '不支持 get_financials_statements' in last_error
+    ):
+        logger.info('[估值数据][%s] 归母序列失败 error=%r', futu_code, last_error)
+        return [], 'opend_unsupported'
+    logger.info(
+        '[估值数据][%s] 归母序列为空 last_error=%r',
+        futu_code,
+        last_error,
+    )
+    return [], 'missing_parent_net_profit'
 
 
 def _format_yi_for_log(value: Optional[float]) -> str:
@@ -1431,7 +1942,7 @@ def _log_dynamic_pe_calculation(
         '[估值][%s] 动态 PE 计算过程:\n'
         '  公式: 动态 PE = 市值 ÷ (最新单季归母净利润 × 4)\n'
         '  市值 = %s\n'
-        '  最新单季归母净利润 (%s, 利润表 1047) = %s\n'
+        '  最新单季归母净利润 (%s) = %s\n'
         '  年化归母净利润 = 单季 × 4 = %s\n'
         '  动态 PE = %s ÷ %s = %s',
         futu_code,
@@ -1598,6 +2109,7 @@ def _build_valuation_scenario(
     growth_period: Optional[str] = None,
     profit_label: Optional[str] = None,
     profit_growth_field_label: Optional[str] = None,
+    compute_peg: bool = True,
 ) -> Dict:
     scenario: Dict = {
         'pe': pe,
@@ -1614,22 +2126,30 @@ def _build_valuation_scenario(
 
     if pe is None or pe <= 0:
         scenario['errors'].append('invalid_pe')
-    if growth_percent is None:
-        scenario['errors'].append('missing_growth')
-    elif growth_percent <= 0:
-        scenario['errors'].append('non_positive_growth')
-    if market_cap is None or market_cap <= 0 or profit is None or profit <= 0:
-        scenario['errors'].append('invalid_profit')
 
-    if not scenario['errors']:
-        scenario['peg'] = _calc_peg(pe, growth_percent)
-        scenario['payback_years'] = _calc_payback_years(market_cap, profit, growth_percent)
-        if scenario['peg'] is None:
-            scenario['errors'].append('invalid_peg')
-        if scenario['payback_years'] is None:
-            scenario['errors'].append('payback_unavailable')
+    if compute_peg:
+        if growth_percent is None:
+            scenario['errors'].append('missing_growth')
+        elif growth_percent <= 0:
+            scenario['errors'].append('non_positive_growth')
+        if market_cap is None or market_cap <= 0 or profit is None or profit <= 0:
+            scenario['errors'].append('invalid_profit')
+
+        peg_errors = {'missing_growth', 'non_positive_growth', 'invalid_profit', 'invalid_pe'}
+        if not peg_errors.intersection(scenario['errors']):
+            scenario['peg'] = _calc_peg(pe, growth_percent)
+            scenario['payback_years'] = _calc_payback_years(market_cap, profit, growth_percent)
+            if scenario['peg'] is None:
+                scenario['errors'].append('invalid_peg')
+            if scenario['payback_years'] is None:
+                scenario['errors'].append('payback_unavailable')
 
     return scenario
+
+
+def _append_unique_error(scenario: Dict, code: str) -> None:
+    if code not in scenario['errors']:
+        scenario['errors'].append(code)
 
 
 def _build_valuation_scenarios(
@@ -1644,37 +2164,42 @@ def _build_valuation_scenarios(
     pe_ttm: Optional[float],
 ) -> Tuple[Dict, Optional[str]]:
     net_quarters, net_error = _collect_quarter_net_profit_series(quote_ctx, futu_code)
-    deducted_quarters, deducted_error = _collect_quarter_deducted_series(quote_ctx, futu_code)
+    is_hk = market == 'HK'
+    if is_hk:
+        growth_quarters, growth_error = _collect_hk_normal_operating_profit_series(
+            quote_ctx,
+            futu_code,
+        )
+        growth_field_label = '正常经营利润同比'
+        growth_ttm_label = '正常经营利润 TTM 同比'
+        growth_ttm_profit_label = '正常经营利润 TTM'
+        missing_growth_code = 'missing_hk_non_ifrs_growth'
+        missing_series_code = 'missing_hk_non_ifrs_operating_profit'
+    else:
+        growth_quarters, growth_error = _collect_quarter_deducted_series(quote_ctx, futu_code)
+        growth_field_label = '扣非净利润同比'
+        growth_ttm_label = '扣非净利润 TTM 同比'
+        growth_ttm_profit_label = '扣非净利润 TTM'
+        missing_growth_code = 'missing_deducted_growth'
+        missing_series_code = 'missing_deducted_net_profit'
 
-    dynamic_scenario = _build_valuation_scenario(
-        pe=None,
-        growth_percent=None,
-        market_cap=market_cap,
-        profit=None,
-        growth_period=None,
-        profit_label='归母净利润（年化）',
-    )
-    ttm_scenario = _build_valuation_scenario(
-        pe=pe_ttm if pe_ttm is not None and pe_ttm > 0 else None,
-        growth_percent=None,
-        market_cap=market_cap,
-        profit=None,
-        growth_period=None,
-        profit_label='扣非净利润 TTM',
-    )
+    dynamic_scenario: Dict = {
+        'pe': None,
+        'profit_growth_percent': None,
+        'profit_growth_period': None,
+        'profit_label': None,
+        'profit_growth_field_label': None,
+        'market_cap_yi': market_cap / 1e8 if market_cap else None,
+        'profit_yi': None,
+        'peg': None,
+        'payback_years': None,
+        'errors': [],
+    }
 
     if not net_quarters:
-        err = net_error or '未找到季报归母净利润'
-        dynamic_scenario['errors'].append(err)
-    if not deducted_quarters:
-        err = deducted_error or '未找到季报扣非净利润'
-        ttm_scenario['errors'].append(err)
-
-    if net_quarters and deducted_quarters:
+        _append_unique_error(dynamic_scenario, net_error or 'missing_parent_net_profit')
+    elif not growth_quarters:
         latest_net = net_quarters[-1]
-        latest_deducted = deducted_quarters[-1]
-        annualized_net_profit = latest_net['profit'] * 4
-        annualized_deducted_profit = latest_deducted['profit'] * 4
         dynamic_pe = _calc_dynamic_pe_from_annualized_profit(
             market_cap,
             current_price,
@@ -1687,43 +2212,81 @@ def _build_valuation_scenarios(
             latest_net=latest_net,
             dynamic_pe=dynamic_pe,
         )
-
+        dynamic_scenario.update({
+            'pe': dynamic_pe,
+            'profit_growth_period': latest_net.get('period'),
+            'profit_label': '归母净利润（单季×4）',
+            'pe_static_reference': pe_static,
+        })
+        if dynamic_pe is None or dynamic_pe <= 0:
+            _append_unique_error(dynamic_scenario, 'invalid_pe')
+        _append_unique_error(
+            dynamic_scenario,
+            growth_error or missing_growth_code,
+        )
+    else:
+        latest_net = net_quarters[-1]
+        latest_growth = growth_quarters[-1]
+        annualized_growth_profit = latest_growth['profit'] * 4
+        dynamic_pe = _calc_dynamic_pe_from_annualized_profit(
+            market_cap,
+            current_price,
+            shares,
+            latest_net['profit'],
+        )
+        _log_dynamic_pe_calculation(
+            futu_code,
+            market_cap=market_cap,
+            latest_net=latest_net,
+            dynamic_pe=dynamic_pe,
+        )
         dynamic_scenario = _build_valuation_scenario(
             pe=dynamic_pe,
-            growth_percent=latest_deducted.get('yoy_percent'),
+            growth_percent=latest_growth.get('yoy_percent'),
             market_cap=market_cap,
-            profit=annualized_deducted_profit,
-            growth_period=latest_deducted.get('period'),
+            profit=annualized_growth_profit,
+            growth_period=latest_growth.get('period'),
             profit_label='归母净利润（单季×4）',
-            profit_growth_field_label='扣非净利润同比',
+            profit_growth_field_label=growth_field_label,
+            compute_peg=True,
         )
         dynamic_scenario['pe_static_reference'] = pe_static
-    elif net_quarters:
-        dynamic_scenario['errors'].append(
-            deducted_error or '未找到季报扣非净利润，无法计算增速与 PEG'
+
+    if not growth_quarters:
+        ttm_scenario = _build_valuation_scenario(
+            pe=pe_ttm if pe_ttm is not None and pe_ttm > 0 else None,
+            growth_percent=None,
+            market_cap=market_cap,
+            profit=None,
+            growth_period=None,
+            profit_label=growth_ttm_profit_label,
+            profit_growth_field_label=growth_ttm_label,
+            compute_peg=False,
         )
+        _append_unique_error(ttm_scenario, growth_error or missing_series_code)
+        if pe_ttm is None or pe_ttm <= 0:
+            _append_unique_error(ttm_scenario, 'missing_pe_ttm')
+    else:
+        ttm_profit, ttm_growth, ttm_period = _calc_ttm_deducted_metrics(
+            growth_quarters,
+            futu_code=futu_code,
+        )
+        ttm_scenario = _build_valuation_scenario(
+            pe=pe_ttm if pe_ttm is not None and pe_ttm > 0 else None,
+            growth_percent=ttm_growth,
+            market_cap=market_cap,
+            profit=ttm_profit,
+            growth_period=ttm_period,
+            profit_label=growth_ttm_profit_label,
+            profit_growth_field_label=growth_ttm_label,
+            compute_peg=ttm_growth is not None and ttm_profit is not None,
+        )
+        if ttm_growth is None and len(growth_quarters) < 8:
+            _append_unique_error(ttm_scenario, 'insufficient_quarters_for_ttm_growth')
+        if pe_ttm is None or pe_ttm <= 0:
+            _append_unique_error(ttm_scenario, 'missing_pe_ttm')
 
-    ttm_profit, ttm_growth, ttm_period = _calc_ttm_deducted_metrics(
-        deducted_quarters,
-        futu_code=futu_code,
-    )
-    ttm_scenario = _build_valuation_scenario(
-        pe=pe_ttm if pe_ttm is not None and pe_ttm > 0 else None,
-        growth_percent=ttm_growth,
-        market_cap=market_cap,
-        profit=ttm_profit,
-        growth_period=ttm_period,
-        profit_label='扣非净利润 TTM',
-        profit_growth_field_label='扣非净利润 TTM 同比',
-    )
-
-    if ttm_growth is None and len(deducted_quarters) < 8:
-        ttm_scenario['errors'].append('insufficient_quarters_for_ttm_growth')
-
-    if pe_ttm is None or pe_ttm <= 0:
-        ttm_scenario['errors'].append('missing_pe_ttm')
-
-    series_error = net_error or deducted_error
+    series_error = net_error or growth_error
     return {'dynamic': dynamic_scenario, 'ttm': ttm_scenario}, series_error
 
 
@@ -1735,6 +2298,7 @@ def get_stock_valuation_metrics(code: str, market: str) -> Dict:
     """
     futu_code = convert_to_futu_code(code, market)
     quote_ctx = get_quote_context()
+    opend_server_ver = _log_opend_environment(quote_ctx, futu_code)
 
     ret, snap_df = quote_ctx.get_market_snapshot([futu_code])
     if ret != RET_OK:
@@ -1751,6 +2315,19 @@ def get_stock_valuation_metrics(code: str, market: str) -> Dict:
     if shares is None or shares <= 0:
         shares = _metric_float(row.get('outstanding_shares'))
 
+    logger.info(
+        '[估值数据][%s] 快照 code=%s market=%s price=%s market_cap_yi=%s '
+        'pe_static=%s pe_ttm=%s shares=%s',
+        futu_code,
+        code,
+        market,
+        current_price,
+        _format_yi_for_log(market_cap),
+        pe_static,
+        pe_ttm,
+        shares,
+    )
+
     metrics: Dict = {
         'code': code,
         'name': str(row.get('name', '')) if pd.notna(row.get('name')) else '',
@@ -1760,6 +2337,7 @@ def get_stock_valuation_metrics(code: str, market: str) -> Dict:
         'market_cap': market_cap,
         'pe_static': pe_static,
         'pe_ttm': pe_ttm,
+        'opend_server_ver': opend_server_ver,
         'data_sources': ['market_snapshot', 'financial_statements_income', 'financial_statements_main_index'],
     }
 
@@ -1779,6 +2357,14 @@ def get_stock_valuation_metrics(code: str, market: str) -> Dict:
     metrics['scenarios'] = scenarios
     if series_error:
         metrics['profit_growth_error'] = series_error
+    logger.info(
+        '[估值数据][%s] 结果 dynamic_errors=%s ttm_errors=%s series_error=%r',
+        futu_code,
+        scenarios.get('dynamic', {}).get('errors'),
+        scenarios.get('ttm', {}).get('errors'),
+        series_error,
+    )
+    if series_error and not metrics.get('opend_server_ver'):
         try:
             ret, global_state = quote_ctx.get_global_state()
             if ret == RET_OK and isinstance(global_state, dict):

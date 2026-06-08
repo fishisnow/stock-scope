@@ -76,6 +76,22 @@ function verdictClass(verdict: PegVerdict): string {
   }
 }
 
+function scenarioErrorMessage(
+  code: string,
+  t: ReturnType<typeof useTranslations>
+): string {
+  const key = `scenarioErrors.${code}` as const
+  try {
+    const message = t(key as never)
+    if (!message || message.includes(`scenarioErrors.${code}`)) {
+      return t("scenarioErrors.unknown")
+    }
+    return message
+  } catch {
+    return t("scenarioErrors.unknown")
+  }
+}
+
 function ScenarioPanel({
   scenario,
   t,
@@ -135,7 +151,7 @@ function ScenarioPanel({
         <div className="space-y-1">
           {scenario.errors!.map((code) => (
             <p key={code} className="text-xs text-destructive">
-              {t(`scenarioErrors.${code}` as never)}
+              {scenarioErrorMessage(code, t)}
             </p>
           ))}
         </div>
@@ -363,10 +379,12 @@ export function PegPaybackCalculator() {
             <p className="text-sm text-destructive">
               {metrics.opend_server_ver
                 ? t("fetch.hintGrowthFailedWithOpend", {
-                    error: metrics.profit_growth_error,
+                    error: scenarioErrorMessage(metrics.profit_growth_error, t),
                     version: metrics.opend_server_ver,
                   })
-                : t("fetch.hintGrowthFailed", { error: metrics.profit_growth_error })}
+                : t("fetch.hintGrowthFailed", {
+                    error: scenarioErrorMessage(metrics.profit_growth_error, t),
+                  })}
             </p>
           ) : null}
         </div>

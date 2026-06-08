@@ -252,7 +252,15 @@
         "invalid_peg": "无法计算 PEG",
         "payback_unavailable": "无法计算盈利回收期",
         "insufficient_quarters_for_ttm_growth": "历史季报不足 8 期，无法计算扣非 TTM 同比增速",
-        "missing_pe_ttm": "缺少 TTM 市盈率"
+        "missing_pe_ttm": "缺少 TTM 市盈率",
+        "missing_parent_net_profit": "未找到季报归母净利润",
+        "missing_deducted_net_profit": "未找到季报扣非净利润",
+        "missing_deducted_growth": "未找到扣非净利润增速，无法计算 PEG",
+        "missing_hk_non_ifrs_operating_profit": "未找到港股正常经营利润（5034-5032）季报数据",
+        "missing_hk_non_ifrs_growth": "未找到正常经营利润增速，无法计算 PEG",
+        "financial_data_unavailable": "财报数据暂不可用",
+        "opend_unsupported": "OpenD 版本过低或不支持财报接口",
+        "unknown": "数据异常，请稍后重试"
       },
       "verdict": {
         "severe_under": "PEG < 0.5：严重低估（需确认增长可持续性）",

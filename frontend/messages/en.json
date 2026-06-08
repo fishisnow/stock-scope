@@ -252,7 +252,15 @@
         "invalid_peg": "Could not calculate PEG",
         "payback_unavailable": "Payback unavailable",
         "insufficient_quarters_for_ttm_growth": "Need 8+ quarters for TTM YoY core profit growth",
-        "missing_pe_ttm": "Missing TTM P/E"
+        "missing_pe_ttm": "Missing TTM P/E",
+        "missing_parent_net_profit": "Parent net profit quarterly data not found",
+        "missing_deducted_net_profit": "Core net profit quarterly data not found",
+        "missing_deducted_growth": "Core profit growth missing; cannot compute PEG",
+        "missing_hk_non_ifrs_operating_profit": "HK normal operating profit (5034-5032) quarterly data not found",
+        "missing_hk_non_ifrs_growth": "Normal operating profit growth missing; cannot compute PEG",
+        "financial_data_unavailable": "Financial statement data unavailable",
+        "opend_unsupported": "OpenD version too old or financial API unsupported",
+        "unknown": "Data error, please try again later"
       },
       "verdict": {
         "severe_under": "PEG < 0.5: severely undervalued (confirm sustainability)",
