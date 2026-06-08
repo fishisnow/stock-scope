@@ -95,9 +95,11 @@ function scenarioErrorMessage(
 function ScenarioPanel({
   scenario,
   t,
+  peNote,
 }: {
   scenario: ValuationScenario
   t: ReturnType<typeof useTranslations>
+  peNote?: string
 }) {
   const hasErrors = (scenario.errors?.length ?? 0) > 0
   const peg = scenario.peg
@@ -116,6 +118,9 @@ function ScenarioPanel({
           <p className="mt-0.5 text-lg font-semibold tabular-nums">
             {formatMetric(scenario.pe)}
           </p>
+          {peNote ? (
+            <p className="mt-1 text-[11px] leading-snug text-muted-foreground">{peNote}</p>
+          ) : null}
         </div>
         <div className="rounded-lg border border-border/60 bg-background/80 p-2.5">
           <p className="text-xs text-muted-foreground">
@@ -406,7 +411,13 @@ export function PegPaybackCalculator() {
             </TabsList>
             {metrics.scenarios.dynamic ? (
               <TabsContent value="dynamic" className="mt-3">
-                <ScenarioPanel scenario={metrics.scenarios.dynamic} t={t} />
+                <ScenarioPanel
+                  scenario={metrics.scenarios.dynamic}
+                  t={t}
+                  peNote={
+                    metrics.market === "HK" ? t("dynamicPeNoteHk") : undefined
+                  }
+                />
               </TabsContent>
             ) : null}
             {metrics.scenarios.ttm ? (

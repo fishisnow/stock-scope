@@ -240,6 +240,7 @@
       },
       "growthLabelFallback": "利润增速（%）",
       "resultPe": "PE",
+      "dynamicPeNoteHk": "基于归母净利润计算",
       "resultPeg": "PEG",
       "resultPayback": "盈利回收期",
       "paybackYearsValue": "{years} 年",

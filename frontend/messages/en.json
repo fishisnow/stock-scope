@@ -240,6 +240,7 @@
       },
       "growthLabelFallback": "Profit growth (%)",
       "resultPe": "PE",
+      "dynamicPeNoteHk": "Based on parent net profit",
       "resultPeg": "PEG",
       "resultPayback": "Payback period",
       "paybackYearsValue": "{years} years",
