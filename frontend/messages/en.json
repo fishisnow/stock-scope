@@ -215,6 +215,46 @@
         "generic": "Calculation failed, please try again"
       }
     },
+    "holdingPainCalculator": {
+      "badge": "Behavioral tool",
+      "title": "Holding Pain Index",
+      "description": "Enter an A-share, HK stock, or index to compute the 6-month holding pain index from daily bars.",
+      "marketLabel": "Market",
+      "marketA": "A-share",
+      "marketHK": "HK",
+      "queryLabel": "Stock / Index",
+      "queryPlaceholder": "e.g. 600519, 800804, SH.000906",
+      "tagStock": "Stock",
+      "tagIndex": "Index",
+      "directCode": "Direct code",
+      "searching": "Searching…",
+      "calculate": "Calculate pain index",
+      "calculating": "Calculating…",
+      "formulaHint": "Pain = (down days ÷ trading days) × (avg down move ÷ avg up move) × (max down streak ÷ 5)",
+      "lookbackHint": "Lookback: past 6 months",
+      "periodRange": "Range {start} ~ {end}",
+      "resultPainIndex": "Pain index",
+      "downDayRatio": "Down-day share",
+      "magnitudeRatio": "Down/up magnitude ratio",
+      "longestDownStreak": "Longest down streak",
+      "streakValue": "{days} days (factor {factor})",
+      "dayBreakdown": "Down / up / flat",
+      "dayBreakdownValue": "Down {down} · Up {up} · Flat {flat}",
+      "levels": {
+        "low": "Lower pain",
+        "medium": "Moderate pain",
+        "high": "Higher pain"
+      },
+      "errors": {
+        "queryRequired": "Enter a stock or index ticker/name",
+        "notFound": "No match found; pick from the dropdown",
+        "multipleMatches": "Multiple matches; pick from the dropdown",
+        "searchFailed": "Search failed",
+        "klineFailed": "Failed to fetch K-line data",
+        "insufficientData": "Not enough trading days in the past 6 months",
+        "generic": "Calculation failed, please try again"
+      }
+    },
     "pegPaybackCalculator": {
       "badge": "Valuation Tool",
       "title": "PEG & Profit Payback Period",
@@ -276,6 +316,33 @@
         "invalidPeg": "Could not calculate PEG",
         "invalidProfitInputs": "Market cap and TTM profit must be positive",
         "paybackUnavailable": "Payback unavailable (negative profit, growth too low, or never pays back)"
+      }
+    },
+    "leaderMetrics": {
+      "badge": "Today's leaders",
+      "title": "High gain & high turnover leaders",
+      "description": "Loads A-share and HK intersection leaders for the latest session with pain index, PEG, and payback period.",
+      "marketA": "A-share leaders",
+      "marketHK": "HK leaders",
+      "intersectionHint": "High gain ∩ high turnover",
+      "asOfDate": "As of {date}",
+      "loading": "Loading leader metrics…",
+      "stockLoading": "Queued for calculation…",
+      "stockFailed": "Failed to compute metrics",
+      "painUnavailable": "Pain index unavailable",
+      "valuationUnavailable": "Valuation metrics unavailable",
+      "loadFailed": "Failed to load leader metrics",
+      "pending": "Pending",
+      "painIndex": "Pain index",
+      "peg": "PEG",
+      "payback": "Payback",
+      "paybackYearsValue": "{years} years",
+      "amount": "Turnover",
+      "amountUnit": "B",
+      "painLevels": {
+        "low": "Low pain",
+        "medium": "Moderate pain",
+        "high": "High pain"
       }
     },
     "briefing": {

@@ -96,7 +96,7 @@ register_market_data_api(app, db=db, trading_date_utils=trading_date_utils)
 
 @app.route('/')
 def serve_root():
-    return redirect('/en/')
+    return redirect('/zh/')
 
 
 @app.route('/_next/<path:path>', strict_slashes=False)

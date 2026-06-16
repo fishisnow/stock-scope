@@ -387,6 +387,7 @@ def get_stock_price():
     try:
         code = request.args.get('code', '').strip()
         market = request.args.get('market', '').upper()
+        exchange = request.args.get('exchange', '').strip().upper() or None
 
         if not code or market not in ['A', 'HK']:
             return jsonify({
@@ -395,7 +396,7 @@ def get_stock_price():
             }), 400
 
         # 使用富途API获取实时价格信息
-        result = get_stock_current_price(code, market)
+        result = get_stock_current_price(code, market, exchange=exchange)
 
         return jsonify({
             "success": True,
@@ -476,6 +477,7 @@ def get_kline_history():
         end = request.args.get('end', '').strip()
         max_count = request.args.get('max_count', '1000').strip()
         ktype = request.args.get('ktype', 'K_DAY').strip().upper()
+        exchange = request.args.get('exchange', '').strip().upper() or None
         
         if not code or market not in ['A', 'HK'] or not start or not end:
             return jsonify({
@@ -494,7 +496,8 @@ def get_kline_history():
             start=start,
             end=end,
             max_count=max_count,
-            ktype=ktype
+            ktype=ktype,
+            exchange=exchange,
         )
         
         return jsonify({

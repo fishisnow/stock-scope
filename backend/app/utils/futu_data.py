@@ -6,10 +6,13 @@ import time
 import socket
 
 from futu import *
-from datetime import date
+from datetime import date, datetime, timedelta
 import pandas as pd
 from typing import Dict, List, Optional, Tuple
 import os
+
+from app.utils.futu_rate_limiter import financial_api_rate_limiter
+from app.utils.ttl_cache import LEADER_STOCK_METRICS_TTL_SECONDS, leader_stock_metrics_cache
 
 logger = logging.getLogger(__name__)
 
@@ -648,16 +651,17 @@ def get_above_ma20_stock_codes() -> set:
     return sh_codes.union(sz_codes)
 
 
-def get_stock_current_price(code: str, market: str) -> Dict:
+def get_stock_current_price(code: str, market: str, exchange: str = None) -> Dict:
     """
     获取指定股票的当前价格信息
-    
+
     :param code: 股票代码，如 '000001'
     :param market: 市场类型，'A' 或 'HK'
+    :param exchange: 交易所代码，'SH', 'SZ', 'HK'（指数等场景可选）
     :return: 包含股票价格信息的字典
     """
     try:
-        futu_code = convert_to_futu_code(code, market)
+        futu_code = convert_to_futu_code(code, market, exchange=exchange)
         quote_ctx = get_quote_context()
         
         ret_sub, err_message = _subscribe_if_needed(quote_ctx, [futu_code], SubType.QUOTE)
@@ -744,7 +748,7 @@ def get_stock_rt_data(code: str, market: str) -> List[Dict]:
         raise Exception(f"获取分时数据失败: {str(e)}")
 
 
-def get_stock_history_kline(code: str, market: str, start: str, end: str, max_count: int = 1000, ktype: str = "K_DAY") -> List[Dict]:
+def get_stock_history_kline(code: str, market: str, start: str, end: str, max_count: int = 1000, ktype: str = "K_DAY", exchange: str = None) -> List[Dict]:
     """
     获取指定股票的历史K线数据（默认日K）
     
@@ -753,6 +757,7 @@ def get_stock_history_kline(code: str, market: str, start: str, end: str, max_co
     :param start: 开始日期，格式 'YYYY-MM-DD'
     :param end: 结束日期，格式 'YYYY-MM-DD'
     :param max_count: 最大返回条数
+    :param exchange: 交易所代码，'SH', 'SZ', 'HK'（指数等场景可选）
     :return: K线数据列表，格式如下：
         [
             {
@@ -769,7 +774,7 @@ def get_stock_history_kline(code: str, market: str, start: str, end: str, max_co
     try:
         if ktype == "K_RT":
             return get_stock_rt_data(code, market)
-        futu_code = convert_to_futu_code(code, market)
+        futu_code = convert_to_futu_code(code, market, exchange=exchange)
         quote_ctx = get_quote_context()
         
         result = []
@@ -819,6 +824,286 @@ def get_stock_history_kline(code: str, market: str, start: str, end: str, max_co
         return result
     except Exception as e:
         raise Exception(f"获取K线历史数据失败: {str(e)}")
+
+
+HOLDING_PAIN_LOOKBACK_DAYS = 183
+HOLDING_PAIN_MIN_COMPARISONS = 20
+
+
+def calculate_holding_pain_index(bars: List[Dict]) -> Optional[Dict]:
+    """
+    持仓痛苦指数（过去半年日 K）：
+    (下跌天数/有效交易天数) × (平均下跌幅度/平均上涨幅度) × (最长连续下跌天数/5)
+    """
+    sorted_bars = sorted(
+        [bar for bar in bars if _metric_float(bar.get('close')) and _metric_float(bar.get('close')) > 0],
+        key=lambda item: item.get('date', ''),
+    )
+    if len(sorted_bars) < 2:
+        return None
+
+    down_days = 0
+    up_days = 0
+    flat_days = 0
+    down_magnitudes: List[float] = []
+    up_magnitudes: List[float] = []
+    longest_consecutive_down_days = 0
+    current_streak = 0
+
+    for index in range(1, len(sorted_bars)):
+        prev_close = _metric_float(sorted_bars[index - 1].get('close'))
+        close = _metric_float(sorted_bars[index].get('close'))
+        if prev_close is None or close is None or prev_close <= 0:
+            continue
+        change = (close - prev_close) / prev_close
+
+        if change < 0:
+            down_days += 1
+            down_magnitudes.append(abs(change))
+            current_streak += 1
+            longest_consecutive_down_days = max(longest_consecutive_down_days, current_streak)
+        elif change > 0:
+            up_days += 1
+            up_magnitudes.append(change)
+            current_streak = 0
+        else:
+            flat_days += 1
+            current_streak = 0
+
+    effective_trading_days = len(sorted_bars) - 1
+    if effective_trading_days < HOLDING_PAIN_MIN_COMPARISONS:
+        return None
+
+    down_day_ratio = down_days / effective_trading_days
+    avg_down_magnitude = sum(down_magnitudes) / len(down_magnitudes) if down_magnitudes else 0.0
+    avg_up_magnitude = sum(up_magnitudes) / len(up_magnitudes) if up_magnitudes else 0.0
+
+    if avg_up_magnitude > 0:
+        magnitude_ratio = avg_down_magnitude / avg_up_magnitude
+    elif avg_down_magnitude > 0:
+        magnitude_ratio = avg_down_magnitude / 0.0001
+    else:
+        magnitude_ratio = 0.0
+
+    streak_factor = longest_consecutive_down_days / 5
+    pain_index = down_day_ratio * magnitude_ratio * streak_factor
+
+    return {
+        'pain_index': pain_index,
+        'effective_trading_days': effective_trading_days,
+        'down_days': down_days,
+        'up_days': up_days,
+        'flat_days': flat_days,
+        'down_day_ratio': down_day_ratio,
+        'avg_down_magnitude': avg_down_magnitude,
+        'avg_up_magnitude': avg_up_magnitude,
+        'magnitude_ratio': magnitude_ratio,
+        'longest_consecutive_down_days': longest_consecutive_down_days,
+        'streak_factor': streak_factor,
+        'period_start': sorted_bars[0].get('date'),
+        'period_end': sorted_bars[-1].get('date'),
+    }
+
+
+def get_pain_level(pain_index: float) -> str:
+    if pain_index < 0.15:
+        return 'low'
+    if pain_index < 0.35:
+        return 'medium'
+    return 'high'
+
+
+def parse_futu_stock_code(code_raw: str, market: str) -> Tuple[str, str, Optional[str]]:
+    """解析富途代码，返回 (裸代码, 市场, 交易所)。"""
+    code_raw = str(code_raw or '').strip()
+    if '.' in code_raw:
+        exchange, bare = code_raw.split('.', 1)
+        resolved_market = 'HK' if exchange.upper() == 'HK' else 'A'
+        return bare, resolved_market, exchange.upper()
+    return code_raw, market, None
+
+
+def get_stock_holding_pain_metrics(
+    code: str,
+    market: str,
+    exchange: str = None,
+) -> Optional[Dict]:
+    end = datetime.now().strftime('%Y-%m-%d')
+    start = (datetime.now() - timedelta(days=HOLDING_PAIN_LOOKBACK_DAYS)).strftime('%Y-%m-%d')
+    bars = get_stock_history_kline(code, market, start, end, max_count=200, exchange=exchange)
+    return calculate_holding_pain_index(bars)
+
+
+def build_leader_stock_insight(stock: Dict, market: str) -> Dict:
+    code_raw = stock.get('code', '')
+    bare_code, resolved_market, exchange = parse_futu_stock_code(code_raw, market)
+
+    insight = {
+        'code': bare_code,
+        'futu_code': code_raw,
+        'name': stock.get('name', ''),
+        'change_ratio': stock.get('changeRatio'),
+        'amount': stock.get('amount'),
+        'pain_index': None,
+        'pain_level': None,
+        'pain_pending': True,
+        'peg': None,
+        'payback_years': None,
+        'peg_pending': True,
+    }
+
+    try:
+        pain = get_stock_holding_pain_metrics(bare_code, resolved_market, exchange=exchange)
+        if pain:
+            insight['pain_index'] = round(pain['pain_index'], 4)
+            insight['pain_level'] = get_pain_level(pain['pain_index'])
+            insight['pain_pending'] = False
+    except Exception as exc:
+        logger.debug('领涨股痛苦指数计算失败 %s: %s', code_raw, exc)
+
+    try:
+        metrics = get_stock_valuation_metrics(bare_code, resolved_market)
+        dynamic = (metrics.get('scenarios') or {}).get('dynamic') or {}
+        peg = dynamic.get('peg')
+        payback_years = dynamic.get('payback_years')
+        if peg is not None:
+            insight['peg'] = peg
+            insight['payback_years'] = payback_years
+            insight['peg_pending'] = False
+    except Exception as exc:
+        logger.debug('领涨股估值指标计算失败 %s: %s', code_raw, exc)
+
+    return insight
+
+
+def build_leader_stock_metrics(code: str, market: str, name: str = '') -> Dict:
+    """单只领涨股的痛苦指数与估值指标（完整字段）。"""
+    bare_code, resolved_market, exchange = parse_futu_stock_code(code, market)
+    cache_key = f'{resolved_market}:{bare_code}'
+
+    cached = leader_stock_metrics_cache.get(cache_key)
+    if cached is not None:
+        if name:
+            cached['name'] = name
+        return cached
+
+    result: Dict = {
+        'code': bare_code,
+        'name': name,
+        'market': resolved_market,
+        'pain': None,
+        'pain_error': None,
+        'valuation': None,
+        'valuation_error': None,
+    }
+
+    try:
+        result['pain'] = get_stock_holding_pain_metrics(bare_code, resolved_market, exchange=exchange)
+    except Exception as exc:
+        result['pain_error'] = str(exc)
+        logger.debug('领涨股痛苦指数计算失败 %s: %s', code, exc)
+
+    try:
+        result['valuation'] = get_stock_valuation_metrics(bare_code, resolved_market)
+    except Exception as exc:
+        result['valuation_error'] = str(exc)
+        logger.debug('领涨股估值指标计算失败 %s: %s', code, exc)
+
+    leader_stock_metrics_cache.set(cache_key, result, LEADER_STOCK_METRICS_TTL_SECONDS)
+    return result
+
+
+def get_market_leader_list(db, trading_date_utils, limit_per_market: int = 8) -> Dict:
+    """获取当日领涨榜（不含指标，供前端排队拉取）。"""
+    now = datetime.now()
+    before_open = now.hour < 9 or (now.hour == 9 and now.minute < 55)
+    end_date = (now - timedelta(days=1)).strftime('%Y-%m-%d') if before_open else now.strftime('%Y-%m-%d')
+    start_date = (now - timedelta(days=60)).strftime('%Y-%m-%d')
+
+    cn_days = set(trading_date_utils.get_trading_days_in_range(start_date, end_date, market="CN"))
+    hk_days = set(trading_date_utils.get_trading_days_in_range(start_date, end_date, market="HK"))
+    all_days = sorted(cn_days | hk_days, reverse=True)
+
+    result = {
+        'date': None,
+        'pending': True,
+        'stocks': [],
+    }
+
+    if not all_days:
+        return result
+
+    target_date = all_days[0]
+    result['date'] = target_date
+
+    stats = db.get_statistics_by_date(target_date, 'futu')
+    futu = stats.get('futu', {})
+    stocks_out: List[Dict] = []
+
+    for market in ('A', 'HK'):
+        market_data = futu.get(market, {})
+        intersection = market_data.get('intersection', [])
+        for stock in intersection[:limit_per_market]:
+            bare_code, resolved_market, _ = parse_futu_stock_code(stock.get('code', ''), market)
+            stocks_out.append({
+                'code': bare_code,
+                'name': stock.get('name', ''),
+                'market': resolved_market,
+                'change_ratio': stock.get('changeRatio'),
+                'amount': stock.get('amount'),
+            })
+
+    result['stocks'] = stocks_out
+    result['pending'] = len(stocks_out) == 0
+    return result
+
+
+def get_market_leader_insights(db, trading_date_utils, limit_per_market: int = 8) -> Dict:
+    """获取当日高涨幅∩高成交额领涨股的痛苦指数与 PEG 指标。"""
+    now = datetime.now()
+    before_open = now.hour < 9 or (now.hour == 9 and now.minute < 55)
+    end_date = (now - timedelta(days=1)).strftime('%Y-%m-%d') if before_open else now.strftime('%Y-%m-%d')
+    start_date = (now - timedelta(days=60)).strftime('%Y-%m-%d')
+
+    cn_days = set(trading_date_utils.get_trading_days_in_range(start_date, end_date, market="CN"))
+    hk_days = set(trading_date_utils.get_trading_days_in_range(start_date, end_date, market="HK"))
+    all_days = sorted(cn_days | hk_days, reverse=True)
+
+    result = {
+        'date': None,
+        'pending': True,
+        'markets': {
+            'A': {'pending': True, 'stocks': []},
+            'HK': {'pending': True, 'stocks': []},
+        },
+    }
+
+    if not all_days:
+        return result
+
+    target_date = all_days[0]
+    result['date'] = target_date
+
+    stats = db.get_statistics_by_date(target_date, 'futu')
+    futu = stats.get('futu', {})
+    has_any_leaders = False
+
+    for market in ('A', 'HK'):
+        market_data = futu.get(market, {})
+        intersection = market_data.get('intersection', [])
+        if not intersection:
+            result['markets'][market] = {'pending': True, 'stocks': []}
+            continue
+
+        has_any_leaders = True
+        stocks_out = [
+            build_leader_stock_insight(stock, market)
+            for stock in intersection[:limit_per_market]
+        ]
+        result['markets'][market] = {'pending': False, 'stocks': stocks_out}
+
+    result['pending'] = not has_any_leaders
+    return result
 
 
 def _metric_float(value) -> Optional[float]:
@@ -1333,6 +1618,7 @@ def _fetch_financial_reports(
         logger.warning('[财报拉取] %s 返回空数据: %s', ctx, error)
         return [], error, []
     try:
+        financial_api_rate_limiter.acquire()
         fin_ret, fin_data = quote_ctx.get_financials_statements(
             futu_code,
             statement_type=statement_type,

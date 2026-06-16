@@ -11,7 +11,12 @@ from datetime import datetime, timedelta
 from flask import Blueprint, jsonify, request
 
 from app.api.auth_middleware import optional_token_reauth_on_error, raise_if_auth_exception
-from app.utils.futu_data import get_market_snapshots_by_futu_codes
+from app.utils.futu_data import (
+    build_leader_stock_metrics,
+    get_market_leader_insights,
+    get_market_leader_list,
+    get_market_snapshots_by_futu_codes,
+)
 
 market_data_bp = Blueprint('market_data', __name__)
 
@@ -76,6 +81,47 @@ def get_futu_data(date):
             'data': data.get('futu', {}),
             'date': date
         })
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@market_data_bp.route('/api/market-leaders/list')
+def get_market_leader_list_api():
+    """获取当日领涨榜列表（不含指标）"""
+    try:
+        limit = int(request.args.get('limit', 8))
+        limit = max(1, min(limit, 20))
+        data = get_market_leader_list(_db, _trading_date_utils, limit_per_market=limit)
+        return jsonify({'success': True, 'data': data})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@market_data_bp.route('/api/market-leaders/metrics')
+def get_market_leader_stock_metrics_api():
+    """按顺序拉取单只领涨股的痛苦指数与估值指标"""
+    try:
+        code = (request.args.get('code') or '').strip()
+        market = (request.args.get('market') or '').upper()
+        name = (request.args.get('name') or '').strip()
+
+        if not code or market not in ('A', 'HK'):
+            return jsonify({'success': False, 'error': '缺少必需参数: code 或 market 无效'}), 400
+
+        data = build_leader_stock_metrics(code, market, name=name)
+        return jsonify({'success': True, 'data': data})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@market_data_bp.route('/api/market-leaders/insights')
+def get_market_leader_insights_api():
+    """获取当日领涨股（高涨幅∩高成交额）的痛苦指数与 PEG 指标"""
+    try:
+        limit = int(request.args.get('limit', 8))
+        limit = max(1, min(limit, 20))
+        data = get_market_leader_insights(_db, _trading_date_utils, limit_per_market=limit)
+        return jsonify({'success': True, 'data': data})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 

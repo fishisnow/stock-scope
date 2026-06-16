@@ -215,6 +215,46 @@
         "generic": "计算失败，请稍后重试"
       }
     },
+    "holdingPainCalculator": {
+      "badge": "行为金融工具",
+      "title": "持仓痛苦指数",
+      "description": "输入 A 股、港股个股或指数，基于过去半年日 K 计算持仓痛苦指数。",
+      "marketLabel": "市场",
+      "marketA": "A 股",
+      "marketHK": "港股",
+      "queryLabel": "个股 / 指数",
+      "queryPlaceholder": "如 600519、800804、SH.000906",
+      "tagStock": "个股",
+      "tagIndex": "指数",
+      "directCode": "代码输入",
+      "searching": "搜索中…",
+      "calculate": "计算痛苦指数",
+      "calculating": "计算中…",
+      "formulaHint": "痛苦指数 = (下跌天数÷有效交易天数) × (平均下跌幅度÷平均上涨幅度) × (最长连续下跌天数÷5)",
+      "lookbackHint": "统计区间：近半年",
+      "periodRange": "数据区间 {start} ~ {end}",
+      "resultPainIndex": "痛苦指数",
+      "downDayRatio": "下跌天数占比",
+      "magnitudeRatio": "跌涨幅度比",
+      "longestDownStreak": "最长连跌",
+      "streakValue": "{days} 天（系数 {factor}）",
+      "dayBreakdown": "涨跌平分布",
+      "dayBreakdownValue": "跌 {down} · 涨 {up} · 平 {flat}",
+      "levels": {
+        "low": "痛苦感较低",
+        "medium": "痛苦感中等",
+        "high": "痛苦感较高"
+      },
+      "errors": {
+        "queryRequired": "请输入个股或指数代码/名称",
+        "notFound": "未找到匹配标的，请从下拉列表选择",
+        "multipleMatches": "匹配到多个标的，请从下拉列表选择",
+        "searchFailed": "搜索失败",
+        "klineFailed": "获取 K 线数据失败",
+        "insufficientData": "近半年有效交易日不足，无法计算痛苦指数",
+        "generic": "计算失败，请稍后重试"
+      }
+    },
     "pegPaybackCalculator": {
       "badge": "估值工具",
       "title": "PEG 与盈利回收期",
@@ -276,6 +316,33 @@
         "invalidPeg": "无法计算 PEG",
         "invalidProfitInputs": "市值与 TTM 净利润须为正数",
         "paybackUnavailable": "无法计算盈利回收期（利润为负、增速过低或永远无法回本）"
+      }
+    },
+    "leaderMetrics": {
+      "badge": "今日领涨洞察",
+      "title": "高涨幅 & 高成交额领涨股",
+      "description": "自动加载 A 股与港股当日交集领涨榜，并计算痛苦指数、PEG 与盈利回收期。",
+      "marketA": "A 股领涨",
+      "marketHK": "港股领涨",
+      "intersectionHint": "高涨幅 ∩ 高成交额",
+      "asOfDate": "数据日期 {date}",
+      "loading": "加载领涨指标中…",
+      "stockLoading": "排队计算中…",
+      "stockFailed": "指标计算失败",
+      "painUnavailable": "痛苦指数暂不可用",
+      "valuationUnavailable": "估值指标暂不可用",
+      "loadFailed": "领涨指标加载失败",
+      "pending": "待计算",
+      "painIndex": "痛苦指数",
+      "peg": "PEG",
+      "payback": "盈利回收期",
+      "paybackYearsValue": "{years} 年",
+      "amount": "成交额",
+      "amountUnit": "亿",
+      "painLevels": {
+        "low": "痛苦感较低",
+        "medium": "痛苦感中等",
+        "high": "痛苦感较高"
       }
     },
     "briefing": {

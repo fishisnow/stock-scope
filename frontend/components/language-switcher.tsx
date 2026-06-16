@@ -13,8 +13,8 @@ import { Languages } from "lucide-react"
 import { useTransition } from 'react';
 
 const languages = [
-  { code: 'en', name: 'English', flag: '🇺🇸' },
   { code: 'zh', name: '中文', flag: '🇨🇳' },
+  { code: 'en', name: 'English', flag: '🇺🇸' },
 ];
 
 export function LanguageSwitcher() {
