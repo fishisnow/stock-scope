@@ -397,6 +397,11 @@
       "hongKong": "香港市场",
       "hongKongStock": "香港股票市场"
     },
+    "detail": {
+      "backToMarket": "返回市场",
+      "industryDetail": "行业详情",
+      "industryDetailDesc": "查看该行业实时成分股与近期宽度趋势"
+    },
     "date": {
       "lastUpdated": "最后更新",
       "loadingDates": "加载日期中...",
@@ -433,6 +438,10 @@
       "industryStocksTableTitle": "{industry}（展示 {selected} / {total} 只）",
       "industryStocksCountText": "展示 {selected} / {total} 只",
       "backToMarket": "返回市场",
+      "latestBreadth": "最新行业宽度",
+      "latestDate": "统计日期",
+      "trendTitle": "行业宽度趋势",
+      "trendDesc": "近 30 个交易日该行业高于 MA20 的股票占比",
       "thresholdHint": "当市场宽度指标接近或超过特定阈值（如 85%）时，可能预示着市场处于阶段性顶部；当指标接近或低于另一个阈值（如 15%）时，则可能预示着市场处于阶段性底部。",
       "loading": "加载市场宽度中...",
       "noData": "暂无市场宽度数据",

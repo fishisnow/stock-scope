@@ -119,7 +119,7 @@ function StockTable({
                   {t("table.rank")}
                 </th>
                 <th className="py-3 px-2 text-left text-[10px] sm:text-xs font-bold uppercase tracking-wide text-muted-foreground min-w-[80px]">
-                  {t("table.name")}
+                  {t("table.stock")}
                 </th>
                 <th className="py-3 px-2 text-right text-[10px] sm:text-xs font-bold uppercase tracking-wide text-muted-foreground whitespace-nowrap">
                   <button type="button" onClick={() => handleSort("amount")} className="inline-flex items-center gap-1 hover:text-primary">
@@ -247,7 +247,11 @@ export default function IndustryStocksPage() {
   const t = useTranslations("market")
   const locale = useLocale()
   const searchParams = useSearchParams()
-  const industry = searchParams.get("industry") || ""
+  const industry = useMemo(() => {
+    const raw = searchParams.get("industry") || ""
+    // 兼容旧链接：industry=半导体?breadth=83.14
+    return raw.split("?")[0].split("&")[0].trim()
+  }, [searchParams])
   const industryLabel = useMemo(() => getLocalizedIndustryName(industry, locale), [industry, locale])
   const breadthValue = useMemo(() => {
     const raw = searchParams.get("breadth")
@@ -305,13 +309,15 @@ export default function IndustryStocksPage() {
         }
 
         const breadthResult = await breadthResponse.json()
-        if (breadthResult.success && Array.isArray(breadthResult.data)) {
-          const series = breadthResult.data
+        if (breadthResult.success) {
+          const payload = breadthResult.data as MarketBreadthData | undefined
+          const records = Array.isArray(payload?.records) ? payload.records : []
+          const series = records
             .map((item: MarketBreadthRecord) => ({
               date: item.date,
               value: parseBreadthIndex(item.breadth_pct) ?? 0,
             }))
-            .reverse()
+            .sort((a, b) => a.date.localeCompare(b.date))
           setBreadthSeries(series)
         } else {
           setBreadthSeries([])
@@ -376,7 +382,7 @@ export default function IndustryStocksPage() {
               {breadthSeriesLoading ? (
                 <div className="flex h-full items-center justify-center text-sm text-muted-foreground">{t("loading")}</div>
               ) : breadthSeries.length === 0 ? (
-                <div className="flex h-full items-center justify-center text-sm text-muted-foreground">{t("errors.failedToLoadData")}</div>
+                <div className="flex h-full items-center justify-center text-sm text-muted-foreground">{t("breadth.noData")}</div>
               ) : (
                 <ResponsiveContainer width="100%" height="100%">
                   <LineChart data={breadthSeries} margin={{ top: 10, right: 12, left: -12, bottom: 0 }}>

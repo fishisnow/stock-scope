@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription } from "@/components/ui/card"
 import { useAuth } from "@/lib/auth-context"
 import { usePathname, useRouter } from "@/i18n/routing"
 import { useLocale, useTranslations } from "next-intl"
-import { Clock3, Loader2, Lock, Send, Sparkles } from "lucide-react"
+import { Clock3, Loader2, Lock, Sparkles } from "lucide-react"
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "/api"
 const PAGE_SIZE = 10
@@ -146,7 +146,7 @@ export default function BriefingPage() {
     <div className="min-h-screen bg-background">
       <Header />
 
-      <main className="page-shell py-6 h-[calc(100vh-4rem)] overflow-hidden flex flex-col">
+      <main className="w-full px-4 sm:px-6 lg:px-8 py-6 h-[calc(100vh-4rem)] overflow-hidden flex flex-col">
         <div className="text-center mb-2 shrink-0">
           <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-secondary mb-6">
             <Sparkles className="h-4 w-4 text-primary" />
@@ -155,7 +155,7 @@ export default function BriefingPage() {
           <p className="-mt-3 text-xs sm:text-sm text-muted-foreground">{t("disclaimer")}</p>
         </div>
 
-        <div className="mx-auto w-full max-w-4xl rounded-2xl border border-border bg-secondary/35 p-2 sm:p-3 flex-1 min-h-0 flex flex-col">
+        <div className="w-full rounded-2xl border border-border bg-secondary/35 p-2 sm:p-3 flex-1 min-h-0 flex flex-col">
           <section ref={chatScrollRef} className="space-y-2 flex-1 min-h-0 overflow-y-auto pr-1">
             <div className="flex justify-end items-start gap-2">
               <div
@@ -260,25 +260,6 @@ export default function BriefingPage() {
               <div className="py-2 text-center text-xs text-muted-foreground">{t("historyEnd")}</div>
             )}
           </section>
-
-          <div className="shrink-0 mt-2 rounded-xl border border-border/70 bg-background/90 px-2 py-2">
-            <div className="flex items-center gap-2">
-              <input
-                value=""
-                readOnly
-                placeholder=""
-                className="h-9 w-full rounded-md border border-border bg-background px-3 text-sm text-muted-foreground outline-none"
-              />
-              <button
-                type="button"
-                disabled
-                aria-label={t("sendDisabled")}
-                className="h-9 w-9 shrink-0 rounded-md border border-border bg-secondary text-muted-foreground grid place-items-center"
-              >
-                <Send className="h-4 w-4" />
-              </button>
-            </div>
-          </div>
         </div>
       </main>
     </div>

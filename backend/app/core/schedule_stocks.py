@@ -4,6 +4,7 @@ import math
 import time
 import traceback
 from datetime import datetime
+from urllib.parse import urlencode
 
 import schedule
 
@@ -48,10 +49,12 @@ def _stock_row_cells(stock, *, with_amount=False):
 
 def _stock_name_link(stock, market):
     stock_code = str(stock['code']).split('.')[-1]
-    return (
-        f"[{stock['name']}](https://invest.fishisnow.xyz/zh/stock/"
-        f"{market}/{stock_code}?name={stock['name']})"
-    )
+    query = urlencode({
+        'market': market,
+        'code': stock_code,
+        'name': stock['name'],
+    })
+    return f"[{stock['name']}](https://invest.fishisnow.xyz/zh/stock?{query})"
 
 
 def futu_job():

@@ -409,16 +409,16 @@ export default function MarketPage() {
   }
 
   const getIndustryDetailHref = (industry: string) => {
-    const base = `/market/industry?industry=${encodeURIComponent(industry)}`
-    if (!breadthData || breadthData.dates.length === 0) return base
-    const latestDate = breadthData.dates[0]
-    const latestBreadth = getBreadthValue(latestDate, industry, "industry")
-    if (latestBreadth === null) return base
-    const params = new URLSearchParams({
-      breadth: latestBreadth.toFixed(2),
-      breadthDate: latestDate,
-    })
-    return `${base}?${params.toString()}`
+    const params = new URLSearchParams({ industry })
+    if (breadthData && breadthData.dates.length > 0) {
+      const latestDate = breadthData.dates[0]
+      const latestBreadth = getBreadthValue(latestDate, industry, "industry")
+      if (latestBreadth !== null) {
+        params.set("breadth", latestBreadth.toFixed(2))
+        params.set("breadthDate", latestDate)
+      }
+    }
+    return `/market/industry?${params.toString()}`
   }
   const handleDateChange = (date: string) => {
     setSelectedDate(date)

@@ -397,6 +397,11 @@
       "hongKong": "Hong Kong Market",
       "hongKongStock": "Hong Kong Stock Market"
     },
+    "detail": {
+      "backToMarket": "Back to Market",
+      "industryDetail": "Industry Detail",
+      "industryDetailDesc": "Realtime constituents and recent breadth trend for this industry"
+    },
     "date": {
       "lastUpdated": "Last updated",
       "loadingDates": "Loading dates...",
@@ -432,6 +437,10 @@
       "industryStocksTableTitle": "{industry} (showing {selected} / {total})",
       "industryStocksCountText": "Showing {selected} / {total}",
       "backToMarket": "Back to Market",
+      "latestBreadth": "Latest breadth",
+      "latestDate": "As of",
+      "trendTitle": "Industry breadth trend",
+      "trendDesc": "Share of stocks above MA20 in this industry over the last 30 sessions",
       "thresholdHint": "When market breadth approaches or exceeds a specific threshold (e.g., 85%), it may signal a cyclical peak; when it nears or falls below another threshold (e.g., 15%), it may signal a cyclical bottom.",
       "loading": "Loading market breadth...",
       "index": "Index",
